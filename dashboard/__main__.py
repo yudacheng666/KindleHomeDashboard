@@ -6,7 +6,7 @@ import re
 import signal
 from threading import Event
 
-from .http_api import API, LocalServer
+from .http_api import API, LocalServer, tls_context
 from .household import Household
 from .runtime import Runtime, Window
 from .service import BusService
@@ -32,6 +32,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True)
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--tls-cert", help="Optional private certificate for loopback HTTPS preview")
+    parser.add_argument("--tls-key", help="Private key matching the certificate")
     parser.add_argument("--enable-bus", action="store_true")
     parser.add_argument("--enable-household", action="store_true")
     parser.add_argument("--timezone", default="Asia/Shanghai")
@@ -40,6 +42,8 @@ def main():
     args = parser.parse_args()
     if args.enable_bus and not args.window:
         parser.error("Explicit collection windows required when enabling bus")
+    if bool(args.tls_cert) != bool(args.tls_key):
+        parser.error("Specify both TLS certificate and key")
     lock_fd = None
     try:
         # Own the private volume for the entire process lifetime.
@@ -51,7 +55,8 @@ def main():
         runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone)
         household = Household(args.directory) if args.enable_household else None
         api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household)
-        with LocalServer(api, args.port) as server:
+        tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
+        with LocalServer(api, args.port, tls=tls) as server:
             stopping = Event()
             def stop_signal(signum, frame):
                 stopping.set()
