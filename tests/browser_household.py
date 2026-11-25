@@ -96,12 +96,22 @@ def main():
                 home.add_poster("Fictional reminder",None,"2026-01-05",task_id=task["id"])
                 home.set_menu("2026-01-05","dinner",["Fictional dish"],["Fictional ingredient"])
                 home.import_ingredients("2026-01-05","2026-01-05")
+                click("today")
+                wait(lambda:text_in("content","保存轮播设置"))
+                # Wait for the async admin overview to finish before editing.
+                wait(lambda:text_in("content","Fictional browser task"))
+                button("content","保存轮播设置")
+                js("var a=document.querySelectorAll('#editor select');a[0].value='120';a[3].value='true'")
+                button("editor","保存")
+                wait(lambda:home.view("2026-01-05")["display_settings"]["autoplay"])
+                wait(lambda:js("return document.getElementById('editor').className==='hidden'"))
                 click("logout")
                 wait(lambda:js("return document.getElementById('home').className==='hidden'"))
                 go("/display")
                 js("document.getElementById('token').value=arguments[0]",[reader])
                 click("connect")
                 wait(lambda:text_in("heading","今日生活"))
+                assert text_in("pause","暂停轮播")
                 click("next");assert text_in("body","Fictional browser task")
                 click("next");assert text_in("heading","Fictional reminder")
                 click("next");assert text_in("body","Fictional dish")
@@ -113,7 +123,7 @@ def main():
                 assert js("return document.getElementById('login').className==='hidden'")
                 click("logout")
                 assert js("return document.getElementById('body').textContent==='' && document.getElementById('display').className==='hidden'")
-                print("Real Chromium PASS: create task, persisted content, linked poster, menu, single-session module switch and logout")
+                print("Real Chromium PASS: create task, persisted content, linked poster, menu, saved rotation, single-session module switch and logout")
             finally:
                 if sid:
                     try:
