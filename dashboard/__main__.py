@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from .http_api import API, LocalServer
+from .household import Household
 from .runtime import Runtime, Window
 from .service import BusService
 from .trip_store import TripStore
@@ -31,6 +32,7 @@ def main():
     parser.add_argument("--directory", required=True)
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--enable-bus", action="store_true")
+    parser.add_argument("--enable-household", action="store_true")
     parser.add_argument("--timezone", default="Asia/Shanghai")
     parser.add_argument("--window", action="append", type=window_arg, default=[])
     parser.add_argument("--daily-limit", type=int, default=1000)
@@ -46,7 +48,8 @@ def main():
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         bus = BusService(args.directory, enabled=args.enable_bus, daily_limit=args.daily_limit)
         runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone)
-        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"))
+        household = Household(args.directory) if args.enable_household else None
+        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household)
         with LocalServer(api, args.port) as server:
             runtime.start()
             try:
