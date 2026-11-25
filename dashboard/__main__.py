@@ -8,6 +8,7 @@ from threading import Event
 
 from .http_api import API, LocalServer, tls_context
 from .household import Household
+from .devices import Devices
 from .runtime import Runtime, Window
 from .service import BusService
 from .trip_store import TripStore
@@ -36,6 +37,7 @@ def main():
     parser.add_argument("--tls-key", help="Private key matching the certificate")
     parser.add_argument("--enable-bus", action="store_true")
     parser.add_argument("--enable-household", action="store_true")
+    parser.add_argument("--enable-pairing", action="store_true", help="Local HTTPS pairing preview")
     parser.add_argument("--timezone", default="Asia/Shanghai")
     parser.add_argument("--window", action="append", type=window_arg, default=[])
     parser.add_argument("--daily-limit", type=int, default=1000)
@@ -44,6 +46,8 @@ def main():
         parser.error("Explicit collection windows required when enabling bus")
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error("Specify both TLS certificate and key")
+    if args.enable_pairing and not args.tls_cert:
+        parser.error("Pairing requires HTTPS")
     lock_fd = None
     try:
         # Own the private volume for the entire process lifetime.
@@ -54,8 +58,9 @@ def main():
         bus = BusService(args.directory, enabled=args.enable_bus, daily_limit=args.daily_limit)
         runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone)
         household = Household(args.directory) if args.enable_household else None
-        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household)
         tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
+        devices = Devices(args.directory) if args.enable_pairing else None
+        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, devices=devices)
         with LocalServer(api, args.port, tls=tls) as server:
             stopping = Event()
             def stop_signal(signum, frame):
