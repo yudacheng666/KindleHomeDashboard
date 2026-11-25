@@ -26,6 +26,9 @@ jobs:
           node tests/test_home_ui.js
           node --check dashboard/web/display.js
           node tests/test_display_ui.js
+      - name: Real household browser integration
+        if: github.event_name == 'pull_request' && github.base_ref == 'feat/bus-adapter'
+        run: PYTHONPATH=. python3 tests/browser_household.py
       - name: Scan Git history for secrets
         run: |
           docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.24.3 git /repo --redact --no-banner
