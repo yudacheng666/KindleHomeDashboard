@@ -3,7 +3,7 @@
 "use strict";
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
-var refreshTimer=null, rotationTimer=null, lastRender="";
+var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", connected=false;
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -39,7 +39,7 @@ function render(){
 }
 function stopRotation(){clearTimeout(rotationTimer);rotationTimer=null;}
 function scheduleRotation(){
-  stopRotation();if(!running||editing||!data||document.hidden||pages.filter(eligible).length<2)return;
+  stopRotation();if(mode!=="family"||!running||editing||!data||document.hidden||pages.filter(eligible).length<2)return;
   rotationTimer=setTimeout(function(){
     rotationTimer=null;advance(1,true);scheduleRotation();
   },seconds*1000);
@@ -60,6 +60,35 @@ function accept(v){
   if(!running||pages.filter(eligible).length<2)stopRotation();
   else if(rotationTimer===null||found<0)scheduleRotation();
 }
+function acceptBus(v){
+  data=null;pages=[];cursor=0;stopRotation();
+  var s=v.snapshot,t=v.trip;
+  var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
+  var vehicles=(s.status==="live"||s.status==="stale")?s.vehicles:[];
+  var key=JSON.stringify([t,s.status,vehicles,s.scheduled_departures,vehicles.length?s.fetched_at:""]);
+  if(key!==lastRender){
+    lastRender=key;txt("date","");txt("heading",t?t.line.name:"实时公交");txt("index","");
+    var root=el("body");clear(root);
+    if(t)append(root,"p",t.boarding.name+" → "+t.destination.name);
+    append(root,"p",labels[s.status]||"状态未知","note");
+    vehicles.forEach(function(v){
+      append(root,"p",v.position===1?"最近一辆":"下一辆","note");
+      append(root,"p",v.eta_min+" 分钟","eta");
+      var a=[];if(v.distance_m!=null)a.push(v.distance_m+" 米");
+      if(v.stops_remaining!=null)a.push("剩余 "+v.stops_remaining+" 站");
+      if(a.length)append(root,"p",a.join(" · "),"note");
+    });
+    if(s.scheduled_departures&&s.status!=="stale")append(root,"p","计划待发车 "+s.scheduled_departures+" 辆（非实时 ETA）","note");
+    if(vehicles.length)append(root,"p","最近有效采集（UTC）："+s.fetched_at.replace("T"," ").slice(0,19),"note");
+  }
+  show("login",false);show("display",true);txt("status","");
+}
+function switchMode(next){
+  if(!token||next===mode)return;
+  epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;editing=false;
+  show("options",false);mode=next;
+  show("familyControls",mode==="family");hide("正在读取");refresh();
+}
 function hide(reason){
   data=null;pages=[];cursor=0;lastRender="";stopRotation();
   txt("date","");txt("heading","");clear(el("body"));txt("index","");txt("status",reason);
@@ -69,23 +98,27 @@ function refresh(){
   busy=true;var g=epoch,x=new XMLHttpRequest(),ended=false,timeout;
   function finish(ok,v,status){
     if(ended)return;ended=true;clearTimeout(timeout);if(g!==epoch)return;busy=false;
-    if(ok){accept(v);}
-    else{hide(status===401?"令牌无效，请重新连接。":status===404?"家庭模块未启用。":"连接异常，家庭内容已隐藏。");
+    if(ok){connected=true;if(mode==="bus")acceptBus(v);else accept(v);}
+    else if(status===404&&mode==="family"){connected=true;show("login",false);show("display",true);hide("家庭模块未启用，可切换至公交。");}
+    else{hide(status===401?"令牌无效，请重新连接。":status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
       if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
-    clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,30000);
+    clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,mode==="bus"?15000:30000);
   }
-  try{x.open("GET","/api/home/view",true);x.setRequestHeader("Authorization","Bearer "+token);
+  try{x.open("GET",mode==="bus"?"/api/bus/view":"/api/home/view",true);x.setRequestHeader("Authorization","Bearer "+token);
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
-      finish(x.status===200&&v&&Array.isArray(v.tasks)&&Array.isArray(v.posters)&&Array.isArray(v.today_menu)&&Array.isArray(v.week_menu)&&Array.isArray(v.shopping),v,x.status);};
+      var valid=v&&(mode==="bus"?v.snapshot&&Array.isArray(v.snapshot.vehicles):Array.isArray(v.tasks)&&Array.isArray(v.posters)&&Array.isArray(v.today_menu)&&Array.isArray(v.week_menu)&&Array.isArray(v.shopping));
+      finish(x.status===200&&valid,v,x.status);};
     timeout=setTimeout(function(){finish(false,null,0);try{x.abort();}catch(e){}},12000);x.send(null);
   }catch(e){finish(false,null,0);}
 }
 function reset(){
-  epoch++;busy=false;token="";running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
+  epoch++;busy=false;token="";connected=false;mode="family";show("familyControls",true);running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   show("options",false);show("display",false);show("login",true);
 }
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(token)refresh();};
+el("familyMode").onclick=function(){switchMode("family");};
+el("busMode").onclick=function(){switchMode("bus");};
 el("previous").onclick=function(){if(editing)return;running=false;stopRotation();advance(-1,false);};
 el("next").onclick=function(){if(editing)return;running=false;stopRotation();advance(1,false);};
 el("pause").onclick=function(){if(!data||editing)return;running=!running;render();scheduleRotation();};
