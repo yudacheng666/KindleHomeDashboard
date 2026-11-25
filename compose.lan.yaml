@@ -14,6 +14,11 @@ services:
     cpus: 0.5
     pids_limit: 32
     stop_grace_period: 35s
+    environment:
+      KHD_BUS_ENABLED: "${KHD_BUS_ENABLED:-0}"
+      KHD_BUS_WINDOWS: "${KHD_BUS_WINDOWS:-}"
+      KHD_TIMEZONE: "${KHD_TIMEZONE:-Asia/Shanghai}"
+      KHD_BUS_DAILY_LIMIT: "${KHD_BUS_DAILY_LIMIT:-1000}"
     volumes:
       - type: bind
         source: "${KHD_DATA_DIR:?Set an absolute private data directory}"
