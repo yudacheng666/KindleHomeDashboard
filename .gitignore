@@ -1,0 +1,21 @@
+# Local and private data must also live outside the repository.
+.env
+.env.*
+!.env.example
+*.local.*
+private/
+config.local/
+data/
+state/
+cache/
+logs/
+backups/
+*.log
+*.db
+*.sqlite*
+*.pem
+*.key
+*.p12
+*.zip
+__pycache__/
+.venv/
