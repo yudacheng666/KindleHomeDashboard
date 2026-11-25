@@ -1,0 +1,29 @@
+# Local integration only. No published ports or host networking.
+services:
+  dashboard:
+    build:
+      context: .
+    image: kindle-home-dashboard:dev
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+    stop_grace_period: 35s
+    env_file:
+      - "${KHD_PRIVATE_ENV:?Set an absolute private token env file}"
+    volumes:
+      - type: bind
+        source: "${KHD_DATA_DIR:?Set an absolute private data directory}"
+        target: /var/lib/khd
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    command: ["--directory","/var/lib/khd","--enable-household"]
+    # Deliberately no ports, no network_mode: host, no Docker socket.

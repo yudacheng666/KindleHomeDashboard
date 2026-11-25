@@ -22,6 +22,24 @@ jobs:
         run: |
           node --check dashboard/web/bus.js
           node tests/test_bus_ui.js
+          node --check dashboard/web/home.js
+          node tests/test_home_ui.js
+          node --check dashboard/web/display.js
+          node tests/test_display_ui.js
+      - name: Real household browser integration
+        if: github.event_name == 'pull_request' && github.base_ref == 'feat/bus-adapter'
+        run: PYTHONPATH=. python3 tests/browser_household.py
       - name: Scan Git history for secrets
         run: |
           docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.24.3 git /repo --redact --no-banner
+
+  docker-smoke:
+    if: github.event_name == 'pull_request' && github.base_ref == 'feat/bus-adapter'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Build and exercise private local container
+        run: bash tests/docker_smoke.sh

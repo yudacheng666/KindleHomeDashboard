@@ -1,6 +1,7 @@
 /* ES5 and XMLHttpRequest for older browsers. No storage or external assets. */
 (function () {
 "use strict";
+var access=typeof window!=="undefined"&&window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", admin=false, busy=false, generation=0, configuring=false;
 var lines=[], stops=[], handle="", lastKey="", timer=null;
 function el(id){return document.getElementById(id);}
@@ -28,7 +29,7 @@ function request(method,path,body,done){
     disable(false);done(ok,data);
   }
   try{
-    x.open(method,path,true);x.setRequestHeader("Authorization","Bearer "+token);
+    x.open(method,path,true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
     if(body!==null)x.setRequestHeader("Content-Type","application/json");
     x.onreadystatechange=function(){
       if(x.readyState!==4)return;
@@ -86,10 +87,12 @@ function exit(){
 el("connect").onclick=function(){
   if(busy)return;token=el("token").value;el("token").value="";
   admin=el("mode").value==="admin";
-  request("GET","/api/bus/view",null,function(ok,data){
+  if(direct&&!token)token="local-direct";
+  if(direct&&admin&&!openAdmin&&token==="local-direct"){note("请输入管理凭证。");return;}
+  request("GET",admin&&direct&&!openAdmin?"/api/access/admin":"/api/bus/view",null,function(ok,data){
     if(!ok){token="";note(errorMessage(data.error));return;}
-    show("login",false);show("dashboard",true);show("settings",admin);
-    render(data);timer=setTimeout(cycle,15000);
+    show("login",false);show("dashboard",true);show("settings",admin);if(direct)txt("logout",openAdmin?"重新连接":"管理登录 / 退出");
+    if(admin&&direct&&!openAdmin)read();else render(data);timer=setTimeout(cycle,15000);
   });
 };
 el("logout").onclick=exit;el("refresh").onclick=read;
@@ -134,4 +137,5 @@ el("save").onclick=function(){
     configuring=false;resetSelection();show("config",false);show("view",true);render(data);note("已保存。");
   });
 };
+if(direct){el("mode").value=openAdmin?"admin":"read";el("connect").onclick();}
 }());
