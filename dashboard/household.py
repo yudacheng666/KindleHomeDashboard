@@ -99,6 +99,29 @@ class Household:
             if db.execute("UPDATE tasks SET title=? WHERE id=?", (text(title),key)).rowcount != 1:
                 raise ValueError("Unknown task")
 
+    def edit_task(self, key, title, start, repeat):
+        title, start = text(title), day(start)
+        if repeat not in ("once", "daily", "weekly"):
+            raise ValueError("Invalid repeat")
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            old = db.execute("SELECT * FROM tasks WHERE id=?", (key,)).fetchone()
+            if old is None:
+                raise ValueError("Unknown task")
+            if (start, repeat) != (old["start"], old["repeat"]) and db.execute(
+                    "SELECT 1 FROM completions WHERE task_id=?", (key,)).fetchone():
+                raise ValueError("Schedule change would affect completion history")
+            db.execute("UPDATE tasks SET title=?,start=?,repeat=? WHERE id=?",
+                       (title, start, repeat, key))
+
+    def delete_task(self, key):
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if db.execute("SELECT 1 FROM posters WHERE task_id=?", (key,)).fetchone():
+                raise ValueError("Remove linked posters first")
+            if db.execute("DELETE FROM tasks WHERE id=?", (key,)).rowcount != 1:
+                raise ValueError("Unknown task")
+
     @staticmethod
     def occurrence(task, on):
         if on < task["start"]:
@@ -153,6 +176,28 @@ class Household:
                        (key,title,body,note,start,end,task_id))
         return key
 
+    def edit_poster(self, key, title, body, start, *, end=None, note="", task_id=None):
+        title, start = text(title), day(start)
+        body = "" if task_id is not None else text(body, 1200)
+        end = day(end) if end is not None else None
+        if end is not None and end < start:
+            raise ValueError("Invalid poster dates")
+        if not isinstance(note, str) or len(note) > 200:
+            raise ValueError("Invalid note")
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if task_id is not None and not db.execute(
+                    "SELECT 1 FROM tasks WHERE id=?", (task_id,)).fetchone():
+                raise ValueError("Unknown linked task")
+            if db.execute("UPDATE posters SET title=?,body=?,start=?,end=?,note=?,task_id=? WHERE id=?",
+                          (title, body, start, end, note, task_id, key)).rowcount != 1:
+                raise ValueError("Unknown poster")
+
+    def delete_poster(self, key):
+        with self.db() as db:
+            if db.execute("DELETE FROM posters WHERE id=?", (key,)).rowcount != 1:
+                raise ValueError("Unknown poster")
+
     def enable_poster(self, key, enabled):
         if type(enabled) is not bool:
             raise ValueError("Invalid enabled value")
@@ -170,6 +215,14 @@ class Household:
         with self.db() as db:
             db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
                        (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
+
+    def delete_menu(self, on, meal):
+        on = day(on)
+        if meal not in MEALS:
+            raise ValueError("Invalid meal")
+        with self.db() as db:
+            if db.execute("DELETE FROM menus WHERE day=? AND meal=?", (on, meal)).rowcount != 1:
+                raise ValueError("Unknown menu")
 
     def _menus(self, db, first, last):
         rows = db.execute("SELECT * FROM menus WHERE day BETWEEN ? AND ? ORDER BY day",(first,last))
@@ -197,6 +250,48 @@ class Household:
                         continue
                     added+=db.execute("INSERT OR IGNORE INTO shopping VALUES (?,?,?,0)",(uuid4().hex,label,source)).rowcount
         return added
+
+    def edit_shopping(self, key, label):
+        label = text(label)
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            item = db.execute("SELECT source FROM shopping WHERE id=?", (key,)).fetchone()
+            if item is None:
+                raise ValueError("Unknown shopping item")
+            if db.execute("SELECT 1 FROM shopping WHERE source=? AND label=? AND id<>?",
+                          (item["source"], label, key)).fetchone():
+                raise ValueError("Duplicate shopping item")
+            db.execute("UPDATE shopping SET label=? WHERE id=?", (label, key))
+
+    def delete_shopping(self, key):
+        with self.db() as db:
+            if db.execute("DELETE FROM shopping WHERE id=?", (key,)).rowcount != 1:
+                raise ValueError("Unknown shopping item")
+
+    def manage(self, on):
+        """Include inactive content for authorized editing, separate from display."""
+        on = day(on)
+        with self.db() as db:
+            db.execute("BEGIN")
+            tasks = []
+            for row in db.execute("SELECT * FROM tasks ORDER BY start,id"):
+                task = dict(row)
+                occurrence = self.occurrence(task, on)
+                task["occurrence"] = occurrence
+                task["completed"] = bool(occurrence and db.execute(
+                    "SELECT 1 FROM completions WHERE task_id=? AND occurrence=?",
+                    (task["id"], occurrence)).fetchone())
+                tasks.append(task)
+            return {"date": on, "tasks": tasks,
+                    "posters": [dict(r) for r in db.execute("SELECT * FROM posters ORDER BY start,id")],
+                    "shopping": [dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]}
+
+    def menus_between(self, first, last):
+        first, last = day(first), day(last)
+        if last < first or (date.fromisoformat(last)-date.fromisoformat(first)).days > 6:
+            raise ValueError("Select up to seven days")
+        with self.db() as db:
+            return self._menus(db, first, last)
 
     def complete_shopping(self, key, completed=True):
         if type(completed) is not bool:
