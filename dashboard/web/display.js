@@ -99,7 +99,7 @@ function refresh(){
   function finish(ok,v,status){
     if(ended)return;ended=true;clearTimeout(timeout);if(g!==epoch)return;busy=false;
     if(ok){if(mode==="bus")acceptBus(v);else accept(v);}
-    else if(status===404&&mode==="family"){connected=true;show("login",false);show("display",true);hide("家庭模块未启用，可切换至公交。");}
+    else if((status===404&&mode==="family")||status===503){show("login",false);show("display",true);hide(status===404?"家庭模块未启用，可切换至公交。":"当前模块暂不可用，可切换其他模块。");}
     else{hide(status===401?"令牌无效，请重新连接。":status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
       if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
     clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,mode==="bus"?15000:30000);
