@@ -1,7 +1,7 @@
 name: One-time bus browser and upstream verification
 on:
-  push:
-    branches: [test/bus-end-to-end]
+  pull_request:
+    branches: [feat/bus-adapter]
     paths: ['.github/workflows/bus-e2e-probe.yml']
 permissions:
   contents: read
