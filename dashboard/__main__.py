@@ -8,7 +8,6 @@ from threading import Event
 
 from .http_api import API, LocalServer, tls_context
 from .household import Household
-from .devices import Devices
 from .runtime import Runtime, Window
 from .service import BusService
 from .trip_store import TripStore
@@ -37,7 +36,9 @@ def main():
     parser.add_argument("--tls-key", help="Private key matching the certificate")
     parser.add_argument("--enable-bus", action="store_true")
     parser.add_argument("--enable-household", action="store_true")
-    parser.add_argument("--enable-pairing", action="store_true", help="Local HTTPS pairing preview")
+    parser.add_argument("--lan-host", help="Explicit private IPv4 NAS address")
+    parser.add_argument("--lan-network", help="Trusted home IPv4 CIDR")
+    parser.add_argument("--open-admin", action="store_true", help="Explicitly allow LAN editing without a password")
     parser.add_argument("--timezone", default="Asia/Shanghai")
     parser.add_argument("--window", action="append", type=window_arg, default=[])
     parser.add_argument("--daily-limit", type=int, default=1000)
@@ -46,8 +47,13 @@ def main():
         parser.error("Explicit collection windows required when enabling bus")
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error("Specify both TLS certificate and key")
-    if args.enable_pairing and not args.tls_cert:
-        parser.error("Pairing requires HTTPS")
+    direct = bool(args.lan_host and args.lan_network)
+    if bool(args.lan_host) != bool(args.lan_network) or (args.open_admin and not direct):
+        parser.error("Specify both LAN address and subnet for direct access")
+    if direct and not args.open_admin and not os.environ.get("KHD_ADMIN_TOKEN"):
+        parser.error("Set management credentials with TLS, or explicitly allow open administration")
+    if args.open_admin and os.environ.get("KHD_ADMIN_TOKEN"):
+        parser.error("Remove management token before explicitly enabling open administration")
     lock_fd = None
     try:
         # Own the private volume for the entire process lifetime.
@@ -59,9 +65,8 @@ def main():
         runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone)
         household = Household(args.directory) if args.enable_household else None
         tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
-        devices = Devices(args.directory) if args.enable_pairing else None
-        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, devices=devices)
-        with LocalServer(api, args.port, tls=tls) as server:
+        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, direct=direct)
+        with LocalServer(api, args.port, tls=tls, lan_host=args.lan_host, lan_network=args.lan_network) as server:
             stopping = Event()
             def stop_signal(signum, frame):
                 stopping.set()
