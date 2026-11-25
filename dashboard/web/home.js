@@ -46,6 +46,16 @@ function editor(title){
   closeEditor();editing=true;var p=el("editor");show("editor",true);node(p,"h2",title);return p;
 }
 function actions(p,save){btn(p,"保存",save).className="primary";btn(p,"取消",closeEditor);}
+function displayForm(){
+  var p=editor("保存轮播设置"),s=data.display_settings||{seconds:180,include_week:false,include_shopping:false,autoplay:false};
+  var interval=field(p,"每页停留",String(s.seconds),"select",[["120","2分钟"],["180","3分钟"],["300","5分钟"]]);
+  var yesNo=[["false","否"],["true","是"]];
+  var week=field(p,"本周菜单加入轮播",String(s.include_week),"select",yesNo);
+  var shopping=field(p,"购物清单加入轮播",String(s.include_shopping),"select",yesNo);
+  var auto=field(p,"连接展示页时自动开始轮播",String(s.autoplay),"select",yesNo);
+  node(p,"p","保存在 NAS；展示页的临时调整不覆盖这里的默认设置。");
+  actions(p,function(){mutate("display/set",{seconds:Number(interval.value),include_week:week.value==="true",include_shopping:shopping.value==="true",autoplay:auto.value==="true"});});
+}
 function taskForm(t){
   var p=editor(t?"编辑待办":"新增待办");
   var title=field(p,"标题",t?t.title:"","text",null,200),start=field(p,"开始日期",t?t.start:data.date,"date");
@@ -117,6 +127,7 @@ function render(){
   var p=el("content");clear(p);if(!data)return;
   if(tab==="today"){
     node(p,"h2","今日生活");
+    if(admin)btn(p,"保存轮播设置",displayForm);
     if(admin){var box=node(p,"div");req("view",null,function(ok,v){if(ok){node(box,"h3","待办");tasks(box,v.tasks,false);node(box,"h3","提醒");posters(box,v.posters,false);node(box,"h3","今日菜单");menuRows(box,v.today_menu,false);}else node(box,"p","今日信息读取失败");});}
     else{node(p,"h3","待办");tasks(p,data.tasks,false);node(p,"h3","提醒");posters(p,data.posters,false);node(p,"h3","今日菜单");menuRows(p,data.today_menu,false);}
   }else if(tab==="tasks"){node(p,"h2","待办");if(admin)btn(p,"新增待办",function(){taskForm(null);});tasks(p,data.tasks,admin);}
