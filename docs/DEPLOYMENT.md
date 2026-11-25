@@ -55,6 +55,6 @@
 
 发布准备：VERSION 指定 v0.1.0-rc.1，主分支版本文件变更或主分支手动运行 Publish tested Docker release 工作流才允许发布。先检查公开路径、Python、网页、Chromium 和密钥扫描，再用免费 amd64/arm64 标准运行器分别构建并执行 Docker 冒烟测试，发布已测试的镜像，合成多架构清单，GitHub Release 写入固定摘要及独立 compose.release.yaml。候选包仍未实机验收，不称稳定版。首次 GHCR 包默认私有，所有者核查仅公开源代码镜像后设为 public，匿名拉取；未经确认不使用付费服务。基础镜像构建标签仍未锁定，最终产物用摘要固定。工作流执行与镜像公开拉取均待验证。
 
-一次性下载 Release 内的 compose.release.yaml（不要与其他 Compose 文件叠加），沿用前述私有目录、环境变量、权限及网络检查。在仓库外私有环境文件添加 KHD_IMAGE=发布说明中的完整 ghcr.io/...@sha256:... 引用。执行 docker compose --env-file <私有文件> -f compose.release.yaml config --quiet，随后 pull，再 up -d --no-build。无需源码或本机镜像构建。极空间界面及 Compose 支持尚未实测。无镜像可拉取时不要宣称已发布安装包。
+一次性下载 Release 内的 compose.release.yaml（不要与其他 Compose 文件叠加），沿用前述私有目录、环境变量、权限及网络检查。在仓库外私有环境文件添加 KHD_IMAGE=ghcr.io/yudacheng666/kindlehomedashboard:preview（明确选择现场候选更新通道），或选固定摘要以锁定版本。preview 仅在版本化候选 Release 创建后推进；稳定版 latest 待实机验收后独立实现，当前不发布 latest。执行 docker compose --env-file <私有文件> -f compose.release.yaml config --quiet，随后 pull，再 up -d --no-build。无需源码或本机镜像构建。极空间界面及 Compose 支持尚未实测。无镜像可拉取时不要宣称已发布安装包。
 
-后续更新只修改本地 KHD_IMAGE 为下一已核验发布摘要，不重复下载源码或 Compose（除非发布说明明确部署参数迁移）。先保留旧镜像及私有配置，停止服务并完成离线备份，检查备份后拉取新镜像并重建，保留数据挂载。升级失败时仅在确认数据库兼容的情况下回退旧镜像；不直接覆盖数据库、不解除公交访问阻断。软件内检查更新和用户确认后安装是后续目标，尚未实现；不挂载 Docker socket、不开放 NAS 管理权限、不新增常驻更新器。网页可先实现只读版本检查，安装由 NAS 端受控操作完成，具体方式待现场环境确认。
+优先使用极空间原生 Docker 镜像更新：preview 标签不变，先备份并保留旧镜像摘要，再用极空间的镜像更新/Compose 重新构建（选择最新镜像），保持原配置和数据卷。固定摘要安装者可修改 KHD_IMAGE 为下一已核验摘要。两种方式均不重复下载源码或 Compose（除非发布说明明确部署参数迁移）。先保留旧镜像及私有配置，停止服务并完成离线备份，检查备份后拉取新镜像并重建，保留数据挂载。升级失败时仅在确认数据库兼容的情况下回退旧镜像；不直接覆盖数据库、不解除公交访问阻断。极空间原生更新优先，不另做网页安装更新器；若需要可另评估只读版本提示。原生更新入口、GHCR 匿名访问及数据保留仍须真机验证；不挂载 Docker socket、不开放 NAS 管理权限、不新增常驻更新器。
