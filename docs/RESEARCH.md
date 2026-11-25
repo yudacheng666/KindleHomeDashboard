@@ -1,16 +1,15 @@
 # 关键可行性证据（2026-11-25）
-只记录仍影响选型和下一步的公开来源；下列第三方记录不代表本项目实际验收。真实部署配置不公开。
+只保留影响选型和下一步的公开证据。真实家庭配置、密钥与原始业务响应不提交仓库。
 
-## 数据源（阻塞）
-- 公交优先：政府公共数据开放平台 https://data.sh.gov.cn/ 。近期个人墨水屏开发案例 https://www.lab-z.com/bsshow/ 、https://www.eetree.cn/project/detail/5310 报告实名取得 Token；资源 sod-p4pm95e968tfxhil41cotzxyn，响应含线路/站点 ID 及上下行。案例展示的计划发车字段不能证明在途 ETA。平台网页访问返回412，未执行授权 POST；当前开放条件、免费额度、覆盖及真实多车 ETA 均未确认。
-- 公交备选：随申行 https://open-web.shmaas.cn/docs/guide/ 及公共交通文档有 getBusStopArriveDetails（多车 ETA），需商务凭证及出口 IP，个人免费授权未知；不要求用户发邮件。Code410 https://www.code410.com/api/231 文档称免费，基础 URL 返回缺参数提示，示例查询未取得车辆数据，上游授权及额度未确认。其他低额度或未确认上游授权的逆向接口不作为正式依赖；不重复调查已失效的旧接口。
-- 驾车：高德 https://lbs.amap.com/api/webservice/guide/api/newroute 、https://lbs.amap.com/pages/base_service_price 及百度 https://lbsyun.baidu.com/docs/webapi?title=directionv2%2Fdirection-api-v2 有正式算路能力，仍需合法 Key、个人免费权限、实时路况字段及实测。基础额度不等于高级路况免费。核实缓存许可；不开通收费服务。
-- 天气：HA https://www.home-assistant.io/integrations/open_meteo/ 与 https://open-meteo.com/en/pricing （非商业免费至1万次/日，无可用性承诺）支持基础天气；实际网络、预警与空气质量覆盖待验证。
+## 数据接口
+- 公交（硬性阻塞）：上海政府公共数据开放平台 https://data.sh.gov.cn/ 。个人墨水屏案例 https://www.lab-z.com/bsshow/ 、https://www.eetree.cn/project/detail/5310 报告实名取得 Token；资源 sod-p4pm95e968tfxhil41cotzxyn。案例含线路/站点 ID 及上下行，但计划发车不能证明在途 ETA。当前网页访问返回412，未持合法 Token 执行接口，免费额度、授权、真实多车 ETA 均未验收。随申行 https://open-web.shmaas.cn/docs/guide/ 的 getBusStopArriveDetails 需要商务凭证及出口 IP，个人免费授权不明确。Code410 两次公开示例实测均 HTTP 200、业务码200，但车辆与 ETA 记录均为0，排除为正式依赖，除非有新证据。其他上游授权不明或失效的接口不重复调查。
+- 驾车（硬性阻塞）：高德 https://lbs.amap.com/api/webservice/guide/api/newroute 、https://lbs.amap.com/pages/base_service_price ，个人基础额度有公开说明，仍需自有合法 Key 验证所需实时路况、持续免费权限和缓存许可。百度 https://lbsyun.baidu.com/docs/webapi?title=directionv2%2Fdirection-api-v2 为备选。未做授权实测，不视为可用。不购买服务。
+- 天气预报：Open-Meteo https://open-meteo.com/en/pricing 非商业免费限额1万次/日，两个公开样例运行均 URLError；暂不作为唯一天气源。MET Norway https://api.met.no/weatherapi/locationforecast/2.0/ （按服务条款标明 User-Agent、遵守缓存及署名要求）公开上海城市示例实际 HTTP 200，基础预报字段及时间存在，尚未验收全部天气字段、预警和本地连通性。
+- 空气质量：Open-Meteo Air Quality https://open-meteo.com/en/docs/air-quality-api 公开示例实测 HTTP 200，PM2.5、PM10、AQI 字段存在；全球模式数据并非本地官方监测站实时观测，AQI 口径须标明。实际部署访问、准确度及免费长期使用仍需验证。
+- 实测证据：临时诊断 PR #1（不合并），Actions runs 45587732018、45587887368（https://github.com/yudacheng666/KindleHomeDashboard/actions/runs/45587887368）。均使用无关公开示例，无秘密、私有参数及原始响应日志；第二轮 MET Norway 成功，Open-Meteo 预报重试失败，Code410 再次零记录。基础仓库检查成功不代表业务通过。没有 NAS 本地连通性或指定线路实测结论。
 
-## HA 架构候选证据
-- 原生 REST https://www.home-assistant.io/integrations/rest/ 、https://www.home-assistant.io/integrations/template/ 、https://www.home-assistant.io/integrations/workday/ ：GET/POST、周期及自动化查询、模板、工作日；需确认分时轮询、调休、错误及时间语义。高频实体历史可由 https://www.home-assistant.io/integrations/recorder/ 排除。
-- 驾车参考 https://github.com/DavisDL-89/amap_commute ：作者文档有多路线、UI 配置、时间/距离/路况，后端需 Web 服务 Key；地图前端需额外 JS Key，墨水屏文字展示不必用地图卡。未审查完整代码、许可及稳定性。
-- 家庭 https://www.home-assistant.io/integrations/local_todo/ 、https://www.home-assistant.io/integrations/shopping_list/ 、https://www.home-assistant.io/integrations/local_calendar/ ：本地待办/购物/菜单日历和自动化。https://github.com/michiel-dewilde/ha-mealplan 可作为菜单联动候选（需 HA 2026.7+，英语/荷兰语界面，GPL-3.0-or-later），优先简单原生实现。
-- HA 渲染候选 https://github.com/cryptomilk/hass-eink-dashboard （Apache-2.0，作者标注 beta）：HA 内部 SVG/resvg 生成 PNG，无独立服务器/浏览器，视觉编辑、CJK 字体、ETag、Kindle 拉取，默认60秒渲染，短周期性能未验证。图片 URL 无认证是安全缺口，须解决；分辨率以实机核实。替代 https://github.com/the-louie/paperboard （Apache-2.0，需 HA 2026.3+，作者有分时布局，中文与 Kindle 适配未验证），暂不并行开发。
-- Kindle 越狱 https://kindlemodding.org/jailbreaking/index.html ；https://github.com/NiLuJe/FBInk ；https://github.com/estcarisimo/paperwhite-weather 为图片刷新及恢复参考（作者15分钟级案例不证明高频可用）。型号/固件、客户端兼容性、许可和恢复仍需核实。
-- HA 备份 https://www.home-assistant.io/common-tasks/general/backups/ ，社区集成更新 https://www.home-assistant.io/integrations/marketplace/ （2026.11+，旧版本 HACS）；不强制升级或额外开发更新平台。
+## 独立后端复用参考
+- HA 官方 REST https://developers.home-assistant.io/docs/api/rest/ ，原生待办、购物清单和日历可按需接入，核心通勤不得依赖 HA。
+- 驾车参考 https://github.com/DavisDL-89/amap_commute ，未审查完整代码及许可。
+- Kindle 越狱 https://kindlemodding.org/jailbreaking/index.html ；https://github.com/NiLuJe/FBInk ；https://github.com/estcarisimo/paperwhite-weather 为图片刷新及恢复参考（15分钟案例不证明高频可用）。设备型号及固件未确定，客户端兼容、许可、安全与恢复待核验。
+- 原 HA 整体后端比较已结束，不再推进 HA 渲染集成选型；以 docs/ARCHITECTURE.md 为准。
