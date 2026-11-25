@@ -93,8 +93,8 @@ cleanup_direct() {
 }
 trap cleanup_direct EXIT
 docker network create --internal --subnet 172.30.99.0/24 "$net" >/dev/null
-KHD_LAN_HOST=172.30.99.20 KHD_LAN_NETWORK=172.30.99.0/24 docker compose -f compose.lan.yaml config --quiet
-docker run -d --name "$direct" --network "$net" --ip 172.30.99.20 --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus .5 --pids-limit 32 --mount "type=bind,source=$KHD_DATA_DIR,target=/var/lib/khd" --no-healthcheck kindle-home-dashboard:dev --directory /var/lib/khd --enable-household --lan-host 172.30.99.20 --lan-network 172.30.99.0/24 --open-admin >/dev/null
+KHD_LAN_HOST=172.30.99.20 KHD_LAN_NETWORK=172.30.99.0/24 KHD_BUS_ENABLED=1 KHD_BUS_WINDOWS='1:13:00-14:00;6:23:00-01:00' KHD_TIMEZONE=UTC KHD_BUS_DAILY_LIMIT=42 docker compose -f compose.lan.yaml config --format json | python3 -c 'import json,sys; e=json.load(sys.stdin)["services"]["dashboard"]["environment"]; assert e["KHD_BUS_ENABLED"]=="1" and e["KHD_BUS_WINDOWS"]=="1:13:00-14:00;6:23:00-01:00" and e["KHD_TIMEZONE"]=="UTC" and e["KHD_BUS_DAILY_LIMIT"]=="42"'
+docker run -d --name "$direct" --network "$net" --ip 172.30.99.20 --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus .5 --pids-limit 32 --mount "type=bind,source=$KHD_DATA_DIR,target=/var/lib/khd" --no-healthcheck -e KHD_BUS_ENABLED=1 -e "KHD_BUS_WINDOWS=1:13:00-14:00;6:23:00-01:00" -e KHD_TIMEZONE=UTC -e KHD_BUS_DAILY_LIMIT=42 kindle-home-dashboard:dev --directory /var/lib/khd --enable-household --lan-host 172.30.99.20 --lan-network 172.30.99.0/24 --open-admin >/dev/null
 docker run --rm -i --network "$net" --entrypoint python kindle-home-dashboard:dev - <<'PY'
 import json,time
 from urllib.request import urlopen, Request
@@ -110,6 +110,11 @@ for _ in range(30):
 else:
     raise RuntimeError("Direct server unavailable")
 assert len(view["tasks"])==1
+# No trip has been configured; isolated network disallows outside requests.
+with urlopen(base+"/api/bus/view",timeout=3) as r:
+    assert json.load(r)["snapshot"]["status"]=="unconfigured"
+with urlopen(base+"/api/display/auto",timeout=3) as r:
+    assert json.load(r)["mode"]=="family"
 body=json.dumps({"title":"Fictional direct task","start":view["date"],"repeat":"once"}).encode()
 with urlopen(Request(base+"/api/home/task/add",data=body,headers={"Content-Type":"application/json"}),timeout=3) as r:
     assert r.status==200
@@ -121,7 +126,7 @@ except HTTPError as e:
     assert e.code==403
 else:
     raise AssertionError("Wrong origin accepted")
-print("Docker direct mode PASS: isolated network client, no credentials, read/write, origin rejection.")
+print("Docker direct mode PASS: isolated network client, no credentials, private bus startup settings, read/write, origin rejection.")
 PY
 docker stop -t 35 "$direct" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$direct")" = 0
