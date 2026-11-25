@@ -105,6 +105,19 @@ def main():
                 button("editor","保存")
                 wait(lambda:home.view("2026-01-05")["display_settings"]["autoplay"])
                 wait(lambda:js("return document.getElementById('editor').className==='hidden'"))
+                # Move a separate fictional meal in the actual editor without
+                # disturbing the dinner used by the display regression.
+                home.set_menu("2026-01-05","breakfast",["Fictional breakfast"])
+                click("menus")
+                wait(lambda:text_in("content","Fictional breakfast"))
+                js("var rows=document.querySelectorAll('#content .item');for(var i=0;i<rows.length;i++){if(rows[i].textContent.indexOf('Fictional breakfast')>=0){rows[i].querySelector('button').click();break;}}")
+                assert js("return !document.querySelector('#editor input').disabled && !document.querySelector('#editor select').disabled")
+                js("document.querySelector('#editor input').value='2026-01-06';document.querySelector('#editor select').value='lunch'")
+                button("editor","保存")
+                wait(lambda:len(home.menus_between("2026-01-06","2026-01-06"))==1)
+                wait(lambda:text_in("content","Fictional breakfast"))
+                assert home.menus_between("2026-01-06","2026-01-06")[0]["meal"]=="lunch"
+                assert all(m["meal"]!="breakfast" for m in home.menus_between("2026-01-05","2026-01-05"))
                 click("logout")
                 wait(lambda:js("return document.getElementById('home').className==='hidden'"))
                 go("/display")
