@@ -101,3 +101,5 @@ jobs:
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           printf '镜像（固定摘要）：\n\n`%s@%s`\n\n支持 Linux amd64/arm64。此为现场验收候选，未在真实极空间与 Kindle 验证。首次使用 GHCR 可能需要仓库所有者将镜像包设为公开；不要上传私有配置。安装使用 compose.release.yaml，详情见 docs/DEPLOYMENT.md。\n' "$image" "$digest" > "$RUNNER_TEMP/notes.md"
           gh release create "$VERSION" --target "$GITHUB_SHA" --title "$VERSION" --prerelease --notes-file "$RUNNER_TEMP/notes.md" compose.release.yaml
+          # Advance the opt-in candidate channel only after the versioned release exists.
+          docker buildx imagetools create -t "$image:preview" "$image@$digest"
