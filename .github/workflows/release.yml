@@ -34,6 +34,11 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - run: python3 scripts/check_public.py
+      - name: Validate NAS Compose template
+        env:
+          KHD_LAN_HOST: 192.168.1.100
+          KHD_LAN_NETWORK: 192.168.1.0/24
+        run: docker compose -f compose.release.yaml config --quiet
       - run: python3 -m unittest discover -s tests -v
       - run: |
           node tests/test_bus_ui.js
@@ -84,7 +89,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Publish multi-platform manifest and release notes
+      - name: Publish public multi-platform image and release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.verify.outputs.version }}
@@ -97,9 +102,17 @@ jobs:
             exit 1
           fi
           docker buildx imagetools create -t "$image:$VERSION" "$image:sha-$GITHUB_SHA-amd64" "$image:sha-$GITHUB_SHA-arm64"
-          digest="$(docker buildx imagetools inspect "$image:$VERSION" | awk '$1=="Digest:" {print $2; exit}')"
-          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          printf '镜像（固定摘要）：\n\n`%s@%s`\n\n支持 Linux amd64/arm64。此为现场验收候选，未在真实极空间与 Kindle 验证。首次使用 GHCR 可能需要仓库所有者将镜像包设为公开；不要上传私有配置。安装使用 compose.release.yaml，详情见 docs/DEPLOYMENT.md。\n' "$image" "$digest" > "$RUNNER_TEMP/notes.md"
+          # A public source repository does not guarantee public GHCR package access.
+          # Try to set package visibility, then verify an anonymous pull before release.
+          if ! gh api --method PATCH "/user/packages/container/kindlehomedashboard/visibility" -f visibility=public >/dev/null; then
+            echo "::warning::Could not change GHCR package visibility automatically; checking anonymous access."
+          fi
+          docker logout ghcr.io >/dev/null 2>&1 || true
+          if ! docker pull "$image:$VERSION"; then
+            echo "::error::GHCR image is not anonymously pullable. Set the package visibility to Public, then rerun this workflow."
+            exit 1
+          fi
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          printf '候选镜像标签：\n\n`%s:%s`\n\n自动更新标签：`%s:preview`。支持 Linux amd64/arm64。此为现场验收候选，未在真实极空间与 Kindle 验证。镜像须可匿名拉取；家庭数据保存在独立 Docker 命名卷。安装使用 compose.release.yaml，详情见 docs/DEPLOYMENT.md。\n' "$image" "$VERSION" "$image" > "$RUNNER_TEMP/notes.md"
           gh release create "$VERSION" --target "$GITHUB_SHA" --title "$VERSION" --prerelease --notes-file "$RUNNER_TEMP/notes.md" compose.release.yaml
-          # Advance the opt-in candidate channel only after the versioned release exists.
-          docker buildx imagetools create -t "$image:preview" "$image@$digest"
+          docker buildx imagetools create -t "$image:preview" "$image:$VERSION"
