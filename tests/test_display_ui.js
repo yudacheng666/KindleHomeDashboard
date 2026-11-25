@@ -15,7 +15,8 @@ const poster={id:"test-poster",title:"Example reminder",body:"Line one\nLine two
 const meal={day:date,meal:"dinner",dishes:["Example dish"]};
 const shopping={id:"test-item",label:"Example ingredient",completed:0};
 const sample={date,tasks:[task],posters:[poster],today_menu:[meal],week_menu:[meal],shopping:[shopping]};
-let data=sample,fail=0,requests=0,clock=0,nextId=1;
+const bus={trip:{line:{name:"Example line"},boarding:{name:"A"},destination:{name:"B"}},snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:0,fetched_at:"2026-01-05T00:00:00+00:00"}};
+let data=sample,fail=0,requests=0,clock=0,nextId=1,busRequests=0,busData=bus;
 const timers=new Map();
 function setTimer(fn,delay){const id=nextId++;timers.set(id,{at:clock+delay,fn});return id;}
 function clearTimer(id){timers.delete(id);}
@@ -29,9 +30,9 @@ function advance(ms){
   clock=end;
 }
 class XHR {
-  open(method,path){assert.equal(method,"GET");assert.equal(path,"/api/home/view");}
+  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view"].includes(path));this.path=path;}
   setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;this.status=fail||200;this.responseText=JSON.stringify(fail?{}:data);this.readyState=4;this.onreadystatechange();}
+  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;this.status=fail||200;this.responseText=JSON.stringify(fail?{}:this.path==="/api/bus/view"?busData:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,setTimeout:setTimer,clearTimeout:clearTimer});
@@ -58,8 +59,19 @@ doc.hidden=true;events.visibilitychange();const hiddenCount=requests;advance(120
 doc.hidden=false;data=sample;events.visibilitychange();heading("今日生活");
 fail=503;advance(30000);heading("");assert.equal(el("body").children.length,0);
 fail=0;advance(30000);heading("今日生活");
+click("busMode");heading("Example line");assert.equal(el("familyControls").className,"hidden");
+assert.ok(el("body").children.some(n=>n.textContent==="4 分钟"));
+assert.ok(el("body").children.some(n=>n.textContent==="9 分钟"));
+const oldBus=busRequests;advance(15000);assert.equal(busRequests,oldBus+1);
+busData={...bus,snapshot:{...bus.snapshot,status:"expired",vehicles:[]}};advance(15000);
+assert.ok(!el("body").children.some(n=>n.className==="eta"));
+click("familyMode");heading("今日生活");assert.equal(el("familyControls").className,"");
+const endBus=busRequests;advance(60000);assert.equal(busRequests,endBus);
 fail=401;advance(30000);assert.equal(el("display").className,"hidden");assert.equal(el("login").className,"");
 assert.equal(el("body").children.length,0);assert.equal(timers.size,0);
 fail=0;el("token").value="example-display-token";click("connect");windowEvents.pagehide();
 assert.equal(el("display").className,"hidden");assert.equal(timers.size,0);heading("");
-console.log("Household display simulation passed: rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
+fail=404;el("token").value="example-display-token";click("connect");
+assert.equal(el("display").className,"");fail=0;click("busMode");heading("Example line");click("logout");
+assert.equal(timers.size,0);
+console.log("Household display simulation passed: unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
