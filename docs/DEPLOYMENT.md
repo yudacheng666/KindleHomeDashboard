@@ -53,8 +53,10 @@
 
 ## 镜像发布安装及更新（首版候选）
 
-发布准备：VERSION 指定 v0.1.0-rc.1，主分支版本文件变更或主分支手动运行 Publish tested Docker release 工作流才允许发布。先检查公开路径、Python、网页、Chromium 和密钥扫描，再用免费 amd64/arm64 标准运行器分别构建并执行 Docker 冒烟测试，发布已测试的镜像，合成多架构清单，GitHub Release 写入固定摘要及独立 compose.release.yaml。候选包仍未实机验收，不称稳定版。首次 GHCR 包默认私有，所有者核查仅公开源代码镜像后设为 public，匿名拉取；未经确认不使用付费服务。基础镜像构建标签仍未锁定，最终产物用摘要固定。工作流执行与镜像公开拉取均待验证。
+发布候选版本由 GitHub Actions 在免费标准 amd64/arm64 runner 构建并分别冒烟测试；随后创建多架构版本标签，尝试将 GHCR 包设为公开，并必须通过退出登录后的匿名拉取验证才创建 GitHub Release。Release 附带 compose.release.yaml，默认使用 ghcr.io/yudacheng666/kindlehomedashboard:preview。preview 只在版本化 Release 创建成功后推进；latest 稳定标签须待极空间和 Kindle 真机验收后再考虑。发布工作流不输出真实家庭数据。
 
-一次性下载 Release 内的 compose.release.yaml（不要与其他 Compose 文件叠加），沿用前述私有目录、环境变量、权限及网络检查。在仓库外私有环境文件添加 KHD_IMAGE=ghcr.io/yudacheng666/kindlehomedashboard:preview（明确选择现场候选更新通道），或选固定摘要以锁定版本。preview 仅在版本化候选 Release 创建后推进；稳定版 latest 待实机验收后独立实现，当前不发布 latest。执行 docker compose --env-file <私有文件> -f compose.release.yaml config --quiet，随后 pull，再 up -d --no-build。无需源码或本机镜像构建。极空间界面及 Compose 支持尚未实测。无镜像可拉取时不要宣称已发布安装包。
+首次安装：在极空间 Docker → Compose 创建项目，项目名使用全小写 kindlehomedashboard。项目存储位置用于保存 Compose 项目文件。导入/粘贴 Release 附带的 compose.release.yaml，使用 image 默认值 ghcr.io/yudacheng666/kindlehomedashboard:preview。根据真实 NAS 网络设置填写 KHD_LAN_HOST（NAS 固定私有 IPv4）和 KHD_LAN_NETWORK（可信家庭子网 CIDR），不可照抄示例地址。若 Compose UI 不提供环境变量设置，则把 YAML 中对应变量替换为真实值。项目包含固定命名的 Docker 数据卷 kindlehomedashboard-data，首次由镜像内 /var/lib/khd 的 UID/GID 10001 初始化，升级容器时保留。不要勾选删除卷/清理数据。数据卷位于 Docker 管理的数据存储位置；创建前确认 Docker 数据目录放在期望的磁盘。HTTP 直连仅限可信家庭 LAN，禁止公网端口转发、访客网络及隐藏来源代理。公交默认关闭；家庭模块可先验收。创建前先执行 Compose 配置校验，且只有 GHCR 匿名拉取检查通过、Release 可见后才允许安装。
 
-优先使用极空间原生 Docker 镜像更新：preview 标签不变，先备份并保留旧镜像摘要，再用极空间的镜像更新/Compose 重新构建（选择最新镜像），保持原配置和数据卷。固定摘要安装者可修改 KHD_IMAGE 为下一已核验摘要。两种方式均不重复下载源码或 Compose（除非发布说明明确部署参数迁移）。先保留旧镜像及私有配置，停止服务并完成离线备份，检查备份后拉取新镜像并重建，保留数据挂载。升级失败时仅在确认数据库兼容的情况下回退旧镜像；不直接覆盖数据库、不解除公交访问阻断。极空间原生更新优先，不另做网页安装更新器；若需要可另评估只读版本提示。原生更新入口、GHCR 匿名访问及数据保留仍须真机验证；不挂载 Docker socket、不开放 NAS 管理权限、不新增常驻更新器。
+后续更新：保持 image: ghcr.io/yudacheng666/kindlehomedashboard:preview 不变，在极空间 Docker 中检查/拉取最新镜像并重建容器，保持同一 Compose 项目和命名卷。升级前备份数据卷；不要删除卷。版本化 GHCR 标签 v0.1.0-rc.N 可用于固定版本和回退。preview 是候选更新通道，不代表稳定版；实机验收后再发布 latest。无需下载源码或反复复制文件。若 GUI 的“更新”只拉镜像而未重建容器，需执行 Compose 重新部署/重建。更新入口名称依极空间版本而异，待用户截图核对。
+
+不挂载 Docker socket、不开放网页管理 NAS、不新增常驻更新器。极空间原生更新入口、GHCR 匿名访问、数据卷初始化及更新后数据保留均须真实 NAS 验收；Kindle 显示、休眠和刷新另行实测。
