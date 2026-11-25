@@ -16,6 +16,8 @@ jobs:
           persist-credentials: false
       - name: Check public tree
         run: python3 scripts/check_public.py
+      - name: Run offline unit tests
+        run: python3 -m unittest discover -s tests -v
       - name: Scan Git history for secrets
         run: |
           docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.24.3 git /repo --redact --no-banner
