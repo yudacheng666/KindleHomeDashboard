@@ -24,6 +24,7 @@ ASSETS = {"/": ("bus.html", "text/html; charset=utf-8"),
           "/home": ("home.html", "text/html; charset=utf-8"),
           "/home.js": ("home.js", "application/javascript; charset=utf-8"),
           "/display": ("display.html", "text/html; charset=utf-8"),
+          "/auto": ("display.html", "text/html; charset=utf-8"),
           "/display.js": ("display.js", "application/javascript; charset=utf-8")}
 
 
@@ -61,6 +62,17 @@ class API:
         value = header[7:]
         return compare_digest(value, self.admin_token) or (
             not admin and compare_digest(value, self.read_token))
+
+    def automatic_view(self):
+        """Use the existing collection windows, never call the upstream here."""
+        if self.household is not None and not self.runtime.active():
+            return {"mode": "family", "view": self.household.get(READ)}
+        bus = self.runtime.read()
+        if self.household is not None and (bus.trip is None or bus.snapshot.status == "disabled"):
+            return {"mode": "family", "view": self.household.get(READ)}
+        # During the configured commute, keep bus failures visible rather than
+        # silently presenting a timetable or hiding the failure.
+        return {"mode": "bus", "view": asdict(bus)}
 
     def dispatch(self, path, body):
         # Single selection session: a newer route preview invalidates the old
@@ -165,12 +177,15 @@ class Handler(BaseHTTPRequestHandler):
         if not self.guard(self.path == MANAGE):
             return
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
-        if self.path != "/api/bus/view" and not home:
+        if self.path not in ("/api/bus/view", "/api/display/auto") and not home:
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            payload = (self.server.api.household.get(self.path) if home
-                       else asdict(self.server.api.runtime.read()))
+            if self.path == "/api/display/auto":
+                payload = self.server.api.automatic_view()
+            else:
+                payload = (self.server.api.household.get(self.path) if home
+                           else asdict(self.server.api.runtime.read()))
         except Exception:
             self.send_json(503, {"error": "service_error"})
             return
