@@ -1,6 +1,7 @@
 /* Read-only display preview. ES5/XHR; no persistence or external requests. */
 (function(){
 "use strict";
+var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="";
@@ -129,7 +130,7 @@ function refresh(){
       if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
     clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,mode==="bus"?15000:30000);
   }
-  try{x.open("GET",mode==="bus"?"/api/bus/view":"/api/home/view",true);x.setRequestHeader("Authorization","Bearer "+token);
+  try{x.open("GET",mode==="bus"?"/api/bus/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
       var valid=v&&(mode==="bus"?v.snapshot&&Array.isArray(v.snapshot.vehicles):Array.isArray(v.tasks)&&Array.isArray(v.posters)&&Array.isArray(v.today_menu)&&Array.isArray(v.week_menu)&&Array.isArray(v.shopping));
       finish(x.status===200&&valid,v,x.status);};
@@ -141,7 +142,7 @@ function reset(){
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(token){clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("familyMode").onclick=function(){switchMode("family");};
 el("busMode").onclick=function(){switchMode("bus");};
 el("previous").onclick=function(){if(editing)return;running=false;stopRotation();advance(-1,false);};
@@ -157,4 +158,5 @@ if(document.addEventListener)document.addEventListener("visibilitychange",functi
   if(document.hidden){stopRotation();clearTimeout(refreshTimer);refreshTimer=null;epoch++;busy=false;}
   else if(token){hide("正在重新读取");refresh();}
 },false);
+if(direct){el("connect").onclick();}
 }());
