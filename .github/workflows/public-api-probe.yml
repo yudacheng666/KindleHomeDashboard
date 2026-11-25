@@ -17,7 +17,7 @@ jobs:
           from datetime import datetime, timezone
           def probe(name, url, params, check):
               try:
-                  req = urllib.request.Request(url + "?" + urllib.parse.urlencode(params), headers={"User-Agent":"KindleHomeDashboard-public-api-test/1.0","Accept":"application/json"})
+                  req = urllib.request.Request(url + "?" + urllib.parse.urlencode(params), headers={"User-Agent":"KindleHomeDashboard-public-api-test/1.0 (https://github.com/yudacheng666/KindleHomeDashboard)","Accept":"application/json"})
                   with urllib.request.urlopen(req, timeout=15) as response:
                       body = json.loads(response.read(1048576))
                       print(name, "HTTP", response.status, check(body))
@@ -36,10 +36,15 @@ jobs:
           def air(d):
               c=d.get("current",{})
               return "air_fields=" + str(all(isinstance(c.get(k),(int,float)) for k in ("pm2_5","pm10","us_aqi"))) + " current_time=" + str(c.get("time"))
-          probe("open_meteo_air", "https://air-quality-api.open-meteo.com/v1/air-quality", {"latitude":31.23,"longitude":121.47,"current":"pm2_5,pm10,us_aqi"}, air)
           def bus(d):
               data=d.get("data")
               rows=[row for val in data.values() if isinstance(val,list) for row in val if isinstance(row,dict)] if isinstance(data,dict) else []
               count=sum(bool(row.get("expected_arrival") and row.get("estimated_time") and row.get("destination")) for row in rows)
               return "business_code=" + str(d.get("code")) + " rows=" + str(len(rows)) + " ETA_fields=" + str(count)
-          probe("code410_documented_example", "https://api.code410.com/api/traffic/bus", {"city":"深圳","site":"京基"}, bus)
+          probe("code410_public_city_example", "https://api.code410.com/api/traffic/bus", {"city":"上海","site":"人民广场"}, bus)
+          def met(d):
+              p=d.get("properties",{}); t=p.get("timeseries",[])
+              if not t: return "forecast_fields=False"
+              v=t[0].get("data",{}); c=v.get("instant",{}).get("details",{})
+              return "forecast_fields=" + str(isinstance(c.get("air_temperature"),(int,float)) and bool(v.get("next_1_hours") or v.get("next_6_hours"))) + " forecast_time=" + str(t[0].get("time"))
+          probe("met_norway", "https://api.met.no/weatherapi/locationforecast/2.0/compact", {"lat":31.23,"lon":121.47}, met)
