@@ -37,8 +37,8 @@ function load(){
     show("login",false);show("home",true);render();
   });
 }
-function mutate(path,body){
-  req(path,body,function(ok,v){if(ok){closeEditor();note("已保存。");load();}else{note("操作未确认成功；请刷新核对后再重试。");}});
+function mutate(path,body,onSaved){
+  req(path,body,function(ok,v){if(ok){if(onSaved)onSaved();closeEditor();note("已保存。");load();}else{note(path==="menu/edit"&&v.error==="invalid_selection_or_request"?"未保存：目标餐次可能已有菜单，或原菜单/填写内容无效。请核对后重试。":"操作未确认成功；请刷新核对后再重试。");}});
 }
 function remove(path,body,label){
   if(window.confirm("确认删除"+label+"？此操作不可撤销。")){body.confirm=true;mutate(path,body);}
@@ -79,10 +79,12 @@ function menuForm(m){
   var meal=field(p,"餐次",m?m.meal:"dinner","select",[["breakfast","早餐"],["lunch","午餐"],["dinner","晚餐"]]);
   var dishes=field(p,"菜品（每行一个）",m?m.dishes.join("\n"):"","textarea");
   var ingredients=field(p,"食材（每行一个，数量写在文字中）",m?m.ingredients.join("\n"):"","textarea");
-  if(m){on.disabled=true;meal.disabled=true;}
+  if(m)node(p,"p","可以调整日期和餐次；不会覆盖其他菜单。已导入的采购项保持原样，改期后重新导入前请核对购物清单。");
   actions(p,function(){
     if(!m&&!window.confirm("保存此日期及餐次的菜单？若已有菜单，将替换该餐次。"))return;
-    menuDate=on.value;mutate("menu/set",{on:on.value,meal:meal.value,dishes:lines(dishes.value),ingredients:lines(ingredients.value)});
+    var b={on:on.value,meal:meal.value,dishes:lines(dishes.value),ingredients:lines(ingredients.value)};
+    if(m){b.old_on=m.day;b.old_meal=m.meal;}
+    mutate(m?"menu/edit":"menu/set",b,function(){menuDate=b.on;});
   });
 }
 function shopForm(s){
