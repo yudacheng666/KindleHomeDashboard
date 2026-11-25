@@ -12,12 +12,13 @@ const date="2026-01-05",task={id:"synthetic-task",title:"Example task",start:dat
 const manage={date,tasks:[task],posters:[],shopping:[]};
 const view={date,tasks:[task],posters:[],shopping:[],today_menu:[],week_menu:[]};
 const calls=[];let fail=false,confirmed=true;
+const sampleMenu={day:date,meal:"lunch",dishes:["Example dish"],ingredients:["Example ingredient"]};
 class XHR {
   open(method,path){this.method=method;this.path=path;}
   setRequestHeader(k,v){}
   send(body){
     calls.push([this.path,body&&JSON.parse(body)]);
-    let response=this.path.endsWith("/manage")?manage:this.path.endsWith("/view")?view:{result:[]};
+    let response=this.path.endsWith("/manage")?manage:this.path.endsWith("/view")?view:this.path.endsWith("/menu/list")?{result:[sampleMenu]}:{result:[]};
     this.status=fail?503:200;this.responseText=JSON.stringify(response);this.readyState=4;this.onreadystatechange();
   }
   abort(){}
@@ -40,6 +41,11 @@ const pi=all(el("editor"),n=>n.tag==="input");pi[0].value="Fictional poster";all
 click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/poster/add")&&c[1].body==="Line one\nLine two"));
 el("menus").onclick();click(el("content"),"新增菜单");const ta=all(el("editor"),n=>n.tag==="textarea");ta[0].value="Dish A\nDish B";ta[1].value="Ingredient A";
 click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/menu/set")&&c[1].dishes.length===2));
+click(el("content"),"编辑");
+const menuOn=all(el("editor"),n=>n.tag==="input")[0],menuMeal=all(el("editor"),n=>n.tag==="select")[0];
+assert.ok(!menuOn.disabled&&!menuMeal.disabled);
+menuOn.value="2026-01-06";menuMeal.value="dinner";click(el("editor"),"保存");
+assert.ok(calls.some(c=>c[0].endsWith("/menu/edit")&&c[1].old_on===date&&c[1].old_meal==="lunch"&&c[1].on==="2026-01-06"&&c[1].meal==="dinner"));
 el("shopping").onclick();click(el("content"),"导入菜单食材");click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/shopping/import")));
 fail=true;el("refresh").onclick();assert.equal(el("content").children.length,0);
 el("logout").onclick();assert.equal(el("home").className,"hidden");assert.equal(el("date").textContent,"");
