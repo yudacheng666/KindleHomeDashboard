@@ -1,5 +1,6 @@
 # Development image; release digest and NAS architecture still require acceptance.
 FROM python:3.12-slim-bookworm
+LABEL org.opencontainers.image.source="https://github.com/yudacheng666/KindleHomeDashboard"
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 khd && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin khd \
