@@ -3,6 +3,7 @@
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
+var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="";
 function el(id){return document.getElementById(id);}
@@ -109,8 +110,18 @@ function acceptBus(v){
   }
   show("login",false);show("display",true);txt("status","");
 }
+function modeLabel(){
+  txt("modeStatus",automatic?"自动分时 · 按 NAS 采集时段":"手动显示 · 不自动切换模块");
+}
+function manual(){
+  if(!automatic)return;
+  automatic=false;epoch++;busy=false;clearTimeout(refreshTimer);
+  refreshTimer=setTimeout(refresh,mode==="bus"?15000:30000);modeLabel();
+}
 function switchMode(next){
-  if(!token||next===mode)return;
+  if(!token)return;
+  manual();
+  if(next===mode)return;
   epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;editing=false;
   show("options",false);mode=next;
   show("familyControls",mode==="family");hide("正在读取");refresh();
@@ -124,31 +135,44 @@ function refresh(){
   busy=true;var g=epoch,x=new XMLHttpRequest(),ended=false,timeout;
   function finish(ok,v,status){
     if(ended)return;ended=true;clearTimeout(timeout);if(g!==epoch)return;busy=false;
-    if(ok){if(mode==="bus")acceptBus(v);else accept(v);}
+    if(ok){
+      if(automatic){
+        if(mode!==v.mode){mode=v.mode;editing=false;show("options",false);show("familyControls",mode==="family");hide("");}
+        v=v.view;
+      }
+      if(mode==="bus")acceptBus(v);else accept(v);
+      modeLabel();
+    }
     else if((status===404&&mode==="family")||status===503){show("login",false);show("display",true);hide(status===404?"家庭模块未启用，可切换至公交。":"当前模块暂不可用，可切换其他模块。");}
     else{hide(status===401?"令牌无效，请重新连接。":status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
       if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
     clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,mode==="bus"?15000:30000);
   }
-  try{x.open("GET",mode==="bus"?"/api/bus/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+  try{x.open("GET",automatic?"/api/display/auto":mode==="bus"?"/api/bus/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
-      var valid=v&&(mode==="bus"?v.snapshot&&Array.isArray(v.snapshot.vehicles):Array.isArray(v.tasks)&&Array.isArray(v.posters)&&Array.isArray(v.today_menu)&&Array.isArray(v.week_menu)&&Array.isArray(v.shopping));
+      var next=automatic&&v?v.mode:mode, payload=automatic&&v?v.view:v;
+      var valid=payload&&(next==="bus"?payload.snapshot&&Array.isArray(payload.snapshot.vehicles):next==="family"&&Array.isArray(payload.tasks)&&Array.isArray(payload.posters)&&Array.isArray(payload.today_menu)&&Array.isArray(payload.week_menu)&&Array.isArray(payload.shopping));
       finish(x.status===200&&valid,v,x.status);};
     timeout=setTimeout(function(){finish(false,null,0);try{x.abort();}catch(e){}},12000);x.send(null);
   }catch(e){finish(false,null,0);}
 }
 function reset(){
-  epoch++;busy=false;token="";mode="family";savedKey="";show("familyControls",true);running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
+  epoch++;busy=false;token="";automatic=false;modeLabel();mode="family";savedKey="";show("familyControls",true);running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("autoMode").onclick=function(){
+  if(!token)return;
+  automatic=true;epoch++;busy=false;editing=false;show("options",false);
+  clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
+};
 el("familyMode").onclick=function(){switchMode("family");};
 el("busMode").onclick=function(){switchMode("bus");};
-el("previous").onclick=function(){if(editing)return;running=false;stopRotation();advance(-1,false);};
-el("next").onclick=function(){if(editing)return;running=false;stopRotation();advance(1,false);};
-el("pause").onclick=function(){if(!data||editing)return;running=!running;render();scheduleRotation();};
-el("settings").onclick=function(){if(editing)return;editing=true;stopRotation();el("seconds").value=String(seconds);el("week").checked=includeWeek;el("shopping").checked=includeShopping;show("options",true);};
+el("previous").onclick=function(){if(editing)return;manual();running=false;stopRotation();advance(-1,false);};
+el("next").onclick=function(){if(editing)return;manual();running=false;stopRotation();advance(1,false);};
+el("pause").onclick=function(){if(!data||editing)return;if(running)manual();running=!running;render();scheduleRotation();};
+el("settings").onclick=function(){if(editing)return;manual();editing=true;stopRotation();el("seconds").value=String(seconds);el("week").checked=includeWeek;el("shopping").checked=includeShopping;show("options",true);};
 function closeSettings(){editing=false;show("options",false);scheduleRotation();}
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;seconds=n;includeWeek=el("week").checked;includeShopping=el("shopping").checked;closeSettings();};
 el("cancel").onclick=closeSettings;
