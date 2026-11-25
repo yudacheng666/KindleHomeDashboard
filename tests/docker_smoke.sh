@@ -94,7 +94,7 @@ cleanup_direct() {
 trap cleanup_direct EXIT
 docker network create --internal --subnet 172.30.99.0/24 "$net" >/dev/null
 KHD_LAN_HOST=172.30.99.20 KHD_LAN_NETWORK=172.30.99.0/24 KHD_BUS_ENABLED=1 KHD_BUS_WINDOWS='1:13:00-14:00;6:23:00-01:00' KHD_TIMEZONE=UTC KHD_BUS_DAILY_LIMIT=42 docker compose -f compose.lan.yaml config --format json | python3 -c 'import json,sys; e=json.load(sys.stdin)["services"]["dashboard"]["environment"]; assert e["KHD_BUS_ENABLED"]=="1" and e["KHD_BUS_WINDOWS"]=="1:13:00-14:00;6:23:00-01:00" and e["KHD_TIMEZONE"]=="UTC" and e["KHD_BUS_DAILY_LIMIT"]=="42"'
-docker run -d --name "$direct" --network "$net" --ip 172.30.99.20 --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus .5 --pids-limit 32 --mount "type=bind,source=$KHD_DATA_DIR,target=/var/lib/khd" --no-healthcheck -e KHD_BUS_ENABLED=1 -e "KHD_BUS_WINDOWS=1:13:00-14:00;6:23:00-01:00" -e KHD_TIMEZONE=UTC -e KHD_BUS_DAILY_LIMIT=42 kindle-home-dashboard:dev --directory /var/lib/khd --enable-household --lan-host 172.30.99.20 --lan-network 172.30.99.0/24 --open-admin >/dev/null
+docker run -d --name "$direct" --network "$net" --ip 172.30.99.20 --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus .5 --pids-limit 32 --mount "type=bind,source=$KHD_DATA_DIR,target=/var/lib/khd" --no-healthcheck -e KHD_BUS_ENABLED=1 -e "KHD_BUS_WINDOWS=1:13:00-14:00;6:23:00-01:00" -e KHD_TIMEZONE=Asia/Shanghai -e KHD_BUS_DAILY_LIMIT=42 kindle-home-dashboard:dev --directory /var/lib/khd --enable-household --lan-host 172.30.99.20 --lan-network 172.30.99.0/24 --open-admin >/dev/null
 docker run --rm -i --network "$net" --entrypoint python kindle-home-dashboard:dev - <<'PY'
 import json,time
 from urllib.request import urlopen, Request
