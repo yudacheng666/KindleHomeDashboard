@@ -8,6 +8,7 @@ from datetime import datetime
 from hmac import compare_digest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+from pathlib import Path
 import re
 from secrets import token_urlsafe
 from threading import Lock
@@ -17,6 +18,9 @@ from .bus import AccessBlocked, BusError
 from .routes import Line
 
 MAX_BODY = 16384
+WEB = Path(__file__).resolve().parent / "web"
+ASSETS = {"/": ("bus.html", "text/html; charset=utf-8"),
+          "/bus.js": ("bus.js", "application/javascript; charset=utf-8")}
 
 
 def _default(value):
@@ -90,19 +94,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_json(self, status, payload):
         raw = json.dumps(payload, ensure_ascii=False, default=_default).encode()
+        self.send_content(status, raw, "application/json; charset=utf-8")
+
+    def send_content(self, status, raw, content_type):
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(raw)
 
-    def guard(self, admin):
-        # No cross-origin browser access. No cookies/query-string tokens.
-        if self.headers.get_all("Host") != [self.server.expected_host] or self.headers.get("Origin") is not None:
+    def same_origin(self):
+        # Exact host and same-origin only; no CORS or cookie auth.
+        origins = self.headers.get_all("Origin") or []
+        if self.headers.get_all("Host") != [self.server.expected_host] or origins not in ([], ["http://" + self.server.expected_host]):
             self.send_json(403, {"error": "forbidden"})
+            return False
+        return True
+
+    def guard(self, admin):
+        if not self.same_origin():
             return False
         headers = self.headers.get_all("Authorization") or []
         if len(headers) != 1 or not self.server.api.authorized(headers[0], admin):
@@ -111,6 +127,18 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def do_GET(self):
+        if self.path in ASSETS:
+            if not self.same_origin():
+                return
+            filename, content_type = ASSETS[self.path]
+            try:
+                raw = (WEB / filename).read_bytes()
+            except OSError:
+                self.send_json(503, {"error": "service_error"})
+                return
+            # Static shell only; no secrets, configuration or live data.
+            self.send_content(200, raw, content_type)
+            return
         if not self.guard(False):
             return
         if self.path != "/api/bus/view":
