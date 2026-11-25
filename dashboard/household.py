@@ -71,6 +71,11 @@ class Household:
                     id TEXT PRIMARY KEY, label TEXT NOT NULL,
                     source TEXT NOT NULL, completed INTEGER NOT NULL DEFAULT 0,
                     UNIQUE(source, label));
+                CREATE TABLE IF NOT EXISTS display_settings (
+                    id INTEGER PRIMARY KEY CHECK(id=1),
+                    seconds INTEGER NOT NULL, include_week INTEGER NOT NULL,
+                    include_shopping INTEGER NOT NULL, autoplay INTEGER NOT NULL);
+                INSERT OR IGNORE INTO display_settings VALUES (1,180,0,0,0);
                 PRAGMA user_version=1;
             """)
 
@@ -268,6 +273,21 @@ class Household:
             if db.execute("DELETE FROM shopping WHERE id=?", (key,)).rowcount != 1:
                 raise ValueError("Unknown shopping item")
 
+    @staticmethod
+    def _display_settings(db):
+        row = db.execute("SELECT * FROM display_settings WHERE id=1").fetchone()
+        return {"seconds": row["seconds"], "include_week": bool(row["include_week"]),
+                "include_shopping": bool(row["include_shopping"]), "autoplay": bool(row["autoplay"])}
+
+    def set_display_settings(self, seconds, include_week, include_shopping, autoplay):
+        if type(seconds) is not int or seconds not in (120, 180, 300):
+            raise ValueError("Invalid rotation interval")
+        if any(type(v) is not bool for v in (include_week, include_shopping, autoplay)):
+            raise ValueError("Invalid display flags")
+        with self.db() as db:
+            db.execute("UPDATE display_settings SET seconds=?,include_week=?,include_shopping=?,autoplay=? WHERE id=1",
+                       (seconds, include_week, include_shopping, autoplay))
+
     def manage(self, on):
         """Include inactive content for authorized editing, separate from display."""
         on = day(on)
@@ -282,7 +302,7 @@ class Household:
                     "SELECT 1 FROM completions WHERE task_id=? AND occurrence=?",
                     (task["id"], occurrence)).fetchone())
                 tasks.append(task)
-            return {"date": on, "tasks": tasks,
+            return {"date": on, "display_settings": self._display_settings(db), "tasks": tasks,
                     "posters": [dict(r) for r in db.execute("SELECT * FROM posters ORDER BY start,id")],
                     "shopping": [dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]}
 
@@ -315,6 +335,6 @@ class Household:
                 posters.append({"id":p["id"],"title":p["title"],"body":due[p["task_id"]] if p["task_id"] else p["body"],"note":p["note"],"task_id":p["task_id"]})
             week=self._menus(db,monday.isoformat(),(monday+timedelta(days=6)).isoformat())
             shopping=[dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]
-            return {"date":on,"tasks":tasks,"posters":posters,
+            return {"date":on,"display_settings":self._display_settings(db),"tasks":tasks,"posters":posters,
                     "today_menu":[m for m in week if m["day"]==on],
                     "week_menu":week,"shopping":shopping}
