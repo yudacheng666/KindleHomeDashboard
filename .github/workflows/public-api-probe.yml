@@ -10,42 +10,54 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Unrelated public bus example, no credentials or raw payloads
+      - name: Two public bus stops
         shell: python
         run: |
-          import json, urllib.request, urllib.error
+          import json, re, urllib.request, urllib.error, datetime
           def post(path, body):
               req=urllib.request.Request("https://api.shmaas.net"+path,data=json.dumps(body).encode(),headers={"Content-Type":"application/json","X-Saic-CityCode":"310100","Accept":"application/json","User-Agent":"KindleHomeDashboard-public-api-test/1.0"},method="POST")
               with urllib.request.urlopen(req,timeout=15) as res:
                   d=json.loads(res.read(1048576))
-                  print("PROBE",path,"HTTP",res.status,"business_code",d.get("errCode"),"data_type",type(d.get("data")).__name__)
+                  print("PROBE",path,"HTTP",res.status,"business_code",d.get("errCode"))
                   if d.get("errCode") != 0: return {}
                   return d.get("data") or {}
+          def norm(v):
+              return re.sub(r"[\s（）()路]", "", str(v)).upper().replace("线","")
+          def numeric(v):
+              s=str(v).strip()
+              return float(s) if re.fullmatch(r"\d+(?:\.\d+)?",s) else None
+          targets=["金阳路中春路","金阳路瓶安路"]
           try:
-              d=post("/traffic/v2/querytrafficline",{"keywords":"71路","type":0,"pageNo":1,"pageSize":20})
-              rows=[]
-              for item in d.get("trafficStop",[]):
-                  rows.extend(item.get("stopLineInfo") or [])
-                  if item.get("lineInfo"): rows.append(item["lineInfo"])
-              line=next((x for x in rows if x.get("lineName")=="71路" and x.get("lineId") and x.get("upDown") is not None),None)
-              print("PROBE search_exact_match",bool(line))
-              if line:
-                  direction=str(line["upDown"])
+              print("PROBE UTC",datetime.datetime.now(datetime.timezone.utc).isoformat())
+              lines={}
+              for keyword in ("闵行37路B线","闵37B"):
+                  d=post("/traffic/v2/querytrafficline",{"keywords":keyword,"type":0,"pageNo":1,"pageSize":20})
+                  for item in d.get("trafficStop") or []:
+                      for x in (item.get("stopLineInfo") or [])+([item["lineInfo"]] if item.get("lineInfo") else []):
+                          if norm(x.get("lineName")) in ("闵行37B","闵37B") and x.get("lineId") and x.get("upDown") is not None:
+                              lines[(str(x["lineId"]),str(x["upDown"]))]=x
+                  if lines: break
+              print("PROBE route_candidates",len(lines))
+              matches=[]
+              for (_,direction),line in lines.items():
                   d=post("/traffic/v1/querybusline",{"lineId":line["lineId"],"lineName":line["lineName"],"direction":direction})
                   stops=(d.get("busLine") or {}).get("stop") or []
-                  print("PROBE stop_count",len(stops))
-                  if len(stops)>2:
-                      s=stops[len(stops)//2]
-                      d=post("/traffic/v1/getbusstoparrivedetails",{"lineName":line["lineName"],"stopName":s["stopName"],"stopId":s["stopId"],"direction":direction})
-                      a=d.get("stopArriveInfo") or {}
-                      print("PROBE eta_fields", {k: (k in a and a[k] is not None and a[k] != "") for k in ("currentBusArriveTime","nextBusArriveTime","currentBusDistance","nextBusDistance","currentBusStopCount","nextBusStopCount")}, "schedule_present",bool(d.get("dispatchCarSchedule")))
-                      import re
-                      def safe_numeric(v):
-                          s=str(v).strip()
-                          return s if re.fullmatch(r"-?\d+(?:\.\d+)?(?:分钟|秒|米|站)?",s) else ("missing" if v is None or s=="" else "nonnumeric")
-                      print("PROBE public_sample_numeric", {k:safe_numeric(a.get(k)) for k in ("currentBusArriveTime","nextBusArriveTime","currentBusDistance","nextBusDistance","currentBusStopCount","nextBusStopCount")})
-                      print("PROBE distinct_vehicles", bool(a.get("currentLicensePlate") and a.get("nextLicensePlate") and a.get("currentLicensePlate")!=a.get("nextLicensePlate")))
-                      print("PROBE public_sample_time", __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat())
+                  indices=[next((i for i,s in enumerate(stops) if s.get("stopName")==name and s.get("stopId")),None) for name in targets]
+                  print("PROBE direction",direction,"stop_count",len(stops),"matched_indices",indices)
+                  if all(i is not None for i in indices) and indices[0]<indices[1]:
+                      matches.append((line,direction,[stops[i] for i in indices]))
+              print("PROBE ordered_matches",len(matches))
+              if len(matches)!=1: raise ValueError("Ambiguous route or direction")
+              line,direction,stops=matches[0]
+              ids=[]
+              for s in stops:
+                  d=post("/traffic/v1/getbusstoparrivedetails",{"lineName":line["lineName"],"stopName":s["stopName"],"stopId":s["stopId"],"direction":direction})
+                  a=d.get("stopArriveInfo") or {}
+                  vals={k:numeric(a.get(k)) for k in ("currentBusArriveTime","nextBusArriveTime","currentBusDistance","nextBusDistance","currentBusStopCount","nextBusStopCount")}
+                  plates=[a.get("currentLicensePlate"),a.get("nextLicensePlate")]
+                  ids.append({str(x) for x in plates if x})
+                  print("PROBE STOP",s["stopName"],json.dumps(vals),"distinct_vehicles",len(ids[-1])==2,"schedule_present",bool(d.get("dispatchCarSchedule")))
+              print("PROBE overlapping_vehicle_count",len(ids[0]&ids[1]))
           except urllib.error.HTTPError as e:
               print("PROBE HTTP",e.code,"stop")
           except Exception as e:
