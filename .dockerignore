@@ -1,18 +1,8 @@
-.git
-.env*
-**/*.local.*
-private/
-config.local/
-data/
-state/
-cache/
-logs/
-backups/
-*.db
-*.sqlite*
-*.log
-*.pem
-*.key
-*.p12
-*.zip
-.venv/
+# Explicit runtime source only. Private directories must remain outside checkout.
+**
+!Dockerfile
+!dashboard/
+!dashboard/*.py
+!dashboard/web/
+!dashboard/web/*.html
+!dashboard/web/*.js

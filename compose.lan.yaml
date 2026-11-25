@@ -1,0 +1,35 @@
+# Explicit trusted-home mode. No public exposure; verify LAN firewall first.
+# Run with -f compose.lan.yaml, NOT merged with compose.yaml.
+services:
+  dashboard:
+    build:
+      context: .
+    image: kindle-home-dashboard:dev
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 32
+    stop_grace_period: 35s
+    environment:
+      KHD_BUS_ENABLED: "${KHD_BUS_ENABLED:-0}"
+      KHD_BUS_WINDOWS: "${KHD_BUS_WINDOWS:-}"
+      KHD_TIMEZONE: "${KHD_TIMEZONE:-Asia/Shanghai}"
+      KHD_BUS_DAILY_LIMIT: "${KHD_BUS_DAILY_LIMIT:-1000}"
+    volumes:
+      - type: bind
+        source: "${KHD_DATA_DIR:?Set an absolute private data directory}"
+        target: /var/lib/khd
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    ports:
+      - "${KHD_LAN_HOST:?Set the private NAS IPv4 address}:8080:8080"
+    command: ["--directory","/var/lib/khd","--enable-household","--lan-host","${KHD_LAN_HOST:?Set private NAS IPv4}","--lan-network","${KHD_LAN_NETWORK:?Set trusted home IPv4 CIDR}","--open-admin"]
+    # The default healthcheck targets the loopback Host; disable for LAN.
+    healthcheck:
+      disable: true

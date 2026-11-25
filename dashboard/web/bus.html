@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家庭看板 · 公交</title>
+<style>
+body{margin:0 auto;padding:18px;max-width:560px;background:#fff;color:#111;font:18px/1.5 sans-serif}
+h1{font-size:26px;margin:0} h2{font-size:22px;margin:12px 0}
+p{margin:8px 0} label{display:block;margin:12px 0 4px}
+input,select,button{box-sizing:border-box;font:inherit;color:#111;background:#fff;border:1px solid #444;border-radius:4px;padding:10px;max-width:100%}
+input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} button:disabled{color:#777}
+.primary{background:#222;color:#fff} .small{font-size:14px;color:#555}
+.panel{border-top:2px solid #222;margin-top:18px;padding-top:14px}
+.vehicle{padding:12px 0;border-bottom:1px solid #777}.eta{font-size:52px;font-weight:bold;line-height:1.1}
+.muted{color:#555}.hidden{display:none}.notice{border:2px solid #444;padding:10px}
+</style>
+</head>
+<body>
+<h1>家庭看板</h1><p class="small">公交 · 本地看板 · <a href="/home">家庭生活</a></p>
+<div id="login" class="panel">
+<label for="token">访问令牌（由本机管理员提供）</label>
+<input type="password" id="token" autocomplete="off" maxlength="128">
+<label for="mode">访问方式</label>
+<select id="mode"><option value="read">仅查看</option><option value="admin">管理公交</option></select>
+<button id="connect" class="primary" type="button">连接</button>
+</div>
+<p id="message" role="status" aria-live="polite"></p>
+<div id="dashboard" class="hidden">
+<p><button id="refresh" type="button">刷新显示</button> <button id="settings" type="button">公交设置</button> <button id="logout" type="button">退出</button></p>
+<div id="view" class="panel" aria-live="polite">
+<h2 id="line">尚未配置公交</h2><p id="trip"></p>
+<p id="status" class="notice">正在读取</p>
+<div id="vehicles"></div>
+<p id="schedule" class="small"></p><p id="updated" class="small"></p>
+</div>
+<div id="config" class="panel hidden">
+<h2>选择公交</h2>
+<label for="keyword">线路名称</label>
+<input id="keyword" maxlength="80" autocomplete="off" placeholder="输入公交线路">
+<button id="search" type="button">搜索</button>
+<div id="results" class="hidden">
+<label for="route">线路及方向</label><select id="route"></select>
+<label for="direction">查询方向</label><select id="direction"><option value="0">上行</option><option value="1">下行</option></select>
+<button id="detail" type="button">获取站点</button>
+</div>
+<div id="stations" class="hidden">
+<p id="endpoints"></p>
+<label for="board">上车站</label><select id="board"></select>
+<label for="destination">下车站</label><select id="destination"></select>
+<p id="selection-summary"></p>
+<button id="save" type="button" class="primary">保存并返回公交</button>
+</div>
+<button id="cancel" type="button">取消设置</button>
+</div>
+</div>
+<script src="/access-mode.js"></script><script src="/bus.js"></script>
+</body></html>
