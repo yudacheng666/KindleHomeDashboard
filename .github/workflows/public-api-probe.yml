@@ -25,12 +25,13 @@ jobs:
               return re.sub(r"[\s（）()路]", "", str(v)).upper().replace("线","")
           def numeric(v):
               s=str(v).strip()
-              return float(s) if re.fullmatch(r"\d+(?:\.\d+)?",s) else None
+              m=re.fullmatch(r"(\d+(?:\.\d+)?)(?:\s*(?:分钟|秒|米|站|m|km))?",s)
+              return float(m.group(1)) if m else None
           targets=["金阳路中春路","金阳路瓶安路"]
           try:
               print("PROBE UTC",datetime.datetime.now(datetime.timezone.utc).isoformat())
               lines={}
-              for keyword in ("闵行37路B线","闵37B","闵行37路"):
+              for keyword in ("闵行37路B线",):
                   d=post("/traffic/v2/querytrafficline",{"keywords":keyword,"type":0,"pageNo":1,"pageSize":20})
                   for item in d.get("trafficStop") or []:
                       for x in (item.get("stopLineInfo") or [])+([item["lineInfo"]] if item.get("lineInfo") else []):
@@ -38,7 +39,7 @@ jobs:
                               lines[(str(x["lineId"]),str(x["upDown"]))]=x
               print("PROBE route_candidates",len(lines))
               matches=[]
-              trials={(lid,dr):line for (lid,_),line in lines.items() for dr in ("0","1")}
+              trials={(lid,dr):line for (lid,_),line in lines.items() for dr in ("0",)}
               for (_,direction),line in trials.items():
                   d=post("/traffic/v1/querybusline",{"lineId":line["lineId"],"lineName":line["lineName"],"direction":direction})
                   stops=(d.get("busLine") or {}).get("stop") or []
@@ -59,6 +60,17 @@ jobs:
                   plates=[a.get("currentLicensePlate"),a.get("nextLicensePlate")]
                   ids.append({str(x) for x in plates if x})
                   print("PROBE STOP",s["stopName"],json.dumps(vals),"distinct_vehicles",len(ids[-1])==2,"schedule_present",bool(d.get("dispatchCarSchedule")))
+                  def state(v):
+                      if v is None: return "missing_or_null"
+                      z=str(v).strip()
+                      if not z: return "empty"
+                      if re.fullmatch(r"-?\d+(?:\.\d+)?(?:\s*(?:分钟|秒|米|站|m|km))?",z): return z
+                      if z in ("--","-","暂无数据","暂无车辆","无车","已到站","即将到站","未发车","待发车","已停运","无实时数据","暂无实时信息","未运营","运营结束"): return z
+                      return "other_text"
+                  print("PROBE field_state",{k:state(a.get(k)) for k in vals},"schedule_keys",list((d.get("dispatchCarSchedule") or {}).keys()))
+                  sc=d.get("dispatchCarSchedule") or {}
+                  msg=str(sc.get("scheduleMsg",""))
+                  print("PROBE schedule_indicators",{k:k in msg for k in ("停运","末班","发车","运营","暂无","无车","结束")},"planned_departures",len(sc.get("dispatchCars") or []))
               print("PROBE overlapping_vehicle_count",len(ids[0]&ids[1]))
           except urllib.error.HTTPError as e:
               print("PROBE HTTP",e.code,"stop")
