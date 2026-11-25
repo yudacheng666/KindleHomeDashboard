@@ -123,6 +123,25 @@ def main():
                 assert js("return document.getElementById('login').className==='hidden'")
                 click("logout")
                 assert js("return document.getElementById('body').textContent==='' && document.getElementById('display').className==='hidden'")
+                # Direct mode preview, isolated loopback only. The same static
+                # pages must open without typing credentials.
+                server.api.direct = True
+                server.api.admin_token = None
+                go("/display")
+                wait(lambda:text_in("heading","今日生活"))
+                click("busMode")
+                wait(lambda:text_in("body","公交采集未启用"))
+                go("/home")
+                wait(lambda:text_in("content","保存轮播设置"))
+                wait(lambda:js("document.getElementById('tasks').click();return document.getElementById('content').textContent.indexOf('新增待办')>=0"))
+                button("content","新增待办")
+                js("document.querySelector('#editor input').value='Fictional direct task'")
+                button("editor","保存")
+                wait(lambda:len(home.view("2026-01-05")["tasks"])==2)
+                go("/")
+                wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
+                assert js("return document.getElementById('settings').className!=='hidden'")
+                print("Real Chromium direct access PASS: display, management without login, bus settings")
                 print("Real Chromium PASS: create task, persisted content, linked poster, menu, saved rotation, single-session module switch and logout")
             finally:
                 if sid:
