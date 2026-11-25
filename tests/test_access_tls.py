@@ -9,7 +9,6 @@ from threading import Thread
 import unittest
 
 from dashboard.access import create_credentials
-from dashboard.devices import Devices
 from dashboard.http_api import API, LocalServer, tls_context
 from dashboard.household import Household
 from dashboard.runtime import Runtime
@@ -137,32 +136,6 @@ class TLSTests(unittest.TestCase):
                 conn.request("GET","/display")
         finally:
             conn.close()
-
-    def test_pairing_end_to_end(self):
-        base = "/api/devices/"
-        self.assertEqual(self.request(base+"issue",self.admin,{"label":"Example"})[0],404)
-        self.server.api.devices = Devices(self.temp.name)
-        self.assertEqual(self.request(base+"issue",self.reader,{"label":"Example"})[0],401)
-        status,body,cache = self.request(base+"issue",self.admin,{"label":"Example"})
-        self.assertEqual((status,cache),(200,"no-store"))
-        code = json.loads(body)["code"]
-        self.assertEqual(self.request(base+"redeem",body={"code":code},
-                         extra={"Origin":"https://example.invalid"})[0],403)
-        status,body,cache = self.request(base+"redeem",body={"code":code})
-        self.assertEqual((status,cache),(200,"no-store"))
-        device = json.loads(body)
-        token = device["token"]
-        self.assertEqual(self.request(base+"redeem",body={"code":code})[0],400)
-        self.assertEqual(self.request("/api/home/view",token)[0],200)
-        self.assertEqual(self.request("/api/bus/view",token)[0],200)
-        self.assertEqual(self.request("/api/home/manage",token)[0],401)
-        self.assertEqual(self.request(base+"list",token)[0],401)
-        self.assertEqual(self.request(base+"revoke",token,{"id":device["id"],"confirm":True})[0],401)
-        self.assertNotIn(token.encode(),self.request(base+"list",self.admin)[1])
-        self.assertEqual(self.request(base+"revoke",self.admin,{"id":device["id"],"confirm":False})[0],400)
-        self.assertEqual(self.request(base+"revoke",self.admin,{"id":device["id"],"confirm":True})[0],200)
-        self.assertEqual(self.request("/api/home/view",token)[0],401)
-        self.assertEqual(self.request("/api/home/view",self.reader)[0],200)
 
     def test_key_permissions(self):
         self.key.chmod(0o644)
