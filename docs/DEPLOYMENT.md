@@ -1,0 +1,26 @@
+# Docker 本机集成部署原型（未发布）
+
+目前只供隔离测试：服务仍绑定容器内部 127.0.0.1:8080，不发布端口、不使用 host 网络，手机和 Kindle 暂不能直接连接。不要把端口转发到局域网或公网，也不要关闭安全校验。极空间 Docker/Compose 版本、CPU 架构、数据卷权限、可信 HTTPS 接入、设备配对及真正的 NAS 资源占用仍待验收。
+
+## 结构与运行
+
+- 单容器，Python 3.12 slim Debian Bookworm，含时区及 CA 证书；无 pip 运行依赖、浏览器或外部数据库服务。
+- 容器 UID/GID 10001；只读根文件系统、无额外 capabilities、禁止提升权限，初始上限 128MiB/0.5 CPU/32 PID。不是实测值。
+- `compose.yaml` 需要 Compose v2 支持 bind.create_host_path；指定已经存在的私有目录与令牌环境文件。只默认启用家庭功能，公交联网默认关闭。
+- 镜像构建仅包含 dashboard 运行源文件；真实数据、备份、凭证和部署参数放在仓库及构建上下文之外。
+- `restart: unless-stopped` 在 Docker 服务正常启动且容器未被手动停止时可自动恢复。健康检查只确认本机静态 HTTP 页面响应，不证明数据源正常，不会自行重启不健康容器。
+- SIGTERM/SIGINT 触发正常停止及后台采集退出；长时间异常上游或磁盘操作仍可能超过停止限时。
+
+## 隔离测试操作（技术维护用，不要求普通用户现在执行）
+
+在专用测试机上准备绝对路径的私有空目录，令 UID/GID 10001 具备读写权限，目录权限尽量为0700。不要对已有 NAS 共享目录递归改所有权。另准备仓库外0600环境文件，用本机密码学随机数分别生成独立的 KHD_READ_TOKEN / KHD_ADMIN_TOKEN（32字节随机数的 URL-safe 编码即可）；禁止公开、粘贴到聊天或 CI，不使用默认口令。Docker 管理员可读取容器环境，勿向他人共享 inspect/config 输出。
+
+将 KHD_DATA_DIR、KHD_PRIVATE_ENV 指向上述绝对路径。执行 `docker compose config --quiet`、`docker compose build`、`docker compose up -d --no-build`。使用容器内部本机 HTTP 检查，不映射端口。健康检查、容器状态和停止操作可通过 Docker 管理器查看。停止使用 `docker compose stop`；不要删除数据目录。
+
+## 升级与恢复
+
+正式发布前需固定镜像版本及 digest，保留上一已验证镜像，备份数据库及独立的私有启动配置/令牌。停止服务后用 `dashboard.backup` 备份，检查返回结果；更新镜像时保留私有目录映射，若版本不兼容先在新目录恢复并验证。禁止自动回滚旧数据库结构或旧访问限制。恢复强制阻断公交联网，尚无受审查的重新启用入口。详见 TEST_PLAN.md。当前原型镜像标签 dev 不代表正式版本。
+
+## 验收
+
+`tests/docker_smoke.sh` 只用于隔离 Linux CI（需要 Docker Compose 和 sudo），生成虚构数据及临时令牌，不使用家庭网络。检查真实构建、非 root、资源限制、无端口映射、HTTP 鉴权、正常停止、删除并重建容器后的持久数据、镜像不含 Git/测试目录。采样资源不代表实际通勤负载或 NAS 兼容性。不得将真实数据导入测试。正式部署必须通过局域网 TLS/配对、真实设备和 NAS 独立验收。
