@@ -6,6 +6,7 @@ MANAGE = "/api/home/manage"
 
 # Map only fixed operations to explicit methods and required fields.
 OPERATIONS = {
+    "display/set": ("set_display_settings", ("seconds","include_week","include_shopping","autoplay")),
     "task/add": ("add_task", ("title","start","repeat")),
     "task/edit": ("edit_task", ("key","title","start","repeat")),
     "task/delete": ("delete_task", ("key",)),
