@@ -121,6 +121,36 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(status, 200)
         return result["selection"]
 
+    def test_browser_shell_and_script(self):
+        conn = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        try:
+            conn.request("GET", "/")
+            res = conn.getresponse()
+            self.assertEqual(res.status, 200)
+            self.assertEqual(res.getheader("Cache-Control"), "no-store")
+            self.assertIn("frame-ancestors 'none'", res.getheader("Content-Security-Policy"))
+            html = res.read().decode()
+            self.assertIn('<script src="/bus.js">', html)
+            self.assertNotIn(self.admin, html)
+            self.assertNotIn(self.reader, html)
+            conn.request("GET", "/bus.js")
+            res = conn.getresponse()
+            self.assertEqual(res.status, 200)
+            self.assertIn("XMLHttpRequest", res.read().decode())
+        finally:
+            conn.close()
+        self.assertEqual(self.calls, [])
+
+    def test_same_origin_browser_post(self):
+        origin = "http://127.0.0.1:" + str(self.server.server_port)
+        status, data, _ = self.req("POST", "/api/bus/search", self.admin,
+                                  {"keyword": "Example"}, {"Origin": origin})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(data["lines"]), 1)
+        self.assertEqual(self.req("POST", "/api/bus/search", self.admin,
+                                  {"keyword": "Example"}, {"Origin": "http://example.invalid"})[0], 403)
+        self.assertEqual(self.req("GET", "/api/bus/view?token=example")[0], 401)
+
     def test_auth_and_no_cache(self):
         self.assertEqual(self.req("GET", "/api/bus/view")[0], 401)
         self.assertEqual(self.req("POST", "/api/bus/search", self.reader, {"keyword": "Example"})[0], 401)
