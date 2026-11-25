@@ -12,3 +12,12 @@ https://www.home-assistant.io/integrations/local_todo/ 与 https://www.home-assi
 官方授权及配额 → 公交线路/方向/ID/ETA私有实测 → 驾车真实交通数据 → 设备型号和固件、NAS Docker/资源 → 架构与界面审批 → 实施。当前只有文档调研，不存在真实接口或硬件通过证据。
 
 补充：随申行网关需对接方提供网络出口 IP，平台邮件发放域名、MerchantId 与签名盐值；个人申请、动态公网 IP/家庭 NAT 是否可接受尚不明确。先咨询公开商务邮箱 DataBD@shmaas.cn，不发送私有路线或家庭 IP。高德高级公交信息查询 https://lbs.amap.com/api/webservice/guide/api-advanced/bus-inquiry 提供站点/线路 ID 和关键字查询，有体验配额，可用于公开线路拓扑验证，但非实时 ETA，供应商 ID 不可假定互通。paperwhite-weather 为 MIT，作者记录15分钟刷新、重启自动恢复，不能直接证明15秒高频可行。
+
+## 2026-11-25 第二轮：个人公交数据源
+优先级调整为政府公共数据开放平台（在线接入候选），不再以商务邮件为前置。
+- 2026 M-Design 墨水屏公交案例：https://www.lab-z.com/bsshow/ （2026-11-23）及 https://www.eetree.cn/project/detail/5310 。作者报告个人实名取得 Token，使用上海公共数据开放平台的 POST 接口，资源标识 sod-p4pm95e968tfxhil41cotzxyn；参数 cityCode、isGetStopArrive、lon、lat、limit、offset、coordinateType，使用 WGS84，响应含 lineId、stopId、upDown。文章展示的 JSON 片段主要为 dispatchCarSchedule（计划发车），不得将其作为在途 ETA 验收证据。案例仅为第三方实测。官方平台主页本轮网页访问返回 412，接口 URL 无法通过当前网页工具读取；未发出带合法 Token 的 POST，资源的现行开放类别、配额、有效期、费用与真实 ETA 待核实。政府规则 https://www.shanghai.gov.cn/sjaqsj/20250724/b07f46d764f24bc9abc93a9e5606c025.html 区分无条件与有条件开放；个人可申请并按协议使用，不能推断所有资源都免费或无限额。
+- Code410 https://www.code410.com/api/231 2026-06-15 文档称免费 GET、全站10万次/日，字段线路/终点/ETA/剩余站数。实际打开不带参数的公开 URL https://api.code410.com/api/traffic/bus 取得 JSON 业务提示需要城市与站点；带无关公共示例站点的查询无法由网页工具读取，不能判断是工具限制还是服务故障。未收到车辆数据。来源授权、单用户额度、多车、稳定性未确认；不作正式依赖。
+- 极数本源 https://apizero.cn/aidocs/bus-realtime/raw.md ：POST，匿名5次/日、登录20次/日、会员5万次/日起；有站台和多车 ETA 结构，但免费额度不足以支撑每15–30秒采集（每小时120–240次）。上游授权与实际覆盖待核实；未实测，不购买会员。
+- https://github.com/2107596808/hacs-chelaile 作者实现 HA 集成，默认30秒轮询；https://github.com/afterglowsdev/chelaile-api-collect 作者记录2026-03-18其他城市实时数据与旧接口停用；https://github.com/Justintunsday/chelaile-api-server 提供 HTTP 封装，两个公共实例健康检查均无法由网页工具读取。以上是第三方逆向适配，未确认上游授权，不采用绕过访问控制或违反条款的方式，不因开源而推断数据授权。可借鉴状态结构与调度。https://github.com/JerryChin/shanghai-bus-api 因接口失效于2022年归档。https://api.aa1.cn/doc/gjc.html 公布监测记录故障3015次、正常208次，不适合核心依赖。
+- 驾车：高德 https://lbs.amap.com/api/webservice/guide/api/newroute (2026-06-17) 和百度 https://lbsyun.baidu.com/docs/webapi?title=directionv2%2Fdirection-api-v2 (2026-03-19) 官方文档复核，后者明确实时路况算路；均需正式 Key/AK，未实测。高德协议 https://lbs.amap.com/pages/terms 对数据存储、缓存及非开放内部数据使用有限制，设计时核实许可，不默认长期保存路况。
+本轮未发送咨询邮件、未调用真实私有线路、未新开通账号/服务、未提交真实配置，未得到指定线路真实 ETA。当前阶段继续数据源验证而非开发或硬件操作。
