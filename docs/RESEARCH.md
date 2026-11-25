@@ -10,3 +10,5 @@ https://kindlemodding.org/jailbreaking/index.html 按型号及固件确定路径
 https://www.home-assistant.io/integrations/local_todo/ 与 https://www.home-assistant.io/integrations/shopping_list/ 原生待办购物可复用；https://www.home-assistant.io/integrations/open_meteo/ 免费无 key 天气候选，预警与空气质量覆盖另核实。Apple 提醒事项同步尚未验证。
 ## 验证顺序
 官方授权及配额 → 公交线路/方向/ID/ETA私有实测 → 驾车真实交通数据 → 设备型号和固件、NAS Docker/资源 → 架构与界面审批 → 实施。当前只有文档调研，不存在真实接口或硬件通过证据。
+
+补充：随申行网关需对接方提供网络出口 IP，平台邮件发放域名、MerchantId 与签名盐值；个人申请、动态公网 IP/家庭 NAT 是否可接受尚不明确。先咨询公开商务邮箱 DataBD@shmaas.cn，不发送私有路线或家庭 IP。高德高级公交信息查询 https://lbs.amap.com/api/webservice/guide/api-advanced/bus-inquiry 提供站点/线路 ID 和关键字查询，有体验配额，可用于公开线路拓扑验证，但非实时 ETA，供应商 ID 不可假定互通。paperwhite-weather 为 MIT，作者记录15分钟刷新、重启自动恢复，不能直接证明15秒高频可行。
