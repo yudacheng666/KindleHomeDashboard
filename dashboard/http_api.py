@@ -1,13 +1,10 @@
-"""Loopback-only authenticated JSON API prototype.
-
-Do not expose this plain HTTP service to the LAN or Internet. A reviewed
-HTTPS/access layer and device pairing are required before LAN deployment.
-"""
+"""Local HTTP API; explicit trusted LAN mode or authenticated loopback."""
 from dataclasses import asdict
 from datetime import datetime
 from hmac import compare_digest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 import re
 import ssl
@@ -21,11 +18,6 @@ from .trip_store import TripStore
 from .household_api import HouseholdAPI, READ, MANAGE, POST_PATHS
 
 MAX_BODY = 16384
-DEVICE_LIST = '/api/devices/list'
-DEVICE_ISSUE = '/api/devices/issue'
-DEVICE_REDEEM = '/api/devices/redeem'
-DEVICE_REVOKE = '/api/devices/revoke'
-DEVICE_POSTS = (DEVICE_ISSUE, DEVICE_REDEEM, DEVICE_REVOKE)
 WEB = Path(__file__).resolve().parent / "web"
 ASSETS = {"/": ("bus.html", "text/html; charset=utf-8"),
           "/bus.js": ("bus.js", "application/javascript; charset=utf-8"),
@@ -48,25 +40,27 @@ def _token(value):
 
 
 class API:
-    def __init__(self, runtime, read_token, admin_token, household=None, devices=None):
+    def __init__(self, runtime, read_token, admin_token, household=None, *, direct=False):
         self.runtime = runtime
-        self.devices = devices
+        self.direct = direct
         self.household = HouseholdAPI(household, runtime) if household is not None else None
-        self.read_token, self.admin_token = _token(read_token), _token(admin_token)
-        if compare_digest(self.read_token, self.admin_token):
+        self.read_token = None if direct else _token(read_token)
+        self.admin_token = _token(admin_token) if admin_token is not None or not direct else None
+        if not direct and compare_digest(self.read_token, self.admin_token):
             raise ValueError("Separate read and administration tokens required")
         self.selection = None
         self.lock = Lock()
 
     def authorized(self, header, admin=False):
+        if self.direct and (not admin or self.admin_token is None):
+            return True
         if not isinstance(header, str) or not header.isascii():
             return False
         if not header.startswith("Bearer "):
             return False
         value = header[7:]
         return compare_digest(value, self.admin_token) or (
-            not admin and (compare_digest(value, self.read_token) or
-                           (self.devices is not None and self.devices.authorized(value))))
+            not admin and compare_digest(value, self.read_token))
 
     def dispatch(self, path, body):
         # Single selection session: a newer route preview invalidates the old
@@ -129,7 +123,7 @@ class Handler(BaseHTTPRequestHandler):
     def same_origin(self):
         # Exact host and same-origin only; no CORS or cookie auth.
         origins = self.headers.get_all("Origin") or []
-        if self.headers.get_all("Host") != [self.server.expected_host] or origins not in ([], [self.server.expected_origin]):
+        if not self.server.allowed_peer(self.client_address[0]) or self.headers.get_all("Host") != [self.server.expected_host] or origins not in ([], [self.server.expected_origin]):
             self.send_json(403, {"error": "forbidden"})
             return False
         return True
@@ -138,12 +132,20 @@ class Handler(BaseHTTPRequestHandler):
         if not self.same_origin():
             return False
         headers = self.headers.get_all("Authorization") or []
-        if len(headers) != 1 or not self.server.api.authorized(headers[0], admin):
+        if len(headers) > 1 or not self.server.api.authorized(headers[0] if headers else None, admin):
             self.send_json(401, {"error": "unauthorized"})
             return False
         return True
 
     def do_GET(self):
+        if self.path == "/access-mode.js":
+            if not self.same_origin():
+                return
+            direct = self.server.api.direct
+            flags = {"direct": direct, "openAdmin": direct and self.server.api.admin_token is None}
+            self.send_content(200, ("window.KHD_ACCESS="+json.dumps(flags)+";").encode(),
+                              "application/javascript; charset=utf-8")
+            return
         if self.path in ASSETS:
             if not self.same_origin():
                 return
@@ -155,13 +157,6 @@ class Handler(BaseHTTPRequestHandler):
                 return
             # Static shell only; no secrets, configuration or live data.
             self.send_content(200, raw, content_type)
-            return
-        if self.path == DEVICE_LIST and self.server.api.devices is not None:
-            if self.guard(True):
-                try:
-                    self.send_json(200, {"devices": self.server.api.devices.list()})
-                except Exception:
-                    self.send_json(503, {"error": "service_error"})
             return
         if not self.guard(self.path == MANAGE):
             return
@@ -178,14 +173,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, payload)
 
     def do_POST(self):
-        device_op = self.path in DEVICE_POSTS and self.server.api.devices is not None
-        if device_op and self.path == DEVICE_REDEEM:
-            if not self.same_origin():
-                return
-        elif not self.guard(True):
+        if not self.guard(True):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
-        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save") and not home and not device_op:
+        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save") and not home:
             self.send_json(404, {"error": "not_found"})
             return
         if self.headers.get("Transfer-Encoding") is not None or self.headers.get_content_type() != "application/json":
@@ -206,19 +197,7 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
             if not isinstance(body, dict):
                 raise ValueError("Object required")
-            if device_op:
-                devices = self.server.api.devices
-                if self.path == DEVICE_ISSUE and set(body) == {"label"}:
-                    result = devices.issue(body["label"])
-                elif self.path == DEVICE_REDEEM and set(body) == {"code"}:
-                    result = devices.redeem(body["code"])
-                elif self.path == DEVICE_REVOKE and set(body) == {"id", "confirm"} and body["confirm"] is True:
-                    devices.revoke(body["id"])
-                    result = {"revoked": True}
-                else:
-                    raise ValueError("Invalid device operation")
-            else:
-                result = self.server.api.dispatch(self.path, body)
+            result = self.server.api.dispatch(self.path, body)
         except AccessBlocked:
             self.send_json(503, {"error": "provider_blocked"})
         except BudgetWait:
@@ -250,15 +229,37 @@ def tls_context(cert, key):
     return ctx
 
 
+PRIVATE = tuple(IPv4Network(n) for n in ("10.0.0.0/8","172.16.0.0/12","192.168.0.0/16"))
+
+
 class LocalServer(HTTPServer):
-    def __init__(self, api, port=8080, *, tls=None):
+    def __init__(self, api, port=8080, *, tls=None, lan_host=None, lan_network=None):
         self.api = api
         self.tls = tls
-        if api.devices is not None and tls is None:
-            raise ValueError("Device pairing requires HTTPS")
-        super().__init__(("127.0.0.1", port), Handler)
-        self.expected_host = "127.0.0.1:" + str(self.server_port)
+        self.lan_network = None
+        bind = "127.0.0.1"
+        host = bind
+        if lan_host is not None or lan_network is not None:
+            if not api.direct or not lan_host or not lan_network:
+                raise ValueError("Explicit LAN address and subnet required")
+            address, network = IPv4Address(lan_host), IPv4Network(lan_network, strict=True)
+            if not any(network.subnet_of(n) for n in PRIVATE) or address not in network:
+                raise ValueError("Use a private IPv4 LAN subnet and address")
+            if address in (network.network_address, network.broadcast_address):
+                raise ValueError("Invalid LAN host")
+            if api.admin_token is not None and tls is None:
+                raise ValueError("Management credentials require HTTPS on LAN")
+            self.lan_network = network
+            # Docker bridge publishing binds the NAS IP at the host boundary.
+            # No proxy headers are used to decide client address or origin.
+            bind, host = "0.0.0.0", str(address)
+        super().__init__((bind, port), Handler)
+        self.expected_host = host + ":" + str(self.server_port)
         self.expected_origin = ("https://" if tls is not None else "http://") + self.expected_host
+
+    def allowed_peer(self, address):
+        return (address == "127.0.0.1" if self.lan_network is None
+                else IPv4Address(address) in self.lan_network)
 
     def get_request(self):
         sock, address = super().get_request()
