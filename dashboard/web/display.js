@@ -39,7 +39,7 @@ function render(){
 }
 function stopRotation(){clearTimeout(rotationTimer);rotationTimer=null;}
 function scheduleRotation(){
-  stopRotation();if(!running||editing||!data||pages.filter(eligible).length<2)return;
+  stopRotation();if(!running||editing||!data||document.hidden||pages.filter(eligible).length<2)return;
   rotationTimer=setTimeout(function(){
     rotationTimer=null;advance(1,true);scheduleRotation();
   },seconds*1000);
@@ -57,21 +57,22 @@ function accept(v){
   data=v;pages=next;cursor=found<0?0:found;
   show("login",false);show("display",true);txt("status","");
   render();
-  if(rotationTimer===null)scheduleRotation();
+  if(!running||pages.filter(eligible).length<2)stopRotation();
+  else if(rotationTimer===null||found<0)scheduleRotation();
 }
 function hide(reason){
   data=null;pages=[];cursor=0;lastRender="";stopRotation();
   txt("date","");txt("heading","");clear(el("body"));txt("index","");txt("status",reason);
 }
 function refresh(){
-  if(!token||busy)return;
+  if(!token||busy||document.hidden)return;
   busy=true;var g=epoch,x=new XMLHttpRequest(),ended=false,timeout;
   function finish(ok,v,status){
     if(ended)return;ended=true;clearTimeout(timeout);if(g!==epoch)return;busy=false;
     if(ok){accept(v);}
     else{hide(status===401?"令牌无效，请重新连接。":status===404?"家庭模块未启用。":"连接异常，家庭内容已隐藏。");
       if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
-    clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,30000);
+    clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,30000);
   }
   try{x.open("GET","/api/home/view",true);x.setRequestHeader("Authorization","Bearer "+token);
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
@@ -95,7 +96,7 @@ el("cancel").onclick=closeSettings;
 el("logout").onclick=reset;
 if(window.addEventListener)window.addEventListener("pagehide",reset,false);
 if(document.addEventListener)document.addEventListener("visibilitychange",function(){
-  if(document.hidden){stopRotation();clearTimeout(refreshTimer);refreshTimer=null;}
+  if(document.hidden){stopRotation();clearTimeout(refreshTimer);refreshTimer=null;epoch++;busy=false;}
   else if(token){hide("正在重新读取");refresh();}
 },false);
 }());
