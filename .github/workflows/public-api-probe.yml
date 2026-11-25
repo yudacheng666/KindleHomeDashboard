@@ -10,37 +10,36 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Check documented response shape and provider messages
+      - name: Unrelated public bus example, no credentials or raw payloads
         shell: python
         run: |
-          import json, urllib.parse, urllib.request, urllib.error
-          def summarize(d):
-              if not isinstance(d,dict):
-                  return {"root_type":type(d).__name__}
-              messages=[]
+          import json, urllib.request, urllib.error
+          def post(path, body):
+              req=urllib.request.Request("https://api.shmaas.net"+path,data=json.dumps(body).encode(),headers={"Content-Type":"application/json","X-Saic-CityCode":"310100","Accept":"application/json","User-Agent":"KindleHomeDashboard-public-api-test/1.0"},method="POST")
+              with urllib.request.urlopen(req,timeout=15) as res:
+                  d=json.loads(res.read(1048576))
+                  print("PROBE",path,"HTTP",res.status,"business_code",d.get("errCode"),"data_type",type(d.get("data")).__name__)
+                  if d.get("errCode") != 0: return {}
+                  return d.get("data") or {}
+          try:
+              d=post("/traffic/v2/querytrafficline",{"keywords":"71路","type":0,"pageNo":1,"pageSize":20})
               rows=[]
-              def walk(x):
-                  if isinstance(x,dict):
-                      if any(k in x for k in ("expected_arrival","estimated_time","remaining_stations")):
-                          rows.append(x)
-                      for v in x.values():
-                          walk(v)
-                  elif isinstance(x,list):
-                      for v in x: walk(v)
-                  elif isinstance(x,str):
-                      for tag in ("暂无","未找到","查不到","未查询","没有","无数据","失败","错误","站点","线路","限流","维护","停止","运营","超时","城市","权限","参数"):
-                          if tag in x and tag not in messages: messages.append(tag)
-              data=d.get("data")
-              walk(data)
-              walk(d.get("msg"))
-              return {"business_code":d.get("code"),"data_type":type(data).__name__,"entries":len(data) if isinstance(data,(dict,list)) else None,"vehicle_like":len(rows),"ETA_nonempty":sum(bool(x.get("expected_arrival") or x.get("estimated_time")) for x in rows),"message_categories":messages}
-          for city,site,direction in [("深圳","京基",0),("上海","人民广场",0),("上海","人民广场",1)]:
-              params={"city":city,"site":site}
-              if direction: params["backward"]=1
-              try:
-                  req=urllib.request.Request("https://api.code410.com/api/traffic/bus?"+urllib.parse.urlencode(params),headers={"Accept":"application/json","User-Agent":"KindleHomeDashboard-public-api-test/1.0"})
-                  with urllib.request.urlopen(req,timeout=12) as res:
-                      d=json.loads(res.read(1048576))
-                      print("PROBE", city,site,direction,res.status,json.dumps(summarize(d),ensure_ascii=False))
-              except Exception as exc:
-                  print("PROBE",city,site,direction,type(exc).__name__,getattr(exc,"code",""))
+              for item in d.get("trafficStop",[]):
+                  rows.extend(item.get("stopLineInfo") or [])
+                  if item.get("lineInfo"): rows.append(item["lineInfo"])
+              line=next((x for x in rows if x.get("lineName")=="71路" and x.get("lineId") and x.get("upDown") is not None),None)
+              print("PROBE search_exact_match",bool(line))
+              if line:
+                  direction=str(line["upDown"])
+                  d=post("/traffic/v1/querybusline",{"lineId":line["lineId"],"lineName":line["lineName"],"direction":direction})
+                  stops=(d.get("busLine") or {}).get("stop") or []
+                  print("PROBE stop_count",len(stops))
+                  if len(stops)>2:
+                      s=stops[len(stops)//2]
+                      d=post("/traffic/v1/getbusstoparrivedetails",{"lineName":line["lineName"],"stopName":s["stopName"],"stopId":s["stopId"],"direction":direction})
+                      a=d.get("stopArriveInfo") or {}
+                      print("PROBE eta_fields", {k: (k in a and a[k] is not None and a[k] != "") for k in ("currentBusArriveTime","nextBusArriveTime","currentBusDistance","nextBusDistance","currentBusStopCount","nextBusStopCount")}, "schedule_present",bool(d.get("dispatchCarSchedule")))
+          except urllib.error.HTTPError as e:
+              print("PROBE HTTP",e.code,"stop")
+          except Exception as e:
+              print("PROBE error",type(e).__name__)
