@@ -145,6 +145,17 @@ class PollerTests(unittest.TestCase):
         self.answer = payload()
         self.assertEqual(p.poll().status, "live")
 
+    def test_fresh_empty_after_expiry(self):
+        p = self.new(enabled=True)
+        p.poll()
+        self.advance(90)
+        self.answer = payload({}, [{"dispatchTime": "08:00"}])
+        snap = p.poll()
+        self.assertEqual(snap.status, "no_live_data")
+        self.assertEqual(snap.vehicles, ())
+        self.assertEqual(snap.scheduled_departures, 1)
+        self.assertEqual(snap.fetched_at, self.now)
+
     def test_failure_backoff(self):
         p = self.new(enabled=True)
         p.poll()
