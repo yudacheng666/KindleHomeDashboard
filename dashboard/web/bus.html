@@ -17,7 +17,7 @@ input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} but
 </style>
 </head>
 <body>
-<h1>家庭看板</h1><p class="small">公交 · 本机联调原型 · <a href="/home">家庭生活</a>（需重新连接）</p>
+<h1>家庭看板</h1><p class="small">公交 · 本地看板 · <a href="/home">家庭生活</a></p>
 <div id="login" class="panel">
 <label for="token">访问令牌（由本机管理员提供）</label>
 <input type="password" id="token" autocomplete="off" maxlength="128">
@@ -54,5 +54,5 @@ input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} but
 <button id="cancel" type="button">取消设置</button>
 </div>
 </div>
-<script src="/bus.js"></script>
+<script src="/access-mode.js"></script><script src="/bus.js"></script>
 </body></html>
