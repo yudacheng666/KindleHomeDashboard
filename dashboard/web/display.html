@@ -10,7 +10,7 @@ button{margin:4px 4px 4px 0}input[type=password]{display:block;width:100%;margin
 .poster{text-align:center;font-size:38px;line-height:1.5;font-weight:bold}.poster.medium{font-size:30px}.poster.compact{font-size:24px}.note{font-size:16px;color:#333}.eta{font-size:44px;line-height:1.2;font-weight:bold}
 label{display:block;margin:8px 0}a{color:#111}.status{font-size:15px;color:#444}
 </style></head>
-<body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 仅本机联调</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button><p><a href="/home">家庭管理</a> · <a href="/">公交</a></p></div>
+<body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button><p><a href="/home">家庭管理</a> · <a href="/">公交</a></p></div>
 <p id="status" class="status" role="status"></p>
 <div id="display" class="hidden"><p><button id="familyMode" type="button">家庭生活</button><button id="busMode" type="button">实时公交</button><button id="logout" type="button">退出</button></p><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div>
 <p id="index" class="status"></p>
@@ -19,5 +19,5 @@ label{display:block;margin:8px 0}a{color:#111}.status{font-size:15px;color:#444}
 <div id="options" class="hidden"><label for="seconds">每页停留</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select>
 <label><input id="week" type="checkbox"> 本周菜单加入轮播</label><label><input id="shopping" type="checkbox"> 购物清单加入轮播</label>
 <p class="status">本次调整不会修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>
-</div><p><small><a href="/home">家庭管理</a> · <a href="/">公交页面</a>（切换需重新连接）</small></p>
-</div><script src="/display.js"></script></body></html>
+</div><p><small><a href="/home">家庭管理</a> · <a href="/">公交页面</a></small></p>
+</div><script src="/access-mode.js"></script><script src="/display.js"></script></body></html>
