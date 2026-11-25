@@ -99,12 +99,14 @@ def parse(payload: dict, fetched_at: datetime) -> Snapshot:
                     tuple(vehicles), len(departures) if isinstance(departures, list) else 0)
 
 
-def fetch(stop: Stop, timeout: float = 8.0) -> Snapshot:
-    body = json.dumps({"lineName": stop.line_name, "stopName": stop.stop_name,
-                       "stopId": stop.stop_id, "direction": stop.direction}).encode()
-    req = Request(BASE + "/traffic/v1/getbusstoparrivedetails", data=body, method="POST",
+def post(path: str, body: dict, city_code: str, timeout: float = 8.0) -> dict:
+    """Fixed upstream endpoints; no caller-controlled URL or redirects."""
+    if path not in ("/traffic/v1/getbusstoparrivedetails", "/traffic/v2/querytrafficline",
+                    "/traffic/v1/querybusline") or not re.fullmatch(r"[0-9]{6}", city_code):
+        raise BusError("Invalid request")
+    req = Request(BASE + path, data=json.dumps(body).encode(), method="POST",
                   headers={"Content-Type": "application/json", "Accept": "application/json",
-                           "X-Saic-CityCode": stop.city_code,
+                           "X-Saic-CityCode": city_code,
                            "User-Agent": "KindleHomeDashboard/0.1-experimental"})
     try:
         with build_opener(NoRedirect()).open(req, timeout=timeout) as response:
@@ -118,6 +120,20 @@ def fetch(stop: Stop, timeout: float = 8.0) -> Snapshot:
         raise BusError("HTTP request failed") from None
     except (URLError, OSError, ValueError, RecursionError):
         raise BusError("Transport or response error") from None
+    if not isinstance(payload, dict) or type(payload.get("errCode")) is not int:
+        raise BusError("Invalid provider response")
+    if payload["errCode"] in (-2903031, -2903032, -2903041, -2903051):
+        raise AccessBlocked("Provider access restricted")
+    if payload["errCode"] != 0 or not isinstance(payload.get("data"), dict):
+        raise BusError("Provider rejected request")
+    return payload
+
+
+def fetch(stop: Stop, timeout: float = 8.0) -> Snapshot:
+    payload = post("/traffic/v1/getbusstoparrivedetails",
+                   {"lineName": stop.line_name, "stopName": stop.stop_name,
+                    "stopId": stop.stop_id, "direction": stop.direction},
+                   stop.city_code, timeout)
     return parse(payload, datetime.now(timezone.utc))
 
 
