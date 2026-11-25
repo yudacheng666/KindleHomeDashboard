@@ -18,6 +18,10 @@ jobs:
         run: python3 scripts/check_public.py
       - name: Run offline unit tests
         run: python3 -m unittest discover -s tests -v
+      - name: Check browser logic offline
+        run: |
+          node --check dashboard/web/bus.js
+          node tests/test_bus_ui.js
       - name: Scan Git history for secrets
         run: |
           docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.24.3 git /repo --redact --no-banner
