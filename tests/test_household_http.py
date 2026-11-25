@@ -148,6 +148,16 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.post("poster/delete",{"key":poster,"confirm":True})
         self.assertEqual(self.manage()["posters"],[])
 
+    def test_menu_move_api(self):
+        other = "2026-01-06"
+        self.post("menu/set",{"on":self.today,"meal":"lunch","dishes":["Example dish"],"ingredients":[]})
+        body={"old_on":self.today,"old_meal":"lunch","on":other,"meal":"dinner","dishes":["Edited dish"],"ingredients":[]}
+        self.assertEqual(self.req("POST","home/menu/edit",self.read_token,body)[0],401)
+        self.post("menu/edit",body)
+        self.assertEqual(self.view()["today_menu"],[])
+        rows=self.post("menu/list",{"first":other,"last":other})
+        self.assertEqual(rows,[{"day":other,"meal":"dinner","dishes":["Edited dish"],"ingredients":[]}])
+
     def test_menu_and_shopping_edits_preserve_purchases(self):
         self.post("menu/set",{"on":self.today,"meal":"lunch","dishes":["Example dish"],"ingredients":["Example ingredient"]})
         self.assertEqual(len(self.post("menu/list",{"first":self.today,"last":self.today})),1)
