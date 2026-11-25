@@ -1,10 +1,11 @@
-"""Run the bus API on loopback for local integration only (Linux/Python 3.10+)."""
+"""Run the private home dashboard (Linux/Python 3.10+)."""
 import argparse
 import fcntl
 import os
 import re
 import signal
 from threading import Event
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .http_api import API, LocalServer, tls_context
 from .household import Household
@@ -28,6 +29,41 @@ def window_arg(value):
         raise argparse.ArgumentTypeError("Invalid window") from None
 
 
+def apply_private_settings(args, env):
+    """Read optional Compose settings without exposing private values in errors."""
+    enabled = env.get("KHD_BUS_ENABLED", "0")
+    if enabled not in ("0", "1"):
+        raise ValueError("Invalid bus enable flag")
+    raw = env.get("KHD_BUS_WINDOWS", "")
+    if len(raw) > 2048:
+        raise ValueError("Too many collection windows")
+    windows = raw.split(";") if raw else []
+    if len(windows) > 32 or (args.window and windows):
+        raise ValueError("Use one source of collection windows")
+    if windows:
+        try:
+            args.window = [window_arg(w.strip()) for w in windows]
+        except argparse.ArgumentTypeError:
+            raise ValueError("Invalid collection windows") from None
+    args.enable_bus = args.enable_bus or enabled == "1"
+    if args.enable_bus and not args.window:
+        raise ValueError("Explicit collection windows required")
+    if args.timezone is None:
+        args.timezone = env.get("KHD_TIMEZONE", "Asia/Shanghai")
+    try:
+        ZoneInfo(args.timezone)
+    except (ValueError, ZoneInfoNotFoundError):
+        raise ValueError("Invalid local timezone") from None
+    if args.daily_limit is None:
+        value = env.get("KHD_BUS_DAILY_LIMIT", "1000")
+        if not re.fullmatch(r"[0-9]{1,4}", value):
+            raise ValueError("Invalid local request limit")
+        args.daily_limit = int(value)
+    if not 1 <= args.daily_limit <= 1000:
+        raise ValueError("Invalid local request limit")
+    return args
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True)
@@ -39,12 +75,14 @@ def main():
     parser.add_argument("--lan-host", help="Explicit private IPv4 NAS address")
     parser.add_argument("--lan-network", help="Trusted home IPv4 CIDR")
     parser.add_argument("--open-admin", action="store_true", help="Explicitly allow LAN editing without a password")
-    parser.add_argument("--timezone", default="Asia/Shanghai")
+    parser.add_argument("--timezone")
     parser.add_argument("--window", action="append", type=window_arg, default=[])
-    parser.add_argument("--daily-limit", type=int, default=1000)
+    parser.add_argument("--daily-limit", type=int)
     args = parser.parse_args()
-    if args.enable_bus and not args.window:
-        parser.error("Explicit collection windows required when enabling bus")
+    try:
+        apply_private_settings(args, os.environ)
+    except ValueError:
+        parser.error("Invalid private bus settings, collection windows, timezone or local request limit")
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error("Specify both TLS certificate and key")
     direct = bool(args.lan_host and args.lan_network)
