@@ -87,6 +87,19 @@ class HouseholdHTTPTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_saved_display_preferences(self):
+        defaults = {"seconds":180,"include_week":False,"include_shopping":False,"autoplay":False}
+        self.assertEqual(self.view()["display_settings"], defaults)
+        saved = {"seconds":120,"include_week":True,"include_shopping":True,"autoplay":True}
+        self.assertEqual(self.req("POST","home/display/set",self.read_token,saved)[0],401)
+        self.post("display/set",saved)
+        self.assertEqual(self.manage()["display_settings"],saved)
+        self.assertEqual(self.view()["display_settings"],saved)
+        self.assertEqual(Household(self.temp.name).view(self.today)["display_settings"],saved)
+        for invalid in ({**saved,"seconds":60},{**saved,"seconds":True},{**saved,"autoplay":1}):
+            self.post("display/set",invalid,400)
+        self.assertEqual(self.view()["display_settings"],saved)
+
     def test_read_admin_and_disabled(self):
         self.assertEqual(self.req("GET","home/view")[0],401)
         self.assertEqual(self.req("GET","home/manage",self.read_token)[0],401)
