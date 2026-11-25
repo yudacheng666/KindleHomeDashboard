@@ -82,3 +82,46 @@ docker image inspect kindle-home-dashboard:dev --format 'Development image size:
 docker compose stop -t 35 dashboard
 test "$(docker inspect --format '{{.State.ExitCode}}' "$cid")" = 0
 echo "Docker deployment PASS: isolated, non-root, resource limits, authenticated API, graceful stop, recreate and persistence."
+
+# Direct-mode probe on an isolated Docker network; do not expose the runner's NIC.
+net="khd-direct-${RANDOM}-$$"
+direct="khd-direct-${RANDOM}-$$"
+cleanup_direct() {
+    docker rm -f "$direct" >/dev/null 2>&1 || true
+    docker network rm "$net" >/dev/null 2>&1 || true
+    cleanup
+}
+trap cleanup_direct EXIT
+docker network create --internal --subnet 172.30.99.0/24 "$net" >/dev/null
+KHD_LAN_HOST=172.30.99.20 KHD_LAN_NETWORK=172.30.99.0/24 docker compose -f compose.lan.yaml config --quiet
+docker run -d --name "$direct" --network "$net" --ip 172.30.99.20 --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus .5 --pids-limit 32 --mount "type=bind,source=$KHD_DATA_DIR,target=/var/lib/khd" --no-healthcheck kindle-home-dashboard:dev --directory /var/lib/khd --enable-household --lan-host 172.30.99.20 --lan-network 172.30.99.0/24 --open-admin >/dev/null
+docker run --rm -i --network "$net" --entrypoint python kindle-home-dashboard:dev - <<'PY'
+import json,time
+from urllib.request import urlopen, Request
+from urllib.error import HTTPError
+base="http://172.30.99.20:8080"
+for _ in range(30):
+    try:
+        with urlopen(base+"/api/home/view",timeout=3) as r:
+            view=json.load(r)
+        break
+    except OSError:
+        time.sleep(1)
+else:
+    raise RuntimeError("Direct server unavailable")
+assert len(view["tasks"])==1
+body=json.dumps({"title":"Fictional direct task","start":view["date"],"repeat":"once"}).encode()
+with urlopen(Request(base+"/api/home/task/add",data=body,headers={"Content-Type":"application/json"}),timeout=3) as r:
+    assert r.status==200
+with urlopen(base+"/api/home/view",timeout=3) as r:
+    assert len(json.load(r)["tasks"])==2
+try:
+    urlopen(Request(base+"/api/home/view",headers={"Origin":"http://example.invalid"}),timeout=3)
+except HTTPError as e:
+    assert e.code==403
+else:
+    raise AssertionError("Wrong origin accepted")
+print("Docker direct mode PASS: isolated network client, no credentials, read/write, origin rejection.")
+PY
+docker stop -t 35 "$direct" >/dev/null
+test "$(docker inspect --format '{{.State.ExitCode}}' "$direct")" = 0
