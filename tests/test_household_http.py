@@ -71,6 +71,21 @@ class HouseholdHTTPTests(unittest.TestCase):
         return self.post("poster/add", {"title":"Example reminder","body":"Example body",
                          "start":self.today,"end":None,"note":"","task_id":key})
 
+    def test_household_page_assets(self):
+        conn = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        try:
+            for path, expected in (("/home", '<script src="/home.js">'), ("/home.js", "XMLHttpRequest")):
+                conn.request("GET", path)
+                res = conn.getresponse()
+                self.assertEqual(res.status, 200)
+                self.assertEqual(res.getheader("Cache-Control"), "no-store")
+                body = res.read().decode()
+                self.assertIn(expected, body)
+                self.assertNotIn(self.admin_token, body)
+                self.assertNotIn(self.read_token, body)
+        finally:
+            conn.close()
+
     def test_read_admin_and_disabled(self):
         self.assertEqual(self.req("GET","home/view")[0],401)
         self.assertEqual(self.req("GET","home/manage",self.read_token)[0],401)
