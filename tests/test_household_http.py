@@ -74,7 +74,8 @@ class HouseholdHTTPTests(unittest.TestCase):
     def test_household_page_assets(self):
         conn = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
         try:
-            for path, expected in (("/home", '<script src="/home.js">'), ("/home.js", "XMLHttpRequest")):
+            for path, expected in (("/home", '<script src="/home.js">'), ("/home.js", "XMLHttpRequest"),
+                                   ("/display", '<script src="/display.js">'), ("/display.js", "XMLHttpRequest")):
                 conn.request("GET", path)
                 res = conn.getresponse()
                 self.assertEqual(res.status, 200)
