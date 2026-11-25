@@ -11,7 +11,7 @@ function option(select,value,label){var n=document.createElement("option");n.val
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function disable(value){
   busy=value;
-  var ids=["connect","refresh","settings","search","detail","save","cancel"];
+  var ids=["connect","refresh","settings","search","detail","save","cancel","route","direction","board","destination","keyword"];
   for(var i=0;i<ids.length;i++)el(ids[i]).disabled=value;
 }
 function errorMessage(code){
@@ -93,8 +93,9 @@ el("connect").onclick=function(){
   });
 };
 el("logout").onclick=exit;el("refresh").onclick=read;
+if(document.addEventListener)document.addEventListener("visibilitychange",function(){if(!document.hidden&&token&&!configuring){hideData("正在重新读取");read();}},false);
 el("settings").onclick=function(){configuring=true;resetSelection();show("view",false);show("config",true);};
-el("cancel").onclick=function(){configuring=false;resetSelection();show("config",false);show("view",true);read();};
+el("cancel").onclick=function(){configuring=false;resetSelection();hideData("正在重新读取");show("config",false);show("view",true);read();};
 el("search").onclick=function(){
   if(busy)return;resetSelection();
   request("POST","/api/bus/search",{keyword:el("keyword").value},function(ok,data){
