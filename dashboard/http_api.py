@@ -10,12 +10,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
 import re
+import ssl
 from secrets import token_urlsafe
 from threading import Lock
 
 from .budget import BudgetWait
 from .bus import AccessBlocked, BusError
 from .routes import Line
+from .trip_store import TripStore
 from .household_api import HouseholdAPI, READ, MANAGE, POST_PATHS
 
 MAX_BODY = 16384
@@ -120,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
     def same_origin(self):
         # Exact host and same-origin only; no CORS or cookie auth.
         origins = self.headers.get_all("Origin") or []
-        if self.headers.get_all("Host") != [self.server.expected_host] or origins not in ([], ["http://" + self.server.expected_host]):
+        if self.headers.get_all("Host") != [self.server.expected_host] or origins not in ([], [self.server.expected_origin]):
             self.send_json(403, {"error": "forbidden"})
             return False
         return True
@@ -201,11 +203,43 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, result)
 
 
+def tls_context(cert, key):
+    """Load explicit private local PEM files; never generate or trust a CA here."""
+    paths = []
+    for value in (cert, key):
+        p = Path(value)
+        if not p.is_absolute() or p.is_symlink() or not p.is_file():
+            raise ValueError("Use private absolute certificate/key paths")
+        TripStore(str(p.parent))
+        paths.append(p)
+    if paths[1].stat().st_mode & 0o077:
+        raise ValueError("TLS key must not be accessible by group or others")
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.load_cert_chain(str(paths[0]), str(paths[1]))
+    return ctx
+
+
 class LocalServer(HTTPServer):
-    def __init__(self, api, port=8080):
+    def __init__(self, api, port=8080, *, tls=None):
         self.api = api
+        self.tls = tls
         super().__init__(("127.0.0.1", port), Handler)
         self.expected_host = "127.0.0.1:" + str(self.server_port)
+        self.expected_origin = ("https://" if tls is not None else "http://") + self.expected_host
+
+    def get_request(self):
+        sock, address = super().get_request()
+        if self.tls is None:
+            return sock, address
+        try:
+            # Bound the handshake before HTTP parsing. No plaintext fallback.
+            sock.settimeout(5)
+            sock = self.tls.wrap_socket(sock, server_side=True)
+            return sock, address
+        except BaseException:
+            sock.close()
+            raise
 
     def handle_error(self, request, client_address):
         # Avoid raw traceback and private client address in logs.
