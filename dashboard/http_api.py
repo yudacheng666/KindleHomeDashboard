@@ -23,7 +23,9 @@ WEB = Path(__file__).resolve().parent / "web"
 ASSETS = {"/": ("bus.html", "text/html; charset=utf-8"),
           "/bus.js": ("bus.js", "application/javascript; charset=utf-8"),
           "/home": ("home.html", "text/html; charset=utf-8"),
-          "/home.js": ("home.js", "application/javascript; charset=utf-8")}
+          "/home.js": ("home.js", "application/javascript; charset=utf-8"),
+          "/display": ("display.html", "text/html; charset=utf-8"),
+          "/display.js": ("display.js", "application/javascript; charset=utf-8")}
 
 
 def _default(value):
