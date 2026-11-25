@@ -3,7 +3,7 @@
 "use strict";
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
-var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", connected=false;
+var refreshTimer=null, rotationTimer=null, lastRender="", mode="family";
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -98,7 +98,7 @@ function refresh(){
   busy=true;var g=epoch,x=new XMLHttpRequest(),ended=false,timeout;
   function finish(ok,v,status){
     if(ended)return;ended=true;clearTimeout(timeout);if(g!==epoch)return;busy=false;
-    if(ok){connected=true;if(mode==="bus")acceptBus(v);else accept(v);}
+    if(ok){if(mode==="bus")acceptBus(v);else accept(v);}
     else if(status===404&&mode==="family"){connected=true;show("login",false);show("display",true);hide("家庭模块未启用，可切换至公交。");}
     else{hide(status===401?"令牌无效，请重新连接。":status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
       if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
@@ -112,11 +112,11 @@ function refresh(){
   }catch(e){finish(false,null,0);}
 }
 function reset(){
-  epoch++;busy=false;token="";connected=false;mode="family";show("familyControls",true);running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
+  epoch++;busy=false;token="";mode="family";show("familyControls",true);running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(token)refresh();};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(token){clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("familyMode").onclick=function(){switchMode("family");};
 el("busMode").onclick=function(){switchMode("bus");};
 el("previous").onclick=function(){if(editing)return;running=false;stopRotation();advance(-1,false);};
