@@ -3,12 +3,36 @@
 "use strict";
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
-var refreshTimer=null, rotationTimer=null, lastRender="", mode="family";
+var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="";
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
 function show(id,yes){el(id).className=yes?"":"hidden";}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function append(root,tag,text,cls){var n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;root.appendChild(n);}
+// Conservative character/line budget; never truncate, including surrogate pairs.
+// Scrolling remains a fallback for unusually narrow viewports or long titles.
+function chunks(value){
+  var chars=value.match(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g)||[], result=[], part="", count=0, breaks=0;
+  chars.forEach(function(ch){
+    if(part&&(count>=54||breaks>=4)){result.push(part);part="";count=0;breaks=0;}
+    part+=ch;count++;if(ch==="\n")breaks++;
+  });
+  if(part||!result.length)result.push(part);return result;
+}
+function posterPages(t){
+  var parts=chunks(t.body),result=[];
+  parts.forEach(function(body,i){
+    var suffix=parts.length>1?" · "+(i+1)+"/"+parts.length:"";
+    result.push({id:"poster:"+t.id+":"+i,title:t.title+suffix,lines:[body],note:i===parts.length-1?t.note||"":"",poster:true});
+  });return result;
+}
+function useSaved(v){
+  var s=v.display_settings;
+  if(!s||[120,180,300].indexOf(s.seconds)<0||typeof s.include_week!=="boolean"||typeof s.include_shopping!=="boolean"||typeof s.autoplay!=="boolean")return;
+  var key=JSON.stringify([s.seconds,s.include_week,s.include_shopping,s.autoplay]);
+  if(savedKey===key)return;
+  savedKey=key;seconds=s.seconds;includeWeek=s.include_week;includeShopping=s.include_shopping;running=s.autoplay;stopRotation();
+}
 function makePages(v){
   var p=[], summaries=[];
   if(v.tasks.length) summaries.push("待办 · "+v.tasks.length+"件");
@@ -16,7 +40,7 @@ function makePages(v){
   if(v.today_menu.length) summaries.push("今日菜单 · "+v.today_menu.length+"餐");
   p.push({id:"today",title:"今日生活",lines:summaries.length?summaries:["暂无家庭安排"],note:""});
   if(v.tasks.length)p.push({id:"tasks",title:"今日待办",lines:v.tasks.map(function(t){return "□ "+t.title;}),note:""});
-  v.posters.forEach(function(t){p.push({id:"poster:"+t.id,title:t.title,lines:[t.body],note:t.note||"",poster:true});});
+  v.posters.forEach(function(t){p=p.concat(posterPages(t));});
   var meals={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"};
   function menu(m,week){return (week?m.day+" · ":"")+meals[m.meal]+"\n"+m.dishes.join("、");}
   if(v.today_menu.length)p.push({id:"menu",title:"今日菜单",lines:v.today_menu.map(function(m){return menu(m,false);}),note:""});
@@ -31,7 +55,7 @@ function render(){
   var key=JSON.stringify([data.date,p,cursor,pages.length]);
   if(key!==lastRender){
     lastRender=key;txt("date",data.date);txt("heading",p.title);
-    var root=el("body");clear(root);p.lines.forEach(function(line){append(root,"p",line,p.poster?"poster":"");});
+    var root=el("body");clear(root);p.lines.forEach(function(line){append(root,"p",line,p.poster?(line.length>38?"poster compact":line.length>18?"poster medium":"poster"):"");});
     if(p.note)append(root,"p",p.note,"note");
     txt("index",(cursor+1)+" / "+pages.length);
   }
@@ -52,6 +76,7 @@ function advance(step,auto){
   }
 }
 function accept(v){
+  useSaved(v);
   var old=pages[cursor], next=makePages(v), found=-1;
   for(var i=0;old&&i<next.length;i++)if(next[i].id===old.id)found=i;
   data=v;pages=next;cursor=found<0?0:found;
@@ -112,7 +137,7 @@ function refresh(){
   }catch(e){finish(false,null,0);}
 }
 function reset(){
-  epoch++;busy=false;token="";mode="family";show("familyControls",true);running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
+  epoch++;busy=false;token="";mode="family";savedKey="";show("familyControls",true);running=false;editing=false;seconds=180;includeWeek=false;includeShopping=false;
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   show("options",false);show("display",false);show("login",true);
 }
