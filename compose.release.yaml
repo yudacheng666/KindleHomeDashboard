@@ -2,7 +2,7 @@
 # Use this file alone. Set KHD_IMAGE to the published version/digest.
 services:
   dashboard:
-    image: "${KHD_IMAGE:?Set the published GHCR image reference}"
+    image: "${KHD_IMAGE:-ghcr.io/yudacheng666/kindlehomedashboard:preview}"
     restart: unless-stopped
     user: "10001:10001"
     read_only: true
@@ -18,11 +18,7 @@ services:
       KHD_TIMEZONE: "${KHD_TIMEZONE:-Asia/Shanghai}"
       KHD_BUS_DAILY_LIMIT: "${KHD_BUS_DAILY_LIMIT:-1000}"
     volumes:
-      - type: bind
-        source: "${KHD_DATA_DIR:?Set an absolute private data directory}"
-        target: /var/lib/khd
-        bind:
-          create_host_path: false
+      - dashboard-data:/var/lib/khd
     tmpfs:
       - /tmp:size=16m,mode=1777
     ports:
@@ -31,3 +27,7 @@ services:
     # The default healthcheck targets the loopback Host; disable for LAN.
     healthcheck:
       disable: true
+
+volumes:
+  dashboard-data:
+    name: kindlehomedashboard-data
