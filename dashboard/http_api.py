@@ -16,6 +16,7 @@ from threading import Lock
 from .budget import BudgetWait
 from .bus import AccessBlocked, BusError
 from .routes import Line
+from .household_api import HouseholdAPI, READ, MANAGE, POST_PATHS
 
 MAX_BODY = 16384
 WEB = Path(__file__).resolve().parent / "web"
@@ -36,8 +37,9 @@ def _token(value):
 
 
 class API:
-    def __init__(self, runtime, read_token, admin_token):
+    def __init__(self, runtime, read_token, admin_token, household=None):
         self.runtime = runtime
+        self.household = HouseholdAPI(household, runtime) if household is not None else None
         self.read_token, self.admin_token = _token(read_token), _token(admin_token)
         if compare_digest(self.read_token, self.admin_token):
             raise ValueError("Separate read and administration tokens required")
@@ -57,6 +59,8 @@ class API:
         # Single selection session: a newer route preview invalidates the old
         # handle, preventing a stale form from silently saving another route.
         with self.lock:
+            if path in POST_PATHS and self.household is not None:
+                return self.household.post(path, body)
             bus = self.runtime.bus
             if path == "/api/bus/search":
                 if set(body) != {"keyword"}:
@@ -139,13 +143,15 @@ class Handler(BaseHTTPRequestHandler):
             # Static shell only; no secrets, configuration or live data.
             self.send_content(200, raw, content_type)
             return
-        if not self.guard(False):
+        if not self.guard(self.path == MANAGE):
             return
-        if self.path != "/api/bus/view":
+        home = self.path in (READ, MANAGE) and self.server.api.household is not None
+        if self.path != "/api/bus/view" and not home:
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            payload = asdict(self.server.api.runtime.read())
+            payload = (self.server.api.household.get(self.path) if home
+                       else asdict(self.server.api.runtime.read()))
         except Exception:
             self.send_json(503, {"error": "service_error"})
             return
@@ -154,7 +160,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.guard(True):
             return
-        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save"):
+        home = self.path in POST_PATHS and self.server.api.household is not None
+        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save") and not home:
             self.send_json(404, {"error": "not_found"})
             return
         if self.headers.get("Transfer-Encoding") is not None or self.headers.get_content_type() != "application/json":
