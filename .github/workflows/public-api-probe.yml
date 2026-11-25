@@ -30,22 +30,24 @@ jobs:
           try:
               print("PROBE UTC",datetime.datetime.now(datetime.timezone.utc).isoformat())
               lines={}
-              for keyword in ("闵行37路B线","闵37B"):
+              for keyword in ("闵行37路B线","闵37B","闵行37路"):
                   d=post("/traffic/v2/querytrafficline",{"keywords":keyword,"type":0,"pageNo":1,"pageSize":20})
                   for item in d.get("trafficStop") or []:
                       for x in (item.get("stopLineInfo") or [])+([item["lineInfo"]] if item.get("lineInfo") else []):
                           if norm(x.get("lineName")) in ("闵行37B","闵37B") and x.get("lineId") and x.get("upDown") is not None:
                               lines[(str(x["lineId"]),str(x["upDown"]))]=x
-                  if lines: break
               print("PROBE route_candidates",len(lines))
               matches=[]
-              for (_,direction),line in lines.items():
+              trials={(lid,dr):line for (lid,_),line in lines.items() for dr in ("0","1")}
+              for (_,direction),line in trials.items():
                   d=post("/traffic/v1/querybusline",{"lineId":line["lineId"],"lineName":line["lineName"],"direction":direction})
                   stops=(d.get("busLine") or {}).get("stop") or []
-                  indices=[next((i for i,s in enumerate(stops) if s.get("stopName")==name and s.get("stopId")),None) for name in targets]
-                  print("PROBE direction",direction,"stop_count",len(stops),"matched_indices",indices)
+                  indices=[next((i for i,s in enumerate(stops) if (s.get("stopName")==name or (all(t in str(s.get("stopName")) for t in ("金阳路", "中春路" if j==0 else "瓶安路")))) and s.get("stopId")),None) for j,name in enumerate(targets)]
+                  print("PROBE direction",direction,"stop_count",len(stops),"matched_indices",indices,"public_stop_variants",[s.get("stopName") for s in stops if any(t in str(s.get("stopName")) for t in ("中春路","瓶安路"))])
                   if all(i is not None for i in indices) and indices[0]<indices[1]:
-                      matches.append((line,direction,[stops[i] for i in indices]))
+                      chosen=[stops[i] for i in indices]
+                      if not any([str(s["stopId"]) for s in m[2]]==[str(s["stopId"]) for s in chosen] for m in matches):
+                          matches.append((line,direction,chosen))
               print("PROBE ordered_matches",len(matches))
               if len(matches)!=1: raise ValueError("Ambiguous route or direction")
               line,direction,stops=matches[0]
