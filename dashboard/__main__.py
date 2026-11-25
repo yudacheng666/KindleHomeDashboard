@@ -3,7 +3,8 @@ import argparse
 import fcntl
 import os
 import re
-from pathlib import Path
+import signal
+from threading import Event
 
 from .http_api import API, LocalServer
 from .household import Household
@@ -51,13 +52,22 @@ def main():
         household = Household(args.directory) if args.enable_household else None
         api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household)
         with LocalServer(api, args.port) as server:
-            runtime.start()
+            stopping = Event()
+            def stop_signal(signum, frame):
+                stopping.set()
+            old_handlers = {s: signal.signal(s, stop_signal)
+                            for s in (signal.SIGTERM, signal.SIGINT)}
+            server.timeout = 0.5
             try:
-                server.serve_forever(poll_interval=0.5)
-            except KeyboardInterrupt:
-                pass
+                runtime.start()
+                while not stopping.is_set():
+                    server.handle_request()
             finally:
-                runtime.close()
+                try:
+                    runtime.close()
+                finally:
+                    for s, handler in old_handlers.items():
+                        signal.signal(s, handler)
     except Exception:
         # No paths, configuration or token values in terminal logs.
         print("Startup or runtime failed; check local settings and service state.")
