@@ -158,6 +158,10 @@ class Handler(BaseHTTPRequestHandler):
             # Static shell only; no secrets, configuration or live data.
             self.send_content(200, raw, content_type)
             return
+        if self.path == "/api/access/admin":
+            if self.guard(True):
+                self.send_json(200, {"admin": True})
+            return
         if not self.guard(self.path == MANAGE):
             return
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
