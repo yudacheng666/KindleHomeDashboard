@@ -1,0 +1,45 @@
+name: One-time public API probe
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/public-api-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Public examples only, no secrets or raw response logs
+        shell: python
+        run: |
+          import json, urllib.parse, urllib.request, urllib.error
+          from datetime import datetime, timezone
+          def probe(name, url, params, check):
+              try:
+                  req = urllib.request.Request(url + "?" + urllib.parse.urlencode(params), headers={"User-Agent":"KindleHomeDashboard-public-api-test/1.0","Accept":"application/json"})
+                  with urllib.request.urlopen(req, timeout=15) as response:
+                      body = json.loads(response.read(1048576))
+                      print(name, "HTTP", response.status, check(body))
+              except urllib.error.HTTPError as exc:
+                  print(name, "HTTP", exc.code)
+              except Exception as exc:
+                  print(name, "error", type(exc).__name__)
+          print("UTC:", datetime.now(timezone.utc).isoformat())
+          def weather(d):
+              c = d.get("current", {})
+              daily = d.get("daily", {})
+              hourly = d.get("hourly", {})
+              ok = all(isinstance(c.get(k), (int,float)) for k in ("temperature_2m","apparent_temperature","weather_code")) and bool(c.get("time")) and bool(daily.get("temperature_2m_max")) and bool(hourly.get("precipitation_probability"))
+              return "weather_fields=" + str(ok) + " current_time=" + str(c.get("time"))
+          probe("open_meteo", "https://api.open-meteo.com/v1/forecast", {"latitude":31.23,"longitude":121.47,"current":"temperature_2m,apparent_temperature,weather_code","daily":"temperature_2m_max,temperature_2m_min","hourly":"precipitation_probability","timezone":"Asia/Shanghai","forecast_days":2}, weather)
+          def air(d):
+              c=d.get("current",{})
+              return "air_fields=" + str(all(isinstance(c.get(k),(int,float)) for k in ("pm2_5","pm10","us_aqi"))) + " current_time=" + str(c.get("time"))
+          probe("open_meteo_air", "https://air-quality-api.open-meteo.com/v1/air-quality", {"latitude":31.23,"longitude":121.47,"current":"pm2_5,pm10,us_aqi"}, air)
+          def bus(d):
+              data=d.get("data")
+              rows=[row for val in data.values() if isinstance(val,list) for row in val if isinstance(row,dict)] if isinstance(data,dict) else []
+              count=sum(bool(row.get("expected_arrival") and row.get("estimated_time") and row.get("destination")) for row in rows)
+              return "business_code=" + str(d.get("code")) + " rows=" + str(len(rows)) + " ETA_fields=" + str(count)
+          probe("code410_documented_example", "https://api.code410.com/api/traffic/bus", {"city":"深圳","site":"京基"}, bus)
