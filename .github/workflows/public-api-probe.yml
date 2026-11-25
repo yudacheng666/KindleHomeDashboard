@@ -1,0 +1,42 @@
+name: One-time public domain metadata check
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/public-api-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Public DNS RDAP and HTTPS certificate
+        shell: python
+        run: |
+          import socket, ssl, json, urllib.request, subprocess
+          for domain in ("shmaas.net","api.shmaas.net","shmaas.cn","open-web.shmaas.cn"):
+              try:
+                  print("META DNS",domain,sorted({x[4][0] for x in socket.getaddrinfo(domain,443,type=socket.SOCK_STREAM)}))
+              except Exception as e: print("META DNS error",domain,type(e).__name__)
+              try:
+                  with socket.create_connection((domain,443),timeout=8) as s:
+                      with ssl.create_default_context().wrap_socket(s,server_hostname=domain) as t:
+                          c=t.getpeercert()
+                          print("META CERT",domain,json.dumps({k:c.get(k) for k in ("subject","issuer","notBefore","notAfter","subjectAltName")},ensure_ascii=False))
+              except Exception as e: print("META CERT error",domain,type(e).__name__)
+          try:
+              with urllib.request.urlopen("https://rdap.verisign.com/net/v1/domain/shmaas.net",timeout=12) as r:
+                  d=json.load(r)
+                  print("META RDAP",json.dumps({k:d.get(k) for k in ("ldhName","events","status")},ensure_ascii=False))
+                  print("META NS",[x.get("ldhName") for x in d.get("nameservers",[])])
+                  for e in d.get("entities",[]):
+                      print("META ENTITY",e.get("roles"),[v[3] for v in (e.get("vcardArray") or [None,[]])[1] if v[0]=="org" or (v[0]=="fn" and "registrar" in e.get("roles",[]))])
+          except Exception as e: print("META RDAP error",type(e).__name__)
+          for domain in ("shmaas.net","api.shmaas.net","www.shmaas.cn"):
+              try:
+                  req=urllib.request.Request("https://"+domain+"/",headers={"User-Agent":"Domain-metadata-check/1.0"})
+                  with urllib.request.urlopen(req,timeout=10) as r:
+                      import re
+                      data=r.read(200000).decode("utf-8","replace")
+                      print("META ROOT",domain,r.status,r.geturl(),re.findall(r"<title[^>]*>(.*?)</title>",data,re.I|re.S)[:1],re.findall(r"[沪京粤浙]ICP备[0-9]+号(?:-[0-9]+)?",data)[:5])
+              except Exception as e: print("META ROOT error",domain,type(e).__name__,getattr(e,"code",None))
