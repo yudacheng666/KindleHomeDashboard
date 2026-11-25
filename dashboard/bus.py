@@ -147,7 +147,7 @@ class Poller:
         if self.last is None:
             return Snapshot("unavailable", now)
         if (now - self.last.fetched_at).total_seconds() >= self.ttl:
-            return replace(self.last, status="expired", vehicles=())
+            return replace(self.last, status="expired", vehicles=(), scheduled_departures=0)
         return self.last
 
     def poll(self) -> Snapshot:
@@ -172,9 +172,9 @@ class Poller:
         # An empty successful response is ambiguous, not proof of no buses.
         # Preserve the prior live data only with the stale label and original
         # timestamp, never as a new successful live reading.
-        if result.status == "no_live_data" and self.last and self.last.vehicles:
-            self.last = replace(self.last, status="stale",
-                                scheduled_departures=result.scheduled_departures)
+        if (result.status == "no_live_data" and self.last and self.last.vehicles
+                and (self.clock() - self.last.fetched_at).total_seconds() < self.ttl):
+            self.last = replace(self.last, status="stale")
         else:
             self.last = result
         return self.current()
