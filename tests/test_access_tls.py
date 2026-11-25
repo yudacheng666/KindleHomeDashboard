@@ -56,7 +56,7 @@ class TLSTests(unittest.TestCase):
         self.key=root/"test.key"
         # Ephemeral self-signed test certificate, explicitly trusted only by test.
         subprocess.run(["openssl","req","-x509","-newkey","rsa:2048","-nodes",
-                        "-days","1","-subj","/CN=localhost",
+                        "-days","1","-subj","/CN=example.invalid",
                         "-addext","subjectAltName=IP:127.0.0.1",
                         "-keyout",str(self.key),"-out",str(self.cert)],
                        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=True,timeout=15)
