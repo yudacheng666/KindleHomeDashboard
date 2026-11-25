@@ -1,0 +1,47 @@
+name: One-time weather field verification
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/public-api-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Public city weather and air quality
+        shell: python
+        run: |
+          import json, urllib.request, urllib.error, concurrent.futures, datetime
+          # Public city-center sample; no household coordinates or credentials.
+          urls={
+            "MET_COMPLETE":"https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=31.23&lon=121.47",
+            "OPEN_METEO_FORECAST":"https://api.open-meteo.com/v1/forecast?latitude=31.23&longitude=121.47&current=temperature_2m,apparent_temperature,weather_code&hourly=precipitation_probability,precipitation,temperature_2m&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=Asia%2FShanghai&forecast_days=3",
+            "OPEN_METEO_AIR":"https://air-quality-api.open-meteo.com/v1/air-quality?latitude=31.23&longitude=121.47&current=pm2_5,pm10,us_aqi&timezone=Asia%2FShanghai"
+          }
+          def run(item):
+              name,url=item
+              try:
+                  req=urllib.request.Request(url,headers={"User-Agent":"KindleHomeDashboard/0.0 (https://github.com/yudacheng666/KindleHomeDashboard)","Accept":"application/json"})
+                  with urllib.request.urlopen(req,timeout=12) as res:
+                      d=json.load(res)
+                      print("PROBE",name,"HTTP",res.status)
+                      if name=="MET_COMPLETE":
+                          p=d["properties"]; ts=p["timeseries"]; t=ts[0]["data"]
+                          instant=t["instant"]["details"]
+                          keys=["air_temperature","apparent_air_temperature","relative_humidity","wind_speed"]
+                          print("PROBE MET instant", {k:instant.get(k) for k in keys})
+                          print("PROBE MET timestamps",p["meta"].get("updated_at"),ts[0]["time"],ts[-1]["time"],"count",len(ts))
+                          print("PROBE MET intervals", {k:{"details":v.get("details",{}),"summary":v.get("summary",{})} for k,v in t.items() if k.startswith("next_")})
+                          print("PROBE MET probability_available",any("probability_of_precipitation" in v.get("details",{}) for row in ts for k,v in row["data"].items() if k.startswith("next_")))
+                      elif name=="OPEN_METEO_FORECAST":
+                          for k in ("current","hourly","daily"):
+                              v=d.get(k,{})
+                              print("PROBE FORECAST",k,{x:(len(y) if isinstance(y,list) else y) for x,y in v.items()})
+                      else:
+                          print("PROBE AIR current",d.get("current"),"units",d.get("current_units"))
+              except urllib.error.HTTPError as e: print("PROBE",name,"HTTP_ERROR",e.code)
+              except Exception as e: print("PROBE",name,"ERROR",type(e).__name__,str(getattr(e,"reason",""))[:100])
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+              list(pool.map(run,urls.items()))
