@@ -22,6 +22,8 @@ jobs:
         run: |
           node --check dashboard/web/bus.js
           node tests/test_bus_ui.js
+          node --check dashboard/web/home.js
+          node tests/test_home_ui.js
       - name: Scan Git history for secrets
         run: |
           docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.24.3 git /repo --redact --no-banner
