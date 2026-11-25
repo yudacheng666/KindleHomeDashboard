@@ -1,6 +1,7 @@
 /* Local household page. ES5, no remote assets, no browser persistence. */
 (function(){
 "use strict";
+var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="",admin=false,busy=false,epoch=0,tab="today",data=null,menus=[],menuDate="",editing=false;
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
@@ -19,7 +20,7 @@ function req(path,body,done){
   function finish(ok,v){if(ended)return;ended=true;clearTimeout(timer);if(g!==epoch)return;busy=false;
     if(!ok){note(v.error==="unauthorized"?"权限不足或令牌无效。":v.error==="not_found"?"家庭模块未启用。":v.error==="invalid_selection_or_request"?"内容无效或状态已改变，请检查日期、关联及历史记录。":"连接异常，请刷新核对后再操作。");}
     done(ok,v);}
-  try{x.open(body===null?"GET":"POST","/api/home/"+path,true);x.setRequestHeader("Authorization","Bearer "+token);
+  try{x.open(body===null?"GET":"POST","/api/home/"+path,true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
     if(body!==null)x.setRequestHeader("Content-Type","application/json");
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v={};try{v=JSON.parse(x.responseText);}catch(e){}finish(x.status===200,v);};
     timer=setTimeout(function(){finish(false,{});try{x.abort();}catch(e){}},12000);
@@ -140,8 +141,9 @@ function render(){
 }
 function canLeave(){return !editing||window.confirm("放弃未保存的编辑？");}
 ["today","tasks","posters","menus","shopping"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;render();}};});
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";admin=el("mode").value==="admin";load();};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";admin=el("mode").value==="admin";if(direct&&!token)token="local-direct";if(direct&&admin&&!openAdmin&&token==="local-direct"){note("请输入管理凭证。");return;}load();};
 el("refresh").onclick=function(){if(!busy&&canLeave()){closeEditor();load();}};
 el("logout").onclick=function(){if(canLeave())reset();};
 if(window.addEventListener)window.addEventListener("pagehide",reset,false);
+if(direct){el("logout").textContent=openAdmin?"重新连接":"管理登录 / 退出";el("mode").value=openAdmin?"admin":"read";el("connect").onclick();}
 }());
