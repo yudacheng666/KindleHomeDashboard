@@ -112,6 +112,8 @@ def validate(root, names):
 
 def backup(source, destination):
     source = private_root(source)
+    if (source / MANIFEST).exists() or (source / MANIFEST).is_symlink():
+        raise ValueError("Source must be an active data volume, not a backup")
     dest = new_path(destination)
     if source == dest or source in dest.parents:
         raise ValueError("Keep backup separate from active volume")
@@ -129,6 +131,8 @@ def backup(source, destination):
                 write_file(dest / name, b"")
                 with closing(sqlite3.connect(path.as_uri()+"?mode=ro", uri=True)) as src, closing(sqlite3.connect(dest / name)) as dst:
                     src.backup(dst)
+                    if dst.execute("PRAGMA journal_mode=DELETE").fetchone()[0] != "delete":
+                        raise ValueError("Cannot create standalone database snapshot")
                 raw = read_file(dest / name)
                 with (dest / name).open("rb") as stream:
                     os.fsync(stream.fileno())
@@ -139,6 +143,8 @@ def backup(source, destination):
         if not hashes:
             raise ValueError("No application data to back up")
         validate(dest, hashes)
+        if {p.name for p in dest.iterdir()} != set(hashes):
+            raise ValueError("Unexpected snapshot sidecar")
         write_file(dest / MANIFEST, json.dumps({"version":1,"files":hashes},sort_keys=True).encode())
 
 
