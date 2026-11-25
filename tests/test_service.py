@@ -97,7 +97,7 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(len(self.calls), count + 1)
         self.assertTrue(self.calls[-1][0].endswith("querybusline"))
         self.assertEqual(restored.read().snapshot.vehicles, ())
-        self.advance(2)
+        self.advance(30)
         self.assertEqual(restored.tick().snapshot.vehicles[0].eta_min, 3)
 
     def test_changed_route_needs_selection(self):
@@ -169,6 +169,20 @@ class ServiceTests(unittest.TestCase):
         with self.assertRaises(BudgetWait):
             self.service().search_lines("Example")
         self.assertEqual(len(self.calls), 1)
+
+    def test_eta_gap_cannot_be_bypassed_by_new_service(self):
+        s = self.service()
+        self.configure(s)
+        s.tick()
+        self.advance(3)
+        gate = self.service().gate
+        count = len(self.calls)
+        with self.assertRaises(BudgetWait):
+            gate("/traffic/v1/getbusstoparrivedetails", {"stopId": "B"}, "310100")
+        self.assertEqual(len(self.calls), count)
+        self.advance(27)
+        gate("/traffic/v1/getbusstoparrivedetails", {"stopId": "B"}, "310100")
+        self.assertEqual(len(self.calls), count + 1)
 
     def test_budget_file_private(self):
         s = self.service()
