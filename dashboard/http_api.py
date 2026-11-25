@@ -21,6 +21,11 @@ from .trip_store import TripStore
 from .household_api import HouseholdAPI, READ, MANAGE, POST_PATHS
 
 MAX_BODY = 16384
+DEVICE_LIST = '/api/devices/list'
+DEVICE_ISSUE = '/api/devices/issue'
+DEVICE_REDEEM = '/api/devices/redeem'
+DEVICE_REVOKE = '/api/devices/revoke'
+DEVICE_POSTS = (DEVICE_ISSUE, DEVICE_REDEEM, DEVICE_REVOKE)
 WEB = Path(__file__).resolve().parent / "web"
 ASSETS = {"/": ("bus.html", "text/html; charset=utf-8"),
           "/bus.js": ("bus.js", "application/javascript; charset=utf-8"),
@@ -43,8 +48,9 @@ def _token(value):
 
 
 class API:
-    def __init__(self, runtime, read_token, admin_token, household=None):
+    def __init__(self, runtime, read_token, admin_token, household=None, devices=None):
         self.runtime = runtime
+        self.devices = devices
         self.household = HouseholdAPI(household, runtime) if household is not None else None
         self.read_token, self.admin_token = _token(read_token), _token(admin_token)
         if compare_digest(self.read_token, self.admin_token):
@@ -59,7 +65,8 @@ class API:
             return False
         value = header[7:]
         return compare_digest(value, self.admin_token) or (
-            not admin and compare_digest(value, self.read_token))
+            not admin and (compare_digest(value, self.read_token) or
+                           (self.devices is not None and self.devices.authorized(value))))
 
     def dispatch(self, path, body):
         # Single selection session: a newer route preview invalidates the old
@@ -149,6 +156,13 @@ class Handler(BaseHTTPRequestHandler):
             # Static shell only; no secrets, configuration or live data.
             self.send_content(200, raw, content_type)
             return
+        if self.path == DEVICE_LIST and self.server.api.devices is not None:
+            if self.guard(True):
+                try:
+                    self.send_json(200, {"devices": self.server.api.devices.list()})
+                except Exception:
+                    self.send_json(503, {"error": "service_error"})
+            return
         if not self.guard(self.path == MANAGE):
             return
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
@@ -164,10 +178,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(200, payload)
 
     def do_POST(self):
-        if not self.guard(True):
+        device_op = self.path in DEVICE_POSTS and self.server.api.devices is not None
+        if device_op and self.path == DEVICE_REDEEM:
+            if not self.same_origin():
+                return
+        elif not self.guard(True):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
-        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save") and not home:
+        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save") and not home and not device_op:
             self.send_json(404, {"error": "not_found"})
             return
         if self.headers.get("Transfer-Encoding") is not None or self.headers.get_content_type() != "application/json":
@@ -188,7 +206,19 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(raw)
             if not isinstance(body, dict):
                 raise ValueError("Object required")
-            result = self.server.api.dispatch(self.path, body)
+            if device_op:
+                devices = self.server.api.devices
+                if self.path == DEVICE_ISSUE and set(body) == {"label"}:
+                    result = devices.issue(body["label"])
+                elif self.path == DEVICE_REDEEM and set(body) == {"code"}:
+                    result = devices.redeem(body["code"])
+                elif self.path == DEVICE_REVOKE and set(body) == {"id", "confirm"} and body["confirm"] is True:
+                    devices.revoke(body["id"])
+                    result = {"revoked": True}
+                else:
+                    raise ValueError("Invalid device operation")
+            else:
+                result = self.server.api.dispatch(self.path, body)
         except AccessBlocked:
             self.send_json(503, {"error": "provider_blocked"})
         except BudgetWait:
@@ -224,6 +254,8 @@ class LocalServer(HTTPServer):
     def __init__(self, api, port=8080, *, tls=None):
         self.api = api
         self.tls = tls
+        if api.devices is not None and tls is None:
+            raise ValueError("Device pairing requires HTTPS")
         super().__init__(("127.0.0.1", port), Handler)
         self.expected_host = "127.0.0.1:" + str(self.server_port)
         self.expected_origin = ("https://" if tls is not None else "http://") + self.expected_host
