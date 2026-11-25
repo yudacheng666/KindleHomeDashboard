@@ -16,7 +16,7 @@ const meal={day:date,meal:"dinner",dishes:["Example dish"]};
 const shopping={id:"test-item",label:"Example ingredient",completed:0};
 const sample={date,tasks:[task],posters:[poster],today_menu:[meal],week_menu:[meal],shopping:[shopping]};
 const bus={trip:{line:{name:"Example line"},boarding:{name:"A"},destination:{name:"B"}},snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:0,fetched_at:"2026-01-05T00:00:00+00:00"}};
-let data=sample,fail=0,requests=0,clock=0,nextId=1,busRequests=0,busData=bus;
+let data=sample,fail=0,requests=0,clock=0,nextId=1,busRequests=0,busData=bus, autoMode="family", autoRequests=0;
 const timers=new Map();
 function setTimer(fn,delay){const id=nextId++;timers.set(id,{at:clock+delay,fn});return id;}
 function clearTimer(id){timers.delete(id);}
@@ -30,9 +30,9 @@ function advance(ms){
   clock=end;
 }
 class XHR {
-  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view"].includes(path));this.path=path;}
+  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto"].includes(path));this.path=path;}
   setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;this.status=fail||200;this.responseText=JSON.stringify(fail?{}:this.path==="/api/bus/view"?busData:data);this.readyState=4;this.onreadystatechange();}
+  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;this.responseText=JSON.stringify(fail?{}:this.path==="/api/bus/view"?busData:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?busData:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,setTimeout:setTimer,clearTimeout:clearTimer});
@@ -95,4 +95,21 @@ assert.equal(el("pause").textContent,"开始轮播");
 const pinned=el("heading").textContent;advance(120000);heading(pinned);
 click("logout");el("token").value="example-display-token";click("connect");
 assert.equal(el("pause").textContent,"暂停轮播");click("logout");assert.equal(timers.size,0);
-console.log("Household display simulation passed: saved settings, long poster preservation, unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
+data=sample;busData=bus;autoMode="family";
+el("token").value="example-display-token";click("connect");heading("今日生活");
+const autoBefore=autoRequests;click("autoMode");heading("今日生活");assert.equal(autoRequests,autoBefore+1);
+autoMode="bus";advance(30000);heading("Example line");
+assert.equal(el("familyControls").className,"hidden");
+autoMode="family";advance(15000);heading("今日生活");
+assert.equal(el("familyControls").className,"");
+click("next");heading("今日待办");const pinnedAuto=autoRequests;
+autoMode="bus";advance(60000);heading("今日待办");assert.equal(autoRequests,pinnedAuto);
+click("autoMode");heading("Example line");
+click("busMode");const manualAuto=autoRequests;autoMode="family";advance(30000);heading("Example line");assert.equal(autoRequests,manualAuto);
+click("autoMode");heading("今日生活");click("settings");const settingsAuto=autoRequests;autoMode="bus";advance(60000);heading("今日生活");assert.equal(autoRequests,settingsAuto);click("cancel");
+click("autoMode");heading("Example line");doc.hidden=true;events.visibilitychange();
+const asleep=autoRequests;advance(60000);assert.equal(autoRequests,asleep);
+autoMode="family";doc.hidden=false;events.visibilitychange();heading("今日生活");
+fail=503;advance(30000);heading("");fail=0;advance(30000);heading("今日生活");
+click("logout");assert.equal(timers.size,0);
+console.log("Household display simulation passed: automatic switching, override, saved settings, long poster preservation, unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
