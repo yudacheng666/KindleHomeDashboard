@@ -74,4 +74,25 @@ assert.equal(el("display").className,"hidden");assert.equal(timers.size,0);headi
 fail=404;el("token").value="example-display-token";click("connect");
 assert.equal(el("display").className,"");fail=0;click("busMode");heading("Example line");click("logout");
 assert.equal(timers.size,0);
-console.log("Household display simulation passed: unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
+// Saved preferences restore on a new connection, while a manual pause survives
+// ordinary refreshes. Long poster chunks must preserve the original string.
+const longBody="示例文字".repeat(25)+"😀\n"+"第二行\n".repeat(7)+"末尾";
+data={...sample,tasks:[],posters:[{...poster,body:longBody}],today_menu:[],week_menu:[],shopping:[],
+  display_settings:{seconds:120,include_week:true,include_shopping:true,autoplay:true}};
+el("token").value="example-display-token";click("connect");heading("今日生活");
+assert.equal(el("pause").textContent,"暂停轮播");
+advance(120000);assert.ok(el("heading").textContent.indexOf("Example reminder · 1/")===0);
+let joined="",last=false;
+while(!last){
+  const title=el("heading").textContent;
+  const m=title.match(/(\d+)\/(\d+)$/);assert.ok(m);
+  joined+=el("body").children[0].textContent;
+  last=m[1]===m[2];if(!last)click("next");
+}
+assert.equal(joined,longBody);
+assert.equal(el("body").children[1].textContent,"Example note");
+assert.equal(el("pause").textContent,"开始轮播");
+const pinned=el("heading").textContent;advance(120000);heading(pinned);
+click("logout");el("token").value="example-display-token";click("connect");
+assert.equal(el("pause").textContent,"暂停轮播");click("logout");assert.equal(timers.size,0);
+console.log("Household display simulation passed: saved settings, long poster preservation, unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
