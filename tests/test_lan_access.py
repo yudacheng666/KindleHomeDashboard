@@ -1,5 +1,9 @@
 """Trusted-home mode tests. All addresses and data are fictional."""
 import json
+from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
+from dashboard.bus import Snapshot
+from dashboard.service import BusView
 from http.client import HTTPConnection
 from secrets import token_urlsafe
 from tempfile import TemporaryDirectory
@@ -8,7 +12,7 @@ import unittest
 
 from dashboard.http_api import API, LocalServer
 from dashboard.household import Household
-from dashboard.runtime import Runtime
+from dashboard.runtime import Runtime, Window
 from dashboard.service import BusService
 
 
@@ -55,6 +59,45 @@ class DirectTests(unittest.TestCase):
         self.assertEqual(self.request(server,"/api/bus/view")[0],200)
         self.assertEqual(self.request(server,"/api/devices/list")[0],404)
         self.assertIn(b'"openAdmin": true',self.request(server,"/access-mode.js")[1])
+
+    def test_auto_uses_server_clock_and_never_collects(self):
+        now = datetime(2026, 1, 5, 0, 59, tzinfo=timezone.utc)
+        bus = Mock()
+        bus.read.return_value = BusView({"fictional":True}, Snapshot("live",now))
+        runtime = Runtime(bus, windows=(Window((0,), 540, 600),),
+                          clock=lambda:now)
+        server = self.start(API(runtime,None,None,household=self.home,direct=True))
+        def auto():
+            status,body = self.request(server,"/api/display/auto")
+            self.assertEqual(status,200)
+            return json.loads(body)
+        self.assertEqual(auto()["mode"],"family")
+        bus.read.assert_not_called()
+        now += timedelta(minutes=1)
+        self.assertEqual(auto()["mode"],"bus")
+        bus.read.return_value = BusView({"fictional":True},Snapshot("blocked",now))
+        self.assertEqual(auto()["view"]["snapshot"]["status"],"blocked")
+        bus.read.return_value = BusView(None,Snapshot("unconfigured",now))
+        self.assertEqual(auto()["mode"],"family")
+        bus.read.return_value = BusView({"fictional":True},Snapshot("disabled",now))
+        self.assertEqual(auto()["mode"],"family")
+        now += timedelta(hours=1)
+        self.assertEqual(auto()["mode"],"family")
+        bus.tick.assert_not_called()
+        self.assertEqual(self.request(server,"/auto")[0],200)
+
+    def test_auto_without_household(self):
+        server = self.start(API(self.runtime,None,None,direct=True))
+        status,body = self.request(server,"/api/display/auto")
+        self.assertEqual(status,200)
+        self.assertEqual(json.loads(body)["mode"],"bus")
+
+    def test_auto_requires_read_access_in_protected_mode(self):
+        reader,admin=token_urlsafe(32),token_urlsafe(32)
+        server=self.start(API(self.runtime,reader,admin,household=self.home))
+        self.assertEqual(self.request(server,"/api/display/auto")[0],401)
+        self.assertEqual(self.request(server,"/api/display/auto",
+                         extra={"Authorization":"Bearer "+reader})[0],200)
 
     def test_optional_admin(self):
         token = token_urlsafe(32)
