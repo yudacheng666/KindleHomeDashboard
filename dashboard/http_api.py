@@ -219,8 +219,8 @@ class Handler(BaseHTTPRequestHandler):
             result = self.server.api.dispatch(self.path, body)
         except AccessBlocked:
             self.send_json(503, {"error": "provider_blocked"})
-        except BudgetWait:
-            self.send_json(429, {"error": "local_budget_wait"})
+        except BudgetWait as exc:
+            self.send_json(503 if exc.code == "bus_disabled" else 429, {"error": exc.code})
         except BusError:
             self.send_json(502, {"error": "provider_error"})
         except (ValueError, TypeError, KeyError, RecursionError):
