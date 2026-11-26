@@ -336,17 +336,20 @@ function acceptWeather(v){
   }
   show("login",false);show("display",true);txt("status","");
 }
-var weatherSettingsEpoch=0,weatherSettingsBusy=false;
+var weatherSettingsEpoch=0,weatherSettingsBusy=false,weatherSearchEpoch=0,weatherSearchBusy=false;
+function clearWeatherSearch(){weatherSearchEpoch++;weatherSearchBusy=false;el("weatherSearch").disabled=false;clear(el("weatherResults"));txt("weatherSearchStatus","");}
+function weatherSelected(){txt("weatherSelected",el("weatherName").value?"当前选择："+el("weatherName").value:"尚未选择地点");}
 function weatherForm(v){
   el("weatherEnabled").checked=v.enabled===true;el("weatherConsent").checked=v.consent===true;
   el("weatherName").value=v.name||"";el("weatherLat").value=v.name?String(v.latitude):"";el("weatherLon").value=v.name?String(v.longitude):"";
+  clearWeatherSearch();el("weatherKeyword").value="";weatherSelected();show("weatherCoordinates",false);
   var b=v.budget;txt("weatherBudget",(v.primary_configured?"和风凭据已配置":"和风凭据未配置，仅可使用备用源")+
     (b?" · 本月已计 "+b.used+" / "+b.limit+"，滚动32天 "+b.rolling_used+(b.blocked?" · 和风已阻断，需核查账户":"")+(b.backup_blocked?" · 备用源已阻断":""):" · 额度不可用"));
   show("weatherForm",true);
 }
 function weatherSettingsRequest(body){
   if(!settingsOpen||!token||weatherSettingsBusy)return;
-  weatherSettingsBusy=true;
+  clearWeatherSearch();weatherSettingsBusy=true;
   var g=++weatherSettingsEpoch,x=new XMLHttpRequest(),done=false,timer;
   txt("weatherSettingStatus",body?"正在保存…":"正在读取…");
   function finish(ok,v,code){
@@ -366,6 +369,49 @@ function weatherSettingsRequest(body){
   }catch(e){finish(false,null,0);}
 }
 el("weatherLoad").onclick=function(){weatherSettingsRequest(null);};
+el("weatherManual").onclick=function(){show("weatherCoordinates",el("weatherCoordinates").className==="hidden");};
+el("weatherName").oninput=weatherSelected;
+el("weatherKeyword").oninput=clearWeatherSearch;
+el("weatherConsent").onchange=function(){if(!el("weatherConsent").checked)clearWeatherSearch();};
+el("weatherSearch").onclick=function(){
+  if(!settingsOpen||!token||weatherSearchBusy||weatherSettingsBusy)return;
+  var keyword=el("weatherKeyword").value.trim();
+  clearWeatherSearch();
+  if(!keyword){txt("weatherSearchStatus","请输入城市或区县名称。");return;}
+  if(!el("weatherConsent").checked){txt("weatherSearchStatus","请先确认位置查询授权。");return;}
+  weatherSearchBusy=true;el("weatherSearch").disabled=true;
+  var g=++weatherSearchEpoch,x=new XMLHttpRequest(),timer,done=false;
+  txt("weatherSearchStatus","搜索中…");
+  function finish(ok,v){
+    if(done)return;done=true;clearTimeout(timer);
+    if(g!==weatherSearchEpoch||!settingsOpen)return;
+    weatherSearchBusy=false;el("weatherSearch").disabled=false;
+    var messages={not_configured:"请先在 NAS 配置和风凭据，或手动输入坐标。",blocked:"和风已阻断，请核查账户；可手动输入坐标。",budget:"已达到请求保护限制。",wait:"搜索过于频繁，请稍后再试。",unavailable:"搜索暂不可用，可手动输入坐标。"};
+    if(!ok||!v||v.status!=="ok"||!Array.isArray(v.locations)){
+      txt("weatherSearchStatus",v&&messages[v.status]||"搜索失败，请检查名称或稍后重试。");return;
+    }
+    txt("weatherSearchStatus",v.locations.length?"请选择地点（和风天气）":"未找到地点，请换个名称。");
+    v.locations.forEach(function(item){
+      var button=append(el("weatherResults"),"button",item.name);
+      button.type="button";append(button,"small",item.region);
+      button.onclick=function(){
+        if(g!==weatherSearchEpoch||!settingsOpen)return;
+        el("weatherName").value=item.name;el("weatherLat").value=String(item.latitude);el("weatherLon").value=String(item.longitude);
+        clearWeatherSearch();txt("weatherSelected","当前选择："+item.name+(item.region?" · "+item.region:""));
+        show("weatherCoordinates",false);txt("weatherSearchStatus","已选择，请保存天气设置。");
+      };
+    });
+  }
+  try{
+    x.open("POST","/api/weather/search",true);
+    if(token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+    x.setRequestHeader("Content-Type","application/json");
+    x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}finish(x.status===200,v);};
+    timer=setTimeout(function(){finish(false,null);try{x.abort();}catch(e){}},12000);
+    x.send(JSON.stringify({keyword:keyword,consent:true}));
+  }catch(e){finish(false,null);}
+};
+el("weatherKeyword").onkeydown=function(e){e=e||window.event;if(e&&e.keyCode===13)el("weatherSearch").onclick();};
 el("weatherSave").onclick=function(){
   var a=el("weatherLat").value,b=el("weatherLon").value,enabled=el("weatherEnabled").checked,consent=el("weatherConsent").checked,name=el("weatherName").value;
   if(!enabled&&!name&&!a&&!b){a="0";b="0";}
@@ -431,7 +477,7 @@ function refresh(){
   }catch(e){finish(false,null,0);}
 }
 function reset(keepResume){
-  weatherSettingsEpoch++;weatherSettingsBusy=false;show("weatherForm",false);txt("weatherSettingStatus","");
+  weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");
   if(keepResume!==true)forgetResume();resumePage="";
   epoch++;busy=false;token="";automatic=false;modeLabel();mode="family";section="tasks";savedKey="";tabs();running=false;editing=false;seconds=180;
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
@@ -452,7 +498,7 @@ el("previous").onclick=function(){if(editing||section!=="posters"||mode!=="famil
 el("next").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(1,false);};
 el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(running)manual();running=!running;render();scheduleRotation();};
 el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
-function closeSettings(){weatherSettingsEpoch++;weatherSettingsBusy=false;show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
+function closeSettings(){weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
 el("returnDisplay").onclick=closeSettings;
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;seconds=n;closeSettings();};
 el("cancel").onclick=closeSettings;

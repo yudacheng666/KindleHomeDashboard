@@ -163,6 +163,51 @@ class QWeather:
             raise ValueError("invalid_weather_credential")
         self.host, self._key, self.ledger, self.transport = host, key, ledger, transport
 
+    def search(self, keyword):
+        if not isinstance(keyword, str) or not 1 <= len(keyword.strip()) <= 40 or not re.fullmatch(r"[\w .'-]+", keyword.strip()) or not any(c.isalpha() for c in keyword):
+            raise ValueError("invalid_city_keyword")
+        url = "https://" + self.host + "/geo/v2/city/lookup?" + urlencode(
+            {"location": keyword.strip(), "number": 10, "lang": "zh"})
+        self.ledger.reserve()
+        try:
+            raw = self.transport(url, {"X-QW-Api-Key": self._key})
+            code = raw.get("code")
+            if code in ("401", "402", "403", "429", "480", "481"):
+                raise WeatherBlocked("provider_blocked")
+            if code == "404":
+                return []
+            if code != "200" or not isinstance(raw.get("location"), list):
+                raise WeatherError("invalid_city_response")
+            results = []
+            for row in raw["location"][:10]:
+                if not isinstance(row, dict):
+                    continue
+                try:
+                    name = row["name"]
+                    if not isinstance(name, str) or not 1 <= len(name.strip()) <= 40 or any(ord(c)<32 for c in name):
+                        continue
+                    lat, lon = coordinates(float(row["lat"]), float(row["lon"]))
+                    region = []
+                    for key in ("adm2", "adm1", "country"):
+                        part = row.get(key, "")
+                        if isinstance(part, str) and 0 < len(part.strip()) <= 80 and not any(ord(c)<32 for c in part) and part.strip() != name.strip() and part.strip() not in region:
+                            region.append(part.strip())
+                    item = {"name": name.strip(), "region": " · ".join(region), "latitude": float(lat), "longitude": float(lon)}
+                    if item not in results:
+                        results.append(item)
+                except (ValueError, KeyError, TypeError, OverflowError):
+                    continue
+            if raw["location"] and not results:
+                raise WeatherError("invalid_city_response")
+            return results
+        except WeatherBlocked:
+            self.ledger.block()
+            raise
+        except WeatherError:
+            raise
+        except Exception:
+            raise WeatherError("invalid_city_response") from None
+
     def fetch(self, kind, latitude, longitude):
         lat, lon = coordinates(latitude, longitude)
         suffix = "/" + lat + "/" + lon
