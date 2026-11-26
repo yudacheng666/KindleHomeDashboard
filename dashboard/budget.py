@@ -4,6 +4,7 @@ One NAS service process owns the adapter. These are conservative LOCAL limits,
 not the provider's quota. No waiting, background threads or automatic unblock.
 """
 import sqlite3
+import json
 from datetime import datetime, timezone
 from threading import RLock
 
@@ -45,6 +46,27 @@ class RequestGate:
             if "eta_next_at" not in {r[1] for r in db.execute("PRAGMA table_info(budget)")}:
                 db.execute("ALTER TABLE budget ADD COLUMN eta_next_at REAL NOT NULL DEFAULT 0")
             db.execute("INSERT OR IGNORE INTO budget VALUES (1, '', 0, 0, 0, 0)")
+            db.execute("CREATE TABLE IF NOT EXISTS schedule (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)")
+
+    def load_schedule(self):
+        with self.lock, self._db() as db:
+            row = db.execute("SELECT payload FROM schedule WHERE id=1").fetchone()
+        if row is None:
+            return None
+        if len(row[0]) > 16384:
+            raise ValueError("Invalid stored bus schedule")
+        return json.loads(row[0])
+
+    def save_schedule(self, value):
+        with self.lock, self._db() as db:
+            db.execute("INSERT OR REPLACE INTO schedule VALUES (1,?)",
+                       (json.dumps(value, separators=(",", ":")),))
+
+    def set_enabled(self, enabled, config_error=False):
+        with self.lock:
+            self.enabled = enabled and not config_error
+            self.disabled_code = "bus_config_error" if config_error else "bus_disabled"
+
 
     def _db(self):
         # A connection per operation, closed explicitly below.
