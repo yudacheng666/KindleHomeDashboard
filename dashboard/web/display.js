@@ -262,7 +262,7 @@ function acceptBus(v){
 }
 
 function weatherNum(v,suffix){return typeof v==="number"&&isFinite(v)?Math.round(v)+suffix:"—";}
-function weatherTime(v){return typeof v==="string"?v.slice(0,16).replace("T"," "):"时间未知";}
+function weatherTime(v){return typeof v==="string"?v.slice(0,16).replace("T"," ")+(v.slice(-1)==="Z"?" UTC":/[+-]\d\d:\d\d$/.test(v)?" "+v.slice(-6):""):"时间未知";}
 function weatherSource(root,s,attrs){
   append(root,"p",(s.source==="QWeather"?"和风天气":"Open-Meteo · 模型估算")+" · 采集 "+weatherTime(s.fetched_at),"weather-source");
   (s.attributions||[]).forEach(function(a){if(typeof a==="string"&&attrs.indexOf(a)<0)attrs.push(a);});
@@ -301,7 +301,8 @@ function acceptWeather(v){
         });
       });
       weatherPart(root,s,"rain","未来2小时降水",attrs,function(block,r){
-        append(block,"p",r.summary+" · 5分钟预报");
+        append(block,"p",r.summary+" · 每5分钟预报");
+        append(block,"p","预报生成时间 "+weatherTime(r.time),"weather-source");
       });
       weatherPart(root,s,"hourly","未来12小时",attrs,function(block,rows){
         var strip=append(block,"div","","weather-strip");
@@ -325,6 +326,12 @@ function acceptWeather(v){
         rows.forEach(function(a){append(block,"p",a.name+" "+a.aqi+" · "+a.category,"note");});
       });
       attrs.forEach(function(a){append(root,"p",a,"weather-source");});
+      if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="QWeather";})){
+        var attribution=append(root,"a","天气服务由和风天气驱动","weather-source");attribution.href="https://www.qweather.com";attribution.rel="noreferrer";
+      }
+      if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="Open-Meteo";})){
+        var meteoLink=append(root,"a"," · Open-Meteo (CC BY 4.0)","weather-source");meteoLink.href="https://open-meteo.com/";meteoLink.rel="noreferrer";
+      }
     }
   }
   show("login",false);show("display",true);txt("status","");

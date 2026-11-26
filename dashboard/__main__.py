@@ -128,7 +128,7 @@ def main():
                       "Initial bus settings invalid; saved local settings restored: ")
             print(prefix + bus_config_error, flush=True)
         household = Household(args.directory) if args.enable_household else None
-        weather = WeatherService(args.directory, os.environ)
+        weather = WeatherService(args.directory, os.environ, timezone_name=args.timezone)
         tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
         api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, direct=direct, weather=weather)
         with LocalServer(api, args.port, tls=tls, lan_host=args.lan_host, lan_network=args.lan_network) as server:

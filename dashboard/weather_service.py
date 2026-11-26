@@ -3,8 +3,9 @@
 Only the private volume stores location and counters; credentials come from
 private startup environment, never from the LAN HTTP API.
 """
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+import stat
 from threading import Event, RLock, Thread
 import json
 import math
@@ -94,7 +95,9 @@ def q_normalize(kind, raw):
             attrs = raw.get("refer", {}).get("sources", [])
         if not isinstance(attrs, list):
             raise WeatherError("invalid_attribution")
-        attrs = [string(x, 1000) for x in attrs[:10]]
+        if len(attrs)>50:
+            raise WeatherError("invalid_attribution")
+        attrs = [string(x, 1000) for x in attrs]
         if not attrs:
             attrs = ["https://developer.qweather.com/attribution.html"]
         if kind == "current":
@@ -115,6 +118,8 @@ def q_normalize(kind, raw):
                     for x in raw["indexes"][:8]]
         elif kind == "alerts":
             rows = raw["alerts"]
+            if len(rows)>100:
+                raise WeatherError("too_many_alerts")
             if not rows and raw.get("metadata", {}).get("zeroResult") is not True:
                 raise WeatherError("unconfirmed_no_alerts")
             superseded = {i for x in rows for i in x.get("messageType",{}).get("supersedes",[])}
@@ -157,14 +162,18 @@ def meteo_normalize(raw):
             hu["temperature_2m"] != "°C" or hu["precipitation_probability"] != "%" or
             du["temperature_2m_max"] != "°C" or du["temperature_2m_min"] != "°C"):
             raise WeatherError("invalid_weather_unit")
-        now = stamp(c["time"],offset_required=False)
+        zone=ZoneInfo(raw["timezone"])
+        def local_stamp(t):
+            value=datetime.fromisoformat(stamp(t,offset_required=False))
+            return (value if value.tzinfo else value.replace(tzinfo=zone)).isoformat()
+        now = local_stamp(c["time"])
         result = {"current": {"time": now, "text": wmo(c["weather_code"]),
                    "temp": number(c["temperature_2m"]), "feels": optional(c.get("apparent_temperature")),
                    "humidity": optional(c.get("relative_humidity_2m"),0,100),
                    "wind": optional(c.get("wind_speed_10m"),0,500), "wind_unit":"km/h"}}
-        result["hourly"] = [{"time": stamp(t,offset_required=False), "text": wmo(h["weather_code"][i]),
+        result["hourly"] = [{"time": local_stamp(t), "text": wmo(h["weather_code"][i]),
                              "temp": number(h["temperature_2m"][i]), "pop": optional(h["precipitation_probability"][i],0,100)}
-                            for i,t in enumerate(h["time"]) if t >= now][:24]
+                            for i,t in enumerate(h["time"]) if t >= c["time"]][:24]
         result["daily"] = [{"time": string(t,10), "text": wmo(d["weather_code"][i]),
                             "max": number(d["temperature_2m_max"][i]), "min": number(d["temperature_2m_min"][i])}
                            for i,t in enumerate(d["time"])][:7]
@@ -179,7 +188,7 @@ def meteo_normalize(raw):
 
 class WeatherService:
     def __init__(self, directory, env, *, clock=lambda: datetime.now(timezone.utc),
-                 monotonic=time.monotonic, q_transport=None, backup_transport=None):
+                 monotonic=time.monotonic, q_transport=None, backup_transport=None, timezone_name="Asia/Shanghai"):
         root = TripStore(directory).path.parent
         self.path = root / "weather-settings.json"
         self.lock = RLock()
@@ -187,6 +196,7 @@ class WeatherService:
         self.wake = Event()
         self.thread = None
         self.clock, self.monotonic = clock, monotonic
+        self.display_zone = ZoneInfo(timezone_name)
         self.settings = dict(DEFAULT)
         self.error = ""
         self.primary = None
@@ -202,7 +212,8 @@ class WeatherService:
             if self.path.exists() or self.path.is_symlink():
                 fd = os.open(self.path, os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
                 with os.fdopen(fd,"rb") as stream:
-                    if os.fstat(stream.fileno()).st_mode & 0o077:
+                    info=os.fstat(stream.fileno())
+                    if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size>8192:
                         raise ValueError("private_weather_settings_required")
                     self.settings = config(json.loads(stream.read(8193)))
                 if not (root/"weather-budget.sqlite3").exists():
@@ -255,7 +266,7 @@ class WeatherService:
 
     def _record(self,data,attrs,source):
         return {"data":data,"attributions":attrs,"source":source,
-                "fetched_at":self.clock().isoformat(),"mono":self.monotonic()}
+                "fetched_at":self.clock().astimezone(self.display_zone).isoformat(),"mono":self.monotonic()}
 
     def _fresh(self,kind,record,now):
         return record is not None and 0 <= now-record["mono"] <= TTL[kind]
@@ -281,6 +292,11 @@ class WeatherService:
         if kind:
             try:
                 data,attrs=q_normalize(kind,primary.fetch(kind,lat,lon))
+                if kind in ("current","rain"):
+                    source_time=datetime.fromisoformat(data["time"].replace("Z","+00:00"))
+                    age=(self.clock()-source_time).total_seconds()
+                    if age < -300 or age > TTL[kind]:
+                        raise WeatherError("source_time_outdated")
                 record=self._record(data,attrs,"QWeather")
                 with self.lock:
                     if generation==self.generation:
@@ -299,6 +315,9 @@ class WeatherService:
                     return
             try:
                 normalized=meteo_normalize(self.backup.fetch(lat,lon))
+                age=(self.clock()-datetime.fromisoformat(normalized["current"]["time"])).total_seconds()
+                if not -300 <= age <= TTL["current"]:
+                    raise WeatherError("source_time_outdated")
                 records={k:self._record(v,["Open-Meteo (CC BY 4.0)"],"Open-Meteo") for k,v in normalized.items()}
                 with self.lock:
                     if generation==self.generation:
@@ -326,6 +345,16 @@ class WeatherService:
                     sections[kind]={"status":"unavailable"}
                 else:
                     data=chosen["data"]
+                    if kind in ("current","rain"):
+                        age=(self.clock()-datetime.fromisoformat(data["time"].replace("Z","+00:00"))).total_seconds()
+                        if not -300<=age<=TTL[kind]:
+                            sections[kind]={"status":"unavailable"}
+                            continue
+                    if kind=="hourly":
+                        data=[x for x in data if datetime.fromisoformat(x["time"].replace("Z","+00:00"))>=self.clock()]
+                        if not data:
+                            sections[kind]={"status":"unavailable"}
+                            continue
                     if kind=="alerts":
                         moment=self.clock()
                         data=[x for x in data if datetime.fromisoformat(x["expires"].replace("Z","+00:00"))>moment]
