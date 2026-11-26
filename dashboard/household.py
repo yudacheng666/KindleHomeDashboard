@@ -359,9 +359,9 @@ class Household:
                 WHERE COALESCE(h.hidden,0)=0
                 ORDER BY COALESCE(h.completed_at,c.occurrence) DESC, c.occurrence DESC, t.id
                 """)]
+            by_id = {task["id"]: task for task in tasks}
             for record in history:
-                task = next(t for t in tasks if t["id"] == record["id"])
-                record["restorable"] = task["occurrence"] == record["occurrence"]
+                record["restorable"] = by_id[record["id"]]["occurrence"] == record["occurrence"]
             return {"date": on, "display_settings": self._display_settings(db), "tasks": tasks,
                     "history": history,
                     "posters": [dict(r) for r in db.execute("SELECT * FROM posters ORDER BY start,id")],

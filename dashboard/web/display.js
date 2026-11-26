@@ -66,10 +66,11 @@ function render(){
     lastRender=key;txt("date",data.date);txt("heading",p.title);
     var root=el("body");clear(root);
     if(p.tasks&&p.tasks.length&&p.canComplete){
+      var displayedDate=data.date;
       p.tasks.forEach(function(t){
-        var row=append(root,"div","","task-row"),name=append(row,"span",t.title,"task-text");
+        var row=append(root,"div","","task-row");append(row,"span",t.title,"task-text");
         var action=append(row,"span","","task-action"),button=append(action,"button","完成","task-complete");
-        button.type="button";button.onclick=function(){completeTask(t,data.date,button);};
+        button.type="button";button.onclick=function(){completeTask(t,displayedDate,button);};
       });
     }else p.lines.forEach(function(line){append(root,"p",line,p.poster?(line.length>38?"poster compact":line.length>18?"poster medium":"poster"):"");});
     if(p.note)append(root,"p",p.note,"note");
@@ -78,7 +79,7 @@ function render(){
   txt("pause",running?"暂停轮播":"开始轮播");
 }
 function completeTask(t,on,button){
-  if(!token||!data||data.can_complete!==true||section!=="tasks"||mode!=="family"||settingsOpen)return;
+  if(!token||!data||data.date!==on||data.can_complete!==true||section!=="tasks"||mode!=="family"||settingsOpen)return;
   if(busy){txt("status","正在同步，请稍后再试。");return;}
   if(!window.confirm("确认完成「"+t.title+"」？完成后保留历史记录。"))return;
   var g=epoch,x=new XMLHttpRequest(),ended=false,timer;

@@ -134,6 +134,7 @@ function render(){
       btn(p,"历史待办",function(){if(canLeave()){closeEditor();historyOpen=true;render();}}).className=historyOpen?"primary":"";
       if(historyOpen){history(p,data.history||[]);return;}
       btn(p,"新增待办",function(){taskForm(null);});
+      node(p,"small","周期任务在本期完成后仍保留管理入口，下个周期自动出现。");
     }
     tasks(p,admin?data.tasks.filter(function(t){return t.repeat!=="once"||!t.completed;}):data.tasks,admin);
   }
