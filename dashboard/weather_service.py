@@ -21,7 +21,8 @@ DEFAULT = {"enabled": False, "consent": False, "name": "", "latitude": 0, "longi
 TTL = {"current": 1800, "hourly": 5400, "daily": 10800, "rain": 900, "air": 5400, "alerts": 900}
 BACKUP_INTERVAL = 1800
 MAX_LOCATIONS = 3
-SECONDARY_INTERVALS = {"current": 1200, "rain": 600, "alerts": 900}
+THREE_LOCATION_INTERVALS = {"current": 900, "hourly": 3600, "daily": 7200,
+                            "rain": 600, "air": 3600, "alerts": 900}
 LOCATION_KEYS = {"name", "latitude", "longitude"}
 
 
@@ -59,8 +60,9 @@ def locations(settings):
     return [{k:settings[k] for k in LOCATION_KEYS}]+settings.get("additional", [])
 
 
-def intervals(index):
-    return INTERVALS if index == 0 else SECONDARY_INTERVALS
+def intervals(count):
+    # All configured locations receive the same six fields and cadence.
+    return THREE_LOCATION_INTERVALS if count == 3 else INTERVALS
 
 
 def number(value, low=-200, high=200):
@@ -345,12 +347,12 @@ class WeatherService:
             now = self.monotonic()
             primary = self.primary
             blocked = self.ledger.usage()["blocked"]
-            pending = [(i,k) for i in range(len(places)) for k in intervals(i)
+            pending = [(i,k) for i in range(len(places)) for k in intervals(len(places))
                        if now >= self.due.get((i,k),0)] if primary and not blocked else []
             task = min(pending, key=lambda t:self.due.get(t,0)) if pending else None
             if task:
                 i,kind = task
-                self.due[task] = now + intervals(i)[kind]
+                self.due[task] = now + intervals(len(places))[kind]
         if task:
             with self.lock:
                 if self.stop.is_set() or generation != self.generation:
@@ -375,14 +377,14 @@ class WeatherService:
                     if generation == self.generation:
                         count = self.failures.get(task,0)+1
                         self.failures[task] = count
-                        self.due[task] = self.monotonic()+min(3600,intervals(i)[kind]*(2**min(count,4)))
+                        self.due[task] = self.monotonic()+min(3600,intervals(len(places))[kind]*(2**min(count,4)))
         with self.lock:
             if self.stop.is_set() or generation != self.generation or self.backup_blocked or not self.ledger:
                 return
             now = self.monotonic()
             pending = [j for j in range(len(places))
                        if now >= self.backup_due.get(j,0) and
-                       (not primary or blocked or any((j,k) in self.failures for k in (CORE if j==0 else ("current",))))]
+                       (not primary or blocked or any((j,k) in self.failures for k in CORE))]
             if not pending:
                 return
             j = min(pending,key=lambda x:self.backup_due.get(x,0))
@@ -394,7 +396,7 @@ class WeatherService:
             if not -300 <= age <= TTL["current"]:
                 raise WeatherError("source_time_outdated")
             records = {(j,k):self._record(v,["Open-Meteo (CC BY 4.0)"],"Open-Meteo")
-                       for k,v in normalized.items() if k in intervals(j)}
+                       for k,v in normalized.items() if k in intervals(len(places))}
             with self.lock:
                 if generation == self.generation:
                     self.backup_records.update(records)
@@ -408,7 +410,7 @@ class WeatherService:
 
     def _location_view(self,index,place,now):
         sections={}
-        for kind in intervals(index):
+        for kind in KINDS:
             task=(index,kind)
             primary=self.records.get(task)
             backup=self.backup_records.get(task)

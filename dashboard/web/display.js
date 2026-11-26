@@ -6,6 +6,7 @@ var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
 var seconds=180, editing=false, section="tasks", settingsOpen=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
+var weatherPages=[],weatherCursor=0,weatherOrder="",WEATHER_SECONDS=120;
 var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null,busStatusNode=null,expiryTimer=null;
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
@@ -58,7 +59,7 @@ function updateManagementLinks(){
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
-function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);if(open)updateManagementLinks();}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&mode==="weather"&&weatherPages.length>1);if(open)updateManagementLinks();}
 function render(){
   var p=pages[cursor];if(!p||!data)return;
   var key=JSON.stringify([data.date,p,cursor,pages.length]);
@@ -144,7 +145,17 @@ function restoreResume(){
 }
 function stopRotation(){clearTimeout(rotationTimer);rotationTimer=null;}
 function scheduleRotation(){
-  stopRotation();if(mode!=="family"||section!=="posters"||!running||settingsOpen||editing||!data||document.hidden||pages.filter(eligible).length<2)return;
+  stopRotation();
+  if(mode==="weather"){
+    if(settingsOpen||document.hidden||!token||automatic||weatherPages.length<2)return;
+    rotationTimer=setTimeout(function(){
+      rotationTimer=null;
+      if(mode!=="weather"||settingsOpen||document.hidden||!token||automatic)return;
+      weatherCursor=(weatherCursor+1)%weatherPages.length;renderWeather();scheduleRotation();
+    },WEATHER_SECONDS*1000);
+    return;
+  }
+  if(mode!=="family"||section!=="posters"||!running||settingsOpen||editing||!data||document.hidden||pages.filter(eligible).length<2)return;
   rotationTimer=setTimeout(function(){
     rotationTimer=null;advance(1,true);scheduleRotation();
   },seconds*1000);
@@ -263,112 +274,128 @@ function acceptBus(v){
 
 function weatherNum(v,suffix){return typeof v==="number"&&isFinite(v)?Math.round(v)+suffix:"—";}
 function weatherTime(v){return typeof v==="string"?v.slice(0,16).replace("T"," ")+(v.slice(-1)==="Z"?" UTC":/[+-]\d\d:\d\d$/.test(v)?" "+v.slice(-6):""):"时间未知";}
-function weatherSource(root,s,attrs){
-  append(root,"p",(s.source==="QWeather"?"和风天气":"Open-Meteo · 模型估算")+" · 采集 "+weatherTime(s.fetched_at),"weather-source");
+function weatherSource(groups,attrs,s,label){
+  var source=s.source==="QWeather"?"和风天气":"Open-Meteo · 模型估算",time=weatherTime(s.fetched_at),key=source+" · "+time;
+  var group=null;
+  groups.forEach(function(g){if(g.key===key)group=g;});
+  if(!group){group={key:key,labels:[]};groups.push(group);}
+  group.labels.push(label);
   (s.attributions||[]).forEach(function(a){if(typeof a==="string"&&attrs.indexOf(a)<0)attrs.push(a);});
 }
-function weatherPart(root,sections,key,title,attrs,draw){
-  var block=append(root,"section","","weather-block"),s=sections[key];
-  append(block,"h2",title);
-  if(!s||s.status!=="available"){append(block,"p","暂不可用","note");return;}
-  draw(block,s.data);
-  weatherSource(block,s,attrs);
+function weatherPart(root,sections,key,title,groups,attrs,missing,draw){
+  var s=sections[key];
+  if(!s||s.status!=="available"){missing.push(title);return;}
+  var block=append(root,"section","","weather-block");
+  append(block,"h2",title);draw(block,s.data);
+  weatherSource(groups,attrs,s,title);
 }
 function weatherRain(block,r){
   append(block,"p",r.summary+" · 每5分钟预报");
   if(Array.isArray(r.points)&&r.points.length>1){
-    var bars=append(block,"div","","rain-bars");
     var maximum=Math.max.apply(null,r.points.map(function(p){return p.mm;}));
-    r.points.forEach(function(p){
-      var cell=append(bars,"span",""),bar=append(cell,"b","");
-      if(bar.style)bar.style.height=String(maximum>0?Math.max(1,Math.round(30*p.mm/maximum)):1)+"px";
-    });
+    if(maximum>0){
+      var bars=append(block,"div","","rain-bars");
+      r.points.forEach(function(p){
+        var cell=append(bars,"span",""),bar=append(cell,"b","");
+        if(bar.style)bar.style.height=String(Math.max(1,Math.round(30*p.mm/maximum)))+"px";
+      });
+    }
     append(block,"p",r.points[0].time.slice(11,16)+" — "+r.points[r.points.length-1].time.slice(11,16)+" · 峰值 "+maximum+" mm/5分钟","weather-source");
   }
-  append(block,"p","预报生成时间 "+weatherTime(r.time),"weather-source");
+  append(block,"p","预报生成 "+weatherTime(r.time),"weather-source");
 }
-function weatherSecondary(root,v,attrs){
-  var area=append(root,"section","","weather-location"),s=v.sections||{};
-  append(area,"h2",v.name);
-  if(s.current&&s.current.status==="available"){
-    var c=s.current.data;append(area,"p",weatherNum(c.temp,"°C")+"　"+c.text,"weather-compact");
-    append(area,"p","体感 "+weatherNum(c.feels,"°C")+" · 湿度 "+weatherNum(c.humidity,"%"),"note");
-    weatherSource(area,s.current,attrs);
-  }else append(area,"p","等待当前天气","note");
-  weatherPart(area,s,"rain","未来2小时降水",attrs,weatherRain);
-  var a=s.alerts;
-  if(a&&a.status==="available"){
-    if(a.data.length)a.data.forEach(function(x){
-      var warning=append(area,"div","","weather-alert");
-      append(warning,"p",x.headline);append(warning,"p",x.sender+" · "+weatherTime(x.issued),"note");
-      if(x.description)append(warning,"p",x.description,"note");
-      if(x.instruction)append(warning,"p",x.instruction,"note");
+function weatherCurve(block,rows){
+  if(!document.createElementNS||rows.length<2||rows.some(function(r){return typeof r.temp!=="number"||!isFinite(r.temp);}))return;
+  var ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg"),temps=rows.map(function(r){return r.temp;});
+  var low=Math.min.apply(null,temps),high=Math.max.apply(null,temps),range=Math.max(2,high-low);
+  svg.setAttribute("viewBox","0 0 300 62");svg.setAttribute("class","weather-curve");svg.setAttribute("aria-hidden","true");
+  var points=rows.map(function(r,i){return [12+i*276/(rows.length-1),49-(r.temp-low)*36/range];});
+  var line=document.createElementNS(ns,"polyline");line.setAttribute("points",points.map(function(p){return p.join(",");}).join(" "));line.setAttribute("stroke","#222");line.setAttribute("stroke-width","1.7");line.setAttribute("fill","none");svg.appendChild(line);
+  points.forEach(function(p){var dot=document.createElementNS(ns,"circle");dot.setAttribute("cx",p[0]);dot.setAttribute("cy",p[1]);dot.setAttribute("r","2.4");dot.setAttribute("fill","#222");svg.appendChild(dot);});
+  block.appendChild(svg);
+}
+function renderWeather(){
+  var v=weatherPages[weatherCursor];if(!v)return;
+  // Only the visible page contributes to the DOM key; invisible location
+  // refreshes must not redraw an e-ink screen or reset its dwell timer.
+  var otherAlerts=[];
+  weatherPages.forEach(function(p,i){
+    if(i===weatherCursor)return;
+    var a=p.sections&&p.sections.alerts;
+    if(a&&a.status==="available"&&a.data.length)otherAlerts.push(p.name+"："+a.data.map(function(x){return (x.type==="cancel"?"解除信息 · ":"")+x.headline;}).join("；"));
+  });
+  var key=JSON.stringify([v,weatherCursor,weatherPages.length,otherAlerts]);
+  if(key===lastRender)return;
+  lastRender=key;txt("date","");txt("heading",v.name||"天气");txt("index",weatherPages.length>1?(weatherCursor+1)+" / "+weatherPages.length:"");
+  var root=el("body"),s=v.sections||{},attrs=[],groups=[],missing=[];clear(root);root.className="weather-page";
+  if(v.status==="disabled"){append(root,"p","天气未启用，请前往设置。","note");return;}
+  if(v.status==="storage_error"){append(root,"p","天气配置或限额记录异常，已暂停采集。","note");return;}
+  var current=s.current;
+  if(current&&current.status==="available"){
+    var c=current.data;
+    append(root,"p",weatherNum(c.temp,"°C")+"　"+c.text,"weather-main");
+    var today=s.daily&&s.daily.status==="available"&&s.daily.data.length?s.daily.data[0]:null;
+    if(today)append(root,"p","今日 "+weatherNum(today.min,"°")+" / "+weatherNum(today.max,"°"),"weather-summary");
+    append(root,"p","体感 "+weatherNum(c.feels,"°C")+" · 湿度 "+weatherNum(c.humidity,"%")+" · 风速 "+weatherNum(c.wind," "+(c.wind_unit||"")),"weather-summary");
+    append(root,"p","观测 "+weatherTime(c.time),"weather-foot");weatherSource(groups,attrs,current,"实时");
+  }else append(root,"p","当前天气暂不可用","note");
+  var air=s.air;
+  if(air&&air.status==="available"){
+    append(root,"p",air.data.map(function(a){return a.name+" "+a.aqi+" · "+a.category;}).join("；"),"weather-summary");
+    weatherSource(groups,attrs,air,"空气质量");
+  }else missing.push("空气质量");
+  var alerts=s.alerts;
+  if(alerts&&alerts.status==="available"){
+    if(alerts.data.length)alerts.data.forEach(function(a){
+      var row=append(root,"div","","weather-alert");append(row,"p",(a.type==="cancel"?"解除信息 · ":"")+a.headline);
+      append(row,"p",a.sender+" · "+weatherTime(a.issued),"weather-foot");
+      if(a.description)append(row,"p",a.description,"note");
+      if(a.instruction)append(row,"p",a.instruction,"note");
     });
-    else append(area,"p","本次未查到预警，以气象部门发布为准。","weather-source");
-    weatherSource(area,a,attrs);
-  }else append(area,"p","预警暂不可用","note");
+    else append(root,"p","本次未查到预警，以气象部门发布为准。","weather-foot");
+    weatherSource(groups,attrs,alerts,"预警");
+  }else missing.push("预警");
+  otherAlerts.forEach(function(a){append(root,"p",a,"weather-alert");});
+  weatherPart(root,s,"rain","未来2小时降水",groups,attrs,missing,weatherRain);
+  weatherPart(root,s,"hourly","未来12小时",groups,attrs,missing,function(block,rows){
+    var samples=rows.slice(0,12).filter(function(h,i){return i%2===0;});
+    weatherCurve(block,samples);
+    var strip=append(block,"div","","weather-strip");
+    samples.forEach(function(h){var cell=append(strip,"div","","weather-cell");
+      append(cell,"p",h.time.slice(11,16));append(cell,"p",h.text);
+      append(cell,"p",weatherNum(h.temp,"°"));append(cell,"p",weatherNum(h.pop,"%"));
+    });
+    append(block,"p","百分比为降水概率","weather-foot");
+  });
+  weatherPart(root,s,"daily","未来7天",groups,attrs,missing,function(block,rows){
+    var strip=append(block,"div","","weather-strip");
+    rows.slice(0,7).forEach(function(d){var cell=append(strip,"div","","weather-cell");
+      append(cell,"p",d.time.slice(5,10));append(cell,"p",d.text);
+      append(cell,"p",weatherNum(d.max,"°"));append(cell,"p",weatherNum(d.min,"°"));
+    });
+  });
+  if(missing.length)append(root,"p",missing.join("、")+"：暂不可用","weather-foot");
+  groups.forEach(function(g){append(root,"p",g.labels.join("、")+" · "+g.key,"weather-foot");});
+  attrs.forEach(function(a){append(root,"p",a,"weather-foot");});
+  if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="QWeather";})){
+    var attribution=append(root,"a","天气服务由和风天气驱动","weather-source");attribution.href="https://www.qweather.com";attribution.rel="noreferrer";
+  }
+  if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="Open-Meteo";})){
+    var meteoLink=append(root,"a"," · Open-Meteo (CC BY 4.0)","weather-source");meteoLink.href="https://open-meteo.com/";meteoLink.rel="noreferrer";
+  }
 }
 function acceptWeather(v){
-  data=null;pages=[];cursor=0;stopRotation();stopAge();
-  var key=JSON.stringify(v);
-  if(key!==lastRender){
-    lastRender=key;txt("date","");txt("heading",v.name||"天气");txt("index","");
-    var root=el("body"),s=v.sections||{},attrs=[];clear(root);
-    if(v.status==="disabled")append(root,"p","天气未启用，请前往设置。","note");
-    else if(v.status==="storage_error")append(root,"p","天气配置或限额记录异常，已暂停采集。","note");
-    else{
-      var current=s.current;
-      if(current&&current.status==="available"){
-        var c=current.data;
-        append(root,"p",weatherNum(c.temp,"°C")+"　"+c.text,"weather-main");
-        append(root,"p","体感 "+weatherNum(c.feels,"°C")+" · 湿度 "+weatherNum(c.humidity,"%")+" · 风速 "+weatherNum(c.wind," "+c.wind_unit),"note");
-        append(root,"p","数据时间 "+weatherTime(c.time),"note");weatherSource(root,current,attrs);
-      }else append(root,"p","等待当前天气","note");
-      weatherPart(root,s,"alerts","气象预警",attrs,function(block,rows){
-        if(!rows.length){append(block,"p","本次未查到预警，以气象部门发布为准。","note");return;}
-        rows.forEach(function(a){
-          var row=append(block,"div","","weather-alert");
-          append(row,"p",(a.type==="cancel"?"解除信息 · ":"")+a.headline);
-          append(row,"p",a.sender+" · "+weatherTime(a.issued),"note");
-          if(a.description)append(row,"p",a.description,"note");
-          if(a.instruction)append(row,"p",a.instruction,"note");
-        });
-      });
-      weatherPart(root,s,"rain","未来2小时降水",attrs,weatherRain);
-      (v.additional||[]).forEach(function(place){weatherSecondary(root,place,attrs);});
-      if(v.additional&&v.additional.length)append(root,"h2",v.name);
-      weatherPart(root,s,"hourly","未来12小时",attrs,function(block,rows){
-        var strip=append(block,"div","","weather-strip");
-        rows.slice(0,12).forEach(function(h,i){
-          if(i%2)return;
-          var cell=append(strip,"div","","weather-cell");
-          append(cell,"p",h.time.slice(11,16));append(cell,"p",h.text);
-          append(cell,"p",weatherNum(h.temp,"°"));append(cell,"p",weatherNum(h.pop,"%"));
-        });
-        append(block,"p","百分比为降水概率","weather-source");
-      });
-      weatherPart(root,s,"daily","未来7天",attrs,function(block,rows){
-        var strip=append(block,"div","","weather-strip");
-        rows.slice(0,7).forEach(function(d){
-          var cell=append(strip,"div","","weather-cell");
-          append(cell,"p",d.time.slice(5,10));append(cell,"p",d.text);
-          append(cell,"p",weatherNum(d.max,"°"));append(cell,"p",weatherNum(d.min,"°"));
-        });
-      });
-      weatherPart(root,s,"air","空气质量",attrs,function(block,rows){
-        rows.forEach(function(a){append(block,"p",a.name+" "+a.aqi+" · "+a.category,"note");});
-      });
-      attrs.forEach(function(a){append(root,"p",a,"weather-source");});
-      var allSections=[s].concat((v.additional||[]).map(function(p){return p.sections||{};}));
-      if(allSections.some(function(sections){return Object.keys(sections).some(function(k){return sections[k].status==="available"&&sections[k].source==="QWeather";});})){
-        var attribution=append(root,"a","天气服务由和风天气驱动","weather-source");attribution.href="https://www.qweather.com";attribution.rel="noreferrer";
-      }
-      if(allSections.some(function(sections){return Object.keys(sections).some(function(k){return sections[k].status==="available"&&sections[k].source==="Open-Meteo";});})){
-        var meteoLink=append(root,"a"," · Open-Meteo (CC BY 4.0)","weather-source");meteoLink.href="https://open-meteo.com/";meteoLink.rel="noreferrer";
-      }
-    }
-  }
+  data=null;pages=[];cursor=0;stopAge();
+  var first={name:v.name,status:v.status,sections:v.sections},next=[first];
+  if(v.status!=="disabled"&&v.status!=="storage_error")next=next.concat(v.additional||[]);
+  var order=JSON.stringify(next.map(function(p){return p.name||"";}));
+  if(order!==weatherOrder){weatherCursor=0;weatherOrder=order;stopRotation();}
+  weatherPages=next;if(weatherCursor>=next.length)weatherCursor=0;
+  renderWeather();
   show("login",false);show("display",true);txt("status","");
+  show("weatherDisplayControls",settingsOpen&&weatherPages.length>1);
+  if(next.length<2||settingsOpen||document.hidden)stopRotation();
+  else if(rotationTimer===null)scheduleRotation();
 }
 var weatherSettingsEpoch=0,weatherSettingsBusy=false,weatherSearchEpoch=0,weatherSearchBusy=false;
 function clearWeatherSearch(){weatherSearchEpoch++;weatherSearchBusy=false;el("weatherSearch").disabled=false;clear(el("weatherResults"));txt("weatherSearchStatus","");}
@@ -381,11 +408,11 @@ function weatherCapture(){
 function weatherLocationButtons(){
   var root=el("weatherLocations");clear(root);
   weatherDraft.forEach(function(p,i){
-    var b=append(root,"button",(i===0?"主地点：":"地点 "+(i+1)+"：")+(p.name||"未命名"),i===weatherActive?"selected":"");
+    var b=append(root,"button",p.name||"未命名",i===weatherActive?"selected":"");
     b.type="button";b.onclick=function(){if(weatherSettingsBusy)return;weatherCapture();weatherActive=i;weatherEdit();};
   });
   el("weatherAdd").disabled=weatherDraft.length>=3;
-  el("weatherMakePrimary").disabled=weatherActive===0;
+  el("weatherMoveUp").disabled=weatherActive===0;
   el("weatherRemove").disabled=weatherDraft.length<=1;
 }
 function weatherEdit(){
@@ -396,9 +423,9 @@ el("weatherAdd").onclick=function(){
   if(weatherSettingsBusy||weatherDraft.length>=3)return;
   weatherCapture();weatherDraft.push({name:"",latitude:"",longitude:""});weatherActive=weatherDraft.length-1;weatherEdit();
 };
-el("weatherMakePrimary").onclick=function(){
+el("weatherMoveUp").onclick=function(){
   if(weatherSettingsBusy||weatherActive===0)return;
-  weatherCapture();weatherDraft.unshift(weatherDraft.splice(weatherActive,1)[0]);weatherActive=0;weatherEdit();
+  weatherCapture();var p=weatherDraft.splice(weatherActive,1)[0];weatherActive--;weatherDraft.splice(weatherActive,0,p);weatherEdit();
 };
 el("weatherRemove").onclick=function(){
   if(weatherSettingsBusy||weatherDraft.length<=1)return;
@@ -521,7 +548,7 @@ function switchSection(next){
 }
 function hide(reason){
   stopAge();
-  data=null;pages=[];cursor=0;lastRender="";stopRotation();
+  data=null;pages=[];cursor=0;lastRender="";stopRotation();weatherPages=[];weatherCursor=0;weatherOrder="";el("body").className="";
   txt("date","");txt("heading","");clear(el("body"));txt("index","");txt("status",reason);
 }
 function refresh(){
@@ -560,7 +587,7 @@ function reset(keepResume){
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#bus"||hash==="#weather")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("autoMode").onclick=function(){
   if(!token)return;
-  panel(false);automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";tabs();show("options",false);
+  panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";tabs();show("options",false);
   clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
 };
 el("tasksMode").onclick=function(){switchSection("tasks");};
@@ -574,6 +601,7 @@ el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(
 el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
 function closeSettings(){weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
 el("returnDisplay").onclick=closeSettings;
+el("weatherNext").onclick=function(){if(mode!=="weather"||weatherPages.length<2||!settingsOpen)return;weatherCursor=(weatherCursor+1)%weatherPages.length;closeSettings();renderWeather();};
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;seconds=n;closeSettings();};
 el("cancel").onclick=closeSettings;
 el("logout").onclick=reset;
