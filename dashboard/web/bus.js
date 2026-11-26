@@ -54,7 +54,7 @@ function render(data){
   if(!s){hideData("未取得有效数据");return;}
   txt("line",trip?trip.line.name:"尚未配置公交");
   txt("trip",trip?trip.boarding.name+" → "+trip.destination.name+" · "+(trip.destination_index-trip.board_index)+"站":"");
-  var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查 Docker 日志",unconfigured:"请先设置线路和站点",unverified:"正在核对保存的线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
+  var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查采集时间设置或 Docker 日志",unconfigured:"请先设置线路和站点",unverified:"正在核对保存的线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
   var vehicles=(s.status==="live"||s.status==="stale")?s.vehicles:[];
   var key=JSON.stringify([trip,s.status,vehicles,s.scheduled_departures,vehicles.length?s.fetched_at:""]);
   if(key===lastKey)return;lastKey=key;
@@ -109,7 +109,7 @@ function addScheduleRow(w){
     sp.textContent=name;n.type="text";n.maxLength=5;n.placeholder="HH:MM";n.value=value;n.disabled=!scheduleEditable;l.appendChild(sp);l.appendChild(n);root.appendChild(l);return n;}
   row.start=field("开始 ",w.start===null?"":scheduleTime(w.start));row.end=field("结束 ",w.end===null?"":scheduleTime(w.end));
   var remove=document.createElement("button");remove.type="button";remove.textContent="删除时段";remove.disabled=!scheduleEditable;
-  remove.onclick=function(){if(busy)return;root.parentNode.removeChild(root);scheduleRows.splice(scheduleRows.indexOf(row),1);};
+  remove.onclick=function(){if(busy)return;el("scheduleRows").removeChild(root);scheduleRows.splice(scheduleRows.indexOf(row),1);};
   root.appendChild(remove);scheduleRows.push(row);
 }
 function closeSchedule(){configuring=false;show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];show("view",true);read();}
