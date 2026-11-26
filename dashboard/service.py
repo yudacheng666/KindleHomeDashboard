@@ -38,6 +38,18 @@ class BusService:
         self.search_cache = None
         self.route_cache = None
 
+    def set_enabled(self, enabled, config_error=False):
+        with self.lock:
+            if self.gate.enabled == enabled and self.config_error == config_error:
+                return
+            self.config_error = config_error
+            self.gate.set_enabled(enabled, config_error)
+            self.poller = None
+            self.restore_status = "unverified" if self.trip else "unconfigured"
+            self.restore_after = None
+            self.search_cache = None
+            self.route_cache = None
+
     def search_lines(self, keyword, city="310100"):
         with self.lock:
             now = self.clock()
