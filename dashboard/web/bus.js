@@ -16,7 +16,7 @@ function disable(value){
   for(var i=0;i<ids.length;i++)el(ids[i]).disabled=value;
 }
 function errorMessage(code){
-  var messages={unauthorized:"令牌无效或没有管理权限。",provider_blocked:"公交服务已限制访问，停止请求。",local_budget_wait:"请求间隔或本地额度限制，请稍后手动重试。",provider_error:"公交接口暂不可用。",invalid_selection_or_request:"选择无效或已过期，请重新搜索。",service_error:"本地服务异常。"};
+  var messages={unauthorized:"令牌无效或没有管理权限。",provider_blocked:"公交服务已限制访问，停止请求。",local_budget_wait:"请求间隔或本地额度限制，请稍后手动重试。",bus_disabled:"公交采集未启用，请检查 Docker 公交开关并重新部署。",local_request_gap:"请求过快，请等几秒再手动重试。",local_daily_limit:"已达到软件每日请求上限（UTC 日期），请次日再试；不是第三方额度。",provider_error:"公交接口暂不可用。",invalid_selection_or_request:"选择无效或已过期，请重新搜索。",service_error:"本地服务异常。"};
   return messages[code]||"连接失败，请检查本机服务。";
 }
 function request(method,path,body,done){
