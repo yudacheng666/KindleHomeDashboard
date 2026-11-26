@@ -75,6 +75,26 @@ class BackupTests(unittest.TestCase):
             restored.ledger.reserve()
         self.assertFalse(service.ledger.usage()["blocked"])
 
+    def test_driving_backup_disables_and_preserves_budget(self):
+        from dashboard.driving_service import DrivingService, DEFAULT
+        from dashboard.driving import DrivingBlocked
+        service=DrivingService(str(self.source),{})
+        groups=[{"name":"Example","origin":"1,2","destination":"2,3","enabled":True,
+                 "windows":[{"days":[0],"start":0,"end":1440}]}]
+        service.configure({**DEFAULT,"groups":groups,"enabled":True,"consent":True,"map_permission":True})
+        service.ledger.reserve("lbs")
+        self.save()
+        restore(str(self.snapshot),str(self.restored))
+        restored=DrivingService(str(self.restored),{})
+        self.assertFalse(restored.settings_view()["enabled"])
+        self.assertFalse(restored.settings_view()["consent"])
+        self.assertFalse(restored.settings_view()["map_permission"])
+        self.assertEqual(restored.settings_view()["groups"][0]["name"],"Example")
+        self.assertEqual(restored.settings_view()["budget"]["lbs"]["used"],1)
+        with self.assertRaises(DrivingBlocked):
+            restored.ledger.reserve("lbs")
+        self.assertFalse(service.ledger.usage()["blocked"])
+
     def test_old_backup_weather_blocked(self):
         from dashboard.weather import RequestLedger, WeatherBlocked
         self.save()

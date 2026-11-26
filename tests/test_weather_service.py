@@ -9,7 +9,7 @@ import unittest
 from secrets import token_urlsafe
 from dashboard.weather_service import WeatherService
 from dashboard.weather import WeatherError, WeatherBlocked, LIMIT, INTERVALS
-from dashboard.weather_service import SECONDARY_INTERVALS
+from dashboard.weather_service import THREE_LOCATION_INTERVALS
 from dashboard.http_api import API, LocalServer
 from dashboard.runtime import Runtime
 from dashboard.service import BusService
@@ -144,13 +144,18 @@ class WeatherServiceTests(unittest.TestCase):
         extra={"name":"Fictional second","latitude":3.45,"longitude":4.56}
         third={"name":"Fictional third","latitude":5.67,"longitude":6.78}
         self.service.configure({**CONFIG,"additional":[extra,third]})
-        for _ in range(12): self.service.step()
-        self.assertEqual(len(self.calls),12)
-        self.assertEqual(self.service.ledger.usage()["used"],12)
+        for _ in range(18): self.service.step()
+        self.assertEqual(len(self.calls),18)
+        self.assertEqual(self.service.ledger.usage()["used"],18)
         view=self.service.read()
         self.assertEqual([x["name"] for x in view["additional"]],["Fictional second","Fictional third"])
-        self.assertEqual(set(view["additional"][0]["sections"]),{"current","rain","alerts"})
-        self.assertTrue(all(x["status"]=="available" for x in view["additional"][0]["sections"].values()))
+        self.assertEqual(set(view["additional"][0]["sections"]),set(INTERVALS))
+        for place in [view]+view["additional"]:
+            self.assertEqual(set(place["sections"]),set(INTERVALS))
+            self.assertTrue(all(x["status"]=="available" for x in place["sections"].values()))
+        self.assertEqual(len(self.service.due),18)
+        for (i,kind),due in self.service.due.items():
+            self.assertEqual(due,self.mono+THREE_LOCATION_INTERVALS[kind])
         self.assertEqual(self.new().settings_view()["additional"],[extra,third])
         with self.assertRaises(ValueError):
             self.service.configure(CONFIG)
@@ -160,7 +165,7 @@ class WeatherServiceTests(unittest.TestCase):
             self.service.configure({**CONFIG,"additional":[{**extra,"latitude":CONFIG["latitude"],"longitude":CONFIG["longitude"]}]})
         self.service.configure({**CONFIG,"additional":[third]})
         self.assertEqual(self.service.read()["additional"][0]["status"],"waiting")
-        self.assertEqual(self.service.ledger.usage()["used"],12)
+        self.assertEqual(self.service.ledger.usage()["used"],18)
 
     def test_shared_quota_and_location_isolation(self):
         extra={"name":"Fictional second","latitude":3.45,"longitude":4.56}
@@ -173,7 +178,7 @@ class WeatherServiceTests(unittest.TestCase):
                 raw["temperature"]["value"]=25
             return raw
         self.service.primary.transport=specific
-        for _ in range(9): self.service.step()
+        for _ in range(12): self.service.step()
         v=self.service.read()
         self.assertEqual(v["sections"]["current"]["data"]["temp"],20)
         self.assertEqual(v["additional"][0]["sections"]["current"]["data"]["temp"],25)
@@ -186,7 +191,7 @@ class WeatherServiceTests(unittest.TestCase):
         self.mono+=1800
         for _ in range(20): self.service.step()
         self.assertEqual(len(calls),count)
-        self.assertLess((sum(86400//x for x in INTERVALS.values())+2*sum(86400//x for x in SECONDARY_INTERVALS.values()))*32,LIMIT)
+        self.assertLess(3*sum(86400//x for x in THREE_LOCATION_INTERVALS.values())*32,LIMIT)
 
     def test_legacy_location_upgrade(self):
         self.service.configure(CONFIG)
