@@ -81,6 +81,23 @@ body{max-width:960px;padding:4px;font:18px/1.35 sans-serif}
 #detailLinks button{margin:4px 4px 4px 0}
 @media(min-width:1024px){#settingsPanel{padding:24px}#settingsPanel button,#settingsPanel select,#settingsPanel input{min-height:40px}#settingsPanel input[type=checkbox]{min-height:24px}}
 @media(max-width:360px){.display-nav button{font-size:12px}.overview-page .bus-first .eta{font-size:25px}.overview-page .bus-first .eta.bus-state{font-size:16px}.overview-page .weather-main{font-size:30px}}
+
+#settingsPanel{box-sizing:border-box}
+#settingsMenu .setting-entry{display:block;width:100%;text-align:left;background:#fff;color:#1f2937;border:1px solid #d1d5db;margin:6px 0}
+#settingsDetail{background:#fff;padding:12px;border:1px solid #d1d5db;border-radius:8px}
+#settingsDetail.hidden,#settingsMenu.hidden,#weatherDetail.hidden,#drivingDetail.hidden,#drivingGroups .hidden{display:none}
+#settingsDetail h2{margin-top:6px}
+#settingsDetail label{word-wrap:break-word}
+#settingsDetail .save-feedback{font-weight:bold;margin:6px 0;word-wrap:break-word}
+#settingsDetail .save-feedback:empty,#weatherLoadStatus:empty,#drivingLoadStatus:empty{display:none}#weatherForm.hidden+#weatherSettingStatus,#drivingForm.hidden+#drivingSettingStatus{display:none}
+#weatherLocations button,#drivingLocations button{max-width:100%;word-wrap:break-word;white-space:normal}
+#drivingGroups .driving-fields{padding:8px;margin:8px 0}
+#drivingGroups .driving-fields .driving-fields{padding:8px 0;border:0;border-top:1px solid #d1d5db;border-radius:0}
+#drivingGroups .driving-days label{min-width:44px;min-height:44px;line-height:44px}
+#settingsDetail input[type=text],#settingsDetail select{width:100%;display:block}
+#settingsPanel button:disabled{opacity:.65}
+#settingsPanel button:active{background:#e5e7eb;color:#111}
+@media(min-width:1024px){#settingsPanel.settings-detail-open #settingsMenu{display:block;float:left;width:210px}#settingsPanel.settings-detail-open #settingsDetail{margin-left:226px}#settingsPanel:after{content:"";display:block;clear:both}#settingsPanel #settingsMenu a,#settingsPanel #settingsMenu button{word-wrap:break-word;white-space:normal}}
 </style></head>
 <body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button></div>
 <p id="status" class="status" role="status"></p>
@@ -88,14 +105,16 @@ body{max-width:960px;padding:4px;font:18px/1.35 sans-serif}
 <div id="displayNav"><div class="display-nav"><span class="detail-tab"><button id="overviewMode" type="button">总览</button></span><span class="detail-tab"><button id="busMode" type="button">公交</button></span><span class="detail-tab"><button id="tasksMode" type="button">待办</button></span><span class="detail-tab"><button id="postersMode" type="button">海报</button></span><span class="detail-tab"><button id="menusMode" type="button">菜单</button></span><span class="detail-tab"><button id="drivingMode" type="button">驾驶</button></span><span class="detail-tab"><button id="weatherMode" type="button">天气</button></span><span><button id="settings" type="button" aria-label="设置" title="设置">设置</button></span></div></div>
 <div id="displayContent"><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
 <div id="settingsPanel" class="hidden"><button id="returnDisplay" type="button">返回看板</button><h1>设置</h1>
-<h2>显示设置</h2><div id="detailLinks"><button id="overviewView" type="button">综合展示</button><button id="posterView" type="button">海报展示</button></div><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
+<div id="settingsMenu"><h2>显示设置</h2><div id="detailLinks"><button id="overviewView" type="button">综合展示</button><button id="posterView" type="button">海报展示</button></div><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
 <div id="weatherDisplayControls" class="hidden"><p class="status">天气地点轮播 · 每2分钟</p><button id="weatherNext" type="button">下一地点并返回看板</button></div>
 <div id="familyControls" class="hidden"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button><button id="pause" type="button">开始轮播</button></div>
 <div id="options" class="hidden"><label for="seconds">本次海报停留时间</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select><p class="status">本次调整不修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>
 <div class="setting-list"><a id="manageLink" href="/bus">公交设置 · 线路、站点及采集时段</a><a id="tasksManage" href="/home#tasks">待办清单管理</a><a id="postersManage" href="/home#posters">海报管理 · 保存默认轮播设置</a><a id="menusManage" href="/home#menus">本周菜单管理</a><a id="catalogManage" href="/home#catalog">家庭菜单维护</a></div>
 
-<h2>天气设置</h2><p class="status">和风天气优先，Open-Meteo 备用。凭据在 NAS 私有容器配置中填写，网页不会读取或显示密钥。</p>
-<button id="weatherLoad" type="button">读取天气设置</button><p id="weatherSettingStatus" class="status" role="status"></p>
+<h2>出行与天气</h2><button id="weatherLoad" type="button" class="setting-entry">天气设置</button><button id="drivingLoad" type="button" class="setting-entry">驾驶设置</button><h2>系统信息</h2><p id="version" class="status"></p><button id="logout" type="button">退出连接</button></div>
+<div id="settingsDetail" class="hidden"><button id="settingsBack" type="button">返回设置</button>
+<section id="weatherDetail" class="hidden"><h2>天气设置</h2><p class="status">和风天气优先，Open-Meteo 备用。凭据在 NAS 私有容器配置中填写，网页不会读取或显示密钥。</p>
+<p id="weatherLoadStatus" class="status" role="status"></p><button id="weatherRetry" type="button" class="hidden">重新读取</button>
 <div id="weatherForm" class="hidden"><label><input id="weatherEnabled" type="checkbox"> 开启天气采集</label>
 <label><input id="weatherConsent" type="checkbox"> 同意 NAS 向和风天气发送搜索的城市名称，并向和风天气及 Open-Meteo 发送所选地点近似坐标查询天气；接受服务条款，知悉和风超额可能收费。</label>
 <p class="status">最多3个地点，按列表顺序每2分钟轮播；只有一个地点时固定显示。各地点天气项目相同，3个地点时统一降低采集频率。</p>
@@ -110,8 +129,7 @@ body{max-width:960px;padding:4px;font:18px/1.35 sans-serif}
 <label for="weatherLat">纬度（WGS84，最多两位小数）</label><input id="weatherLat" type="text" inputmode="decimal" maxlength="12">
 <label for="weatherLon">经度（WGS84，最多两位小数）</label><input id="weatherLon" type="text" inputmode="decimal" maxlength="12">
 </div>
-<p id="weatherBudget" class="status"></p><button id="weatherSave" type="button">保存天气设置</button></div>
-<h2>驾驶设置</h2><p class="status">最多三个目的地；高德密钥在 NAS 私有容器环境变量中配置。</p><button id="drivingLoad" type="button">读取驾驶设置</button><p id="drivingSettingStatus" class="status" role="status"></p>
-<div id="drivingForm" class="hidden"><label><input id="drivingEnabled" type="checkbox">开启驾驶采集</label><label><input id="drivingConsent" type="checkbox">同意将地点搜索词及精确起终点坐标发送给高德查询，已核实账号免费额度。</label><label><input id="drivingMapPermission" type="checkbox">已核实高德地图使用许可，允许在家庭看板内短暂展示原图。</label><label>刷新间隔<select id="drivingInterval"><option value="60">1分钟</option><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select></label><p class="status">坐标格式：高德 GCJ-02，经度,纬度。地点搜索不可用时，可手工填写。</p><div id="drivingGroups"></div><button id="drivingAdd" type="button">添加目的地</button><p id="drivingBudget" class="status"></p><button id="drivingSave" type="button">保存驾驶设置</button></div>
-<h2>系统信息</h2><p id="version" class="status"></p><p class="status">数据由本地 NAS 提供；各模块显示采集及错误状态。</p><button id="logout" type="button">退出连接</button></div>
+<p id="weatherBudget" class="status"></p><button id="weatherSave" type="button">保存天气设置</button></div><p id="weatherSettingStatus" class="status save-feedback" role="status"></p></section>
+<section id="drivingDetail" class="hidden"><h2>驾驶设置</h2><p class="status">最多三个目的地；高德密钥在 NAS 私有容器环境变量中配置。</p><p id="drivingLoadStatus" class="status" role="status"></p><button id="drivingRetry" type="button" class="hidden">重新读取</button>
+<div id="drivingForm" class="hidden"><label><input id="drivingEnabled" type="checkbox">开启驾驶采集</label><label><input id="drivingConsent" type="checkbox">同意将地点搜索词及精确起终点坐标发送给高德查询，已核实账号免费额度。</label><label><input id="drivingMapPermission" type="checkbox">已核实高德地图使用许可，允许在家庭看板内短暂展示原图。</label><label>刷新间隔<select id="drivingInterval"><option value="60">1分钟</option><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select></label><p class="status">坐标格式：高德 GCJ-02，经度,纬度。地点搜索不可用时，可手工填写。</p><div id="drivingLocations"></div><div id="drivingGroups"></div><button id="drivingAdd" type="button">添加目的地</button><p id="drivingBudget" class="status"></p><button id="drivingSave" type="button">保存驾驶设置</button></div><p id="drivingSettingStatus" class="status save-feedback" role="status"></p></section></div></div>
 </div><script src="/access-mode.js"></script><script src="/display.js"></script></body></html>
