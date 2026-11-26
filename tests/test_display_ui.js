@@ -69,6 +69,9 @@ const firstEta=el("body").children.find(n=>n.className==="eta");
 busData={...bus,snapshot:{...bus.snapshot,fetched_at:new Date(FakeDate.now()).toISOString()}};advance(15000);
 assert.equal(el("body").children.find(n=>n.className==="eta"),firstEta);
 assert.equal(firstEta.textContent,"约 4 分钟"); // new sample can increase ETA
+busData={...busData,snapshot:{...busData.snapshot,fetched_at:new Date(FakeDate.now()).toISOString(),vehicles:[{...bus.snapshot.vehicles[0],distance_m:250,eta_min:5},bus.snapshot.vehicles[1]]}};advance(15000);
+assert.equal(el("body").children.find(n=>n.className==="eta"),firstEta);assert.equal(firstEta.textContent,"约 5 分钟");assert.ok(el("body").children.some(n=>n.textContent.includes("250 米")));
+busData={...bus,snapshot:{...bus.snapshot,fetched_at:new Date(FakeDate.now()).toISOString()}};advance(15000);
 assert.ok(el("body").children.some(n=>n.textContent.startsWith("预计到站 ")));
 busData={...busData,snapshot:{...busData.snapshot,status:"stale"}};advance(15000);
 assert.ok(el("body").children.some(n=>n.textContent==="旧预测 · 约 4 分钟"));
