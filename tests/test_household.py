@@ -19,6 +19,37 @@ class HouseholdTests(unittest.TestCase):
         for key in ("tasks","posters","today_menu","week_menu","shopping"):
             self.assertEqual(view[key],[])
 
+    def test_shared_dishes_concurrent_and_last_confirmation(self):
+        from concurrent.futures import ThreadPoolExecutor
+        def add(name):
+            return self.home.change_menu_dish(self.today,"dinner",name,True,False,None)
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(add,["Example A","Example B","Example A","Example C"]))
+        self.assertEqual(set(self.home.view(self.today)["week_menu"][0]["dishes"]),{"Example A","Example B","Example C"})
+        self.assertEqual(len(self.home.view(self.today)["week_menu"][0]["dishes"]),3)
+        self.home.change_menu_dish(self.today,"lunch","Example A",True,False,None)
+        for name in ("Example A","Example B"):
+            self.home.change_menu_dish(self.today,"dinner",name,False,False,None)
+        with self.assertRaises(ValueError):
+            self.home.change_menu_dish(self.today,"dinner","Example C",False,False,None)
+        self.home.plan_menu(self.today,"dinner",["Example C"],["Example ingredient"],{"dishes":["Example C"],"ingredients":[]})
+        with self.assertRaises(ValueError):
+            self.home.change_menu_dish(self.today,"dinner","Example C",False,True,[])
+        self.assertIsNone(self.home.change_menu_dish(self.today,"dinner","Example C",False,True,["Example ingredient"]))
+        self.assertIsNone(self.home.change_menu_dish(self.today,"dinner","Example C",False,False,None))
+        self.assertEqual(self.home.view(self.today)["week_menu"][0]["meal"],"lunch")
+        self.assertEqual(len(self.home.view(self.today)["week_menu"]),1)
+
+    def test_old_menu_editor_snapshot_guards(self):
+        self.home.set_menu(self.today,"dinner",["Example A"])
+        original={"dishes":["Example A"],"ingredients":[]}
+        self.home.change_menu_dish(self.today,"dinner","Example B",True,False,None)
+        with self.assertRaises(ValueError):
+            self.home.edit_menu(self.today,"dinner",self.today,"lunch",["Example A"],[],original)
+        with self.assertRaises(ValueError):
+            self.home.delete_menu(self.today,"dinner",original)
+        self.assertEqual(self.home.view(self.today)["week_menu"][0]["dishes"],["Example A","Example B"])
+
     def test_quick_menu_rejects_stale_snapshot(self):
         self.home.plan_menu(self.today,"dinner",["Example dish"],[],None)
         with self.assertRaises(ValueError):

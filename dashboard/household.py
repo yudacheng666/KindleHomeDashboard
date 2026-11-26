@@ -9,6 +9,7 @@ from uuid import uuid4
 from .trip_store import TripStore
 
 MEALS = ("breakfast", "lunch", "dinner")
+_UNSET = object()
 
 
 def text(value, limit=200):
@@ -323,7 +324,25 @@ class Household:
             db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
                        (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
 
-    def edit_menu(self, old_on, old_meal, on, meal, dishes, ingredients):
+    @staticmethod
+    def _menu_snapshot(db, on, meal):
+        current = db.execute("SELECT dishes,ingredients FROM menus WHERE day=? AND meal=?",
+                             (on,meal)).fetchone()
+        return None if current is None else {k:json.loads(current[k]) for k in ("dishes","ingredients")}
+
+    @staticmethod
+    def _check_menu_snapshot(db, on, meal, expected):
+        if expected is _UNSET:
+            return
+        if expected is not None:
+            if not isinstance(expected, dict) or set(expected) != {"dishes", "ingredients"}:
+                raise ValueError("Invalid expected menu")
+            expected = {"dishes": strings(expected["dishes"]),
+                        "ingredients": strings(expected["ingredients"],80)}
+        if Household._menu_snapshot(db,on,meal) != expected:
+            raise ValueError("Menu changed; reload before saving")
+
+    def edit_menu(self, old_on, old_meal, on, meal, dishes, ingredients, expected=_UNSET):
         """Move or edit one menu atomically without overwriting another meal."""
         old_on, on = day(old_on), day(on)
         if old_meal not in MEALS or meal not in MEALS:
@@ -333,6 +352,7 @@ class Household:
             raise ValueError("At least one dish required")
         with self.db() as db:
             db.execute("BEGIN IMMEDIATE")
+            self._check_menu_snapshot(db,old_on,old_meal,expected)
             if not db.execute("SELECT 1 FROM menus WHERE day=? AND meal=?",
                               (old_on, old_meal)).fetchone():
                 raise ValueError("Unknown menu")
@@ -353,26 +373,53 @@ class Household:
         dishes, ingredients = strings(dishes), strings(ingredients,80)
         if not dishes:
             raise ValueError("At least one dish required")
-        if expected is not None:
-            if not isinstance(expected, dict) or set(expected) != {"dishes", "ingredients"}:
-                raise ValueError("Invalid expected menu")
-            expected = {"dishes": strings(expected["dishes"]),
-                        "ingredients": strings(expected["ingredients"],80)}
         with self.db() as db:
             db.execute("BEGIN IMMEDIATE")
-            current = db.execute("SELECT dishes,ingredients FROM menus WHERE day=? AND meal=?",
-                                 (on,meal)).fetchone()
-            actual = None if current is None else {k:json.loads(current[k]) for k in ("dishes","ingredients")}
-            if actual != expected:
-                raise ValueError("Menu changed; reload before saving")
+            self._check_menu_snapshot(db,on,meal,expected)
             db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
                        (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
 
-    def delete_menu(self, on, meal):
+    def change_menu_dish(self, on, meal, name, present, confirm_empty, expected_ingredients):
+        """Apply explicit single-dish intent to the current shared meal atomically."""
+        on, name = day(on), text(name)
+        if meal not in MEALS or type(present) is not bool or type(confirm_empty) is not bool:
+            raise ValueError("Invalid meal or operation")
+        if confirm_empty:
+            if present:
+                raise ValueError("Invalid empty confirmation")
+            expected_ingredients = strings(expected_ingredients,80)
+        elif expected_ingredients is not None:
+            raise ValueError("Unexpected ingredients")
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = self._menu_snapshot(db,on,meal)
+            if current is None and not present:
+                return None
+            dishes = current["dishes"] if current else []
+            ingredients = current["ingredients"] if current else []
+            if present:
+                if name not in dishes:
+                    dishes = dishes + [name]
+            elif name in dishes:
+                dishes = [dish for dish in dishes if dish != name]
+                if not dishes:
+                    if not confirm_empty or ingredients != expected_ingredients:
+                        raise ValueError("Confirm removal of final dish and ingredients")
+                    db.execute("DELETE FROM menus WHERE day=? AND meal=?", (on,meal))
+                    return None
+            if len(dishes) > 30:
+                raise ValueError("Too many dishes")
+            db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
+                       (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
+            return {"day":on,"meal":meal,"dishes":dishes,"ingredients":ingredients}
+
+    def delete_menu(self, on, meal, expected=_UNSET):
         on = day(on)
         if meal not in MEALS:
             raise ValueError("Invalid meal")
         with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._check_menu_snapshot(db,on,meal,expected)
             if db.execute("DELETE FROM menus WHERE day=? AND meal=?", (on, meal)).rowcount != 1:
                 raise ValueError("Unknown menu")
 

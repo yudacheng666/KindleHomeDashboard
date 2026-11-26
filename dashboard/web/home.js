@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
-var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false,historyOpen=false,catalogCategory="",catalogQuery="",menusLoaded=false;
+var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false,historyOpen=false,catalogCategory="",catalogQuery="",menusLoaded=false,stopQuick=null,resumeQuick=null,quickCanLeave=null;
 function initialTab(){var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#catalog"?"catalog":h==="#display"?"displaySettings":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
@@ -28,7 +28,10 @@ function req(path,body,done){
     x.send(body===null?null:JSON.stringify(body));
   }catch(e){finish(false,{});}
 }
-function closeEditor(){editing=false;clear(el("editor"));show("editor",false);}
+function closeEditor(){
+  if(stopQuick)stopQuick();stopQuick=null;resumeQuick=null;quickCanLeave=null;
+  editing=false;clear(el("editor"));show("editor",false);el("content").className="panel";
+}
 function reset(){epoch++;busy=false;token="";admin=false;data=null;menus=[];menusLoaded=false;menuDate="";tab=initialTab();historyOpen=false;catalogCategory="";catalogQuery="";
   closeEditor();clear(el("content"));el("date").textContent="";el("token").value="";show("home",false);show("login",true);note("");}
 function load(){
@@ -39,7 +42,7 @@ function load(){
   });
 }
 function mutate(path,body,onSaved){
-  req(path,body,function(ok,v){if(ok){if(onSaved)onSaved();closeEditor();note("已保存。");load();}else{note(path==="menu/edit"&&v.error==="invalid_selection_or_request"?"未保存：目标餐次可能已有菜单，或原菜单/填写内容无效。请核对后重试。":"操作未确认成功；请刷新核对后再重试。");}});
+  req(path,body,function(ok,v){if(ok){if(onSaved)onSaved();closeEditor();note("已保存。");load();}else{note((path==="menu/edit"||path==="menu/move"||path==="menu/plan"||path==="menu/snapshot/delete")&&v.error==="invalid_selection_or_request"?"未保存：目标餐次可能已有菜单，或原菜单/填写内容无效。请核对后重试。":"操作未确认成功；请刷新核对后再重试。");}});
 }
 function remove(path,body,label){
   if(window.confirm("确认删除"+label+"？此操作不可撤销。")){body.confirm=true;mutate(path,body);}
@@ -113,37 +116,45 @@ function catalogPage(p){
   search.oninput=function(){catalogQuery=search.value.trim();draw();};draw();
 }
 function uniqueLines(s){var out=[];lines(s).forEach(function(v){if(out.indexOf(v)<0)out.push(v);});return out;}
-function dishPicker(p,dishes){
+function dishPicker(p,dishes,onPick){
   var wrap=node(p,"div"),query="",selectedCategory="",search=field(wrap,"搜索菜品","","text",null,200);
-  var tabs=node(wrap,"div"),choices=node(wrap,"div");
+  var tabs=node(wrap,"div"),choices=node(wrap,"div"),buttons=[];
+  function sync(){
+    var selected=uniqueLines(dishes.value);
+    buttons.forEach(function(item){var active=selected.indexOf(item.name)>=0;
+      item.button.className="dish-pick"+(active?" dish-selected":"");
+      if(item.button.setAttribute)item.button.setAttribute("aria-pressed",active?"true":"false");
+    });
+  }
   function draw(){
-    clear(tabs);clear(choices);
+    clear(tabs);clear(choices);buttons=[];
     var c=catalogData();
     if(!c.categories.some(function(t){return t.id===selectedCategory;}))selectedCategory=c.categories.length?c.categories[0].id:"";
     c.categories.forEach(function(t){btn(tabs,t.name,function(){selectedCategory=t.id;query="";search.value="";draw();}).className=t.id===selectedCategory?"primary":"";});
     var selected=uniqueLines(dishes.value),count=0;
     c.dishes.forEach(function(d){
       if(query?d.name.toLowerCase().indexOf(query.toLowerCase())<0:d.category!==selectedCategory)return;
-      count++;var active=selected.indexOf(d.name)>=0;
+      count++;
       var b=btn(choices,d.name,function(){
         var a=uniqueLines(dishes.value),i=a.indexOf(d.name);
+        if(onPick){onPick(d.name,i<0);return;}
         if(i>=0)a.splice(i,1);else a.push(d.name);
-        dishes.value=a.join("\n");draw();
-      });b.className="dish-pick"+(active?" dish-selected":"");b.setAttribute&&b.setAttribute("aria-pressed",active?"true":"false");
+        dishes.value=a.join("\n");sync();
+      });buttons.push({name:d.name,button:b});
     });
-    if(!count)node(choices,"small","暂无匹配菜品，可手动输入。");
+    if(!count)node(choices,"small","暂无匹配菜品，可手动输入。");sync();
   }
   search.oninput=function(){query=search.value.trim();draw();};
-  dishes.oninput=draw;
+  dishes.oninput=sync;
   btn(wrap,"将手输菜品加入菜品库",function(){
     var c=catalogData(),names=uniqueLines(dishes.value).filter(function(n){return !c.dishes.some(function(d){return d.name===n;});});
     if(!names.length){note("没有未入库的菜品。");return;}
     if(!selectedCategory){note("请先在家庭菜单维护中新增分类。");return;}
     var category=c.categories.filter(function(t){return t.id===selectedCategory;})[0];
     if(!window.confirm("将 "+names.length+" 道未入库菜品加入「"+category.name+"」？"))return;
-    req("dish/import",{names:names,category:selectedCategory},function(ok,v){if(ok&&v.result){data.catalog=v.result;note("菜品已入库，本餐菜单仍需保存。");draw();}});
+    req("dish/import",{names:names,category:selectedCategory},function(ok,v){if(ok&&v.result){data.catalog=v.result;note(onPick?"菜品已入库。":"菜品已入库，本餐菜单仍需保存。");draw();}});
   });
-  draw();return draw;
+  draw();draw.sync=sync;return draw;
 }
 function weekDates(anchor){
   var monday=new Date(anchor+"T00:00:00Z");if(isNaN(monday.getTime()))return [];
@@ -152,36 +163,84 @@ function weekDates(anchor){
 }
 function quickMenu(){
   if(!menusLoaded){note("请先成功查询所在周的菜单，再快捷排餐。");return;}
-  var p=editor("快捷排餐"),days=weekDates(menuDate||data.date),selectedDay=days.indexOf(menuDate)>=0?menuDate:days[0],selectedMeal="dinner",drafts={},original={};
-  menus.forEach(function(m){original[m.day+"/"+m.meal]={dishes:m.dishes.join("\n"),ingredients:m.ingredients.join("\n")};});
+  var days=weekDates(menuDate||data.date);if(!days.length)return;
+  var p=editor("多人快捷排餐"),selectedDay=days.indexOf(menuDate)>=0?menuDate:days[0],selectedMeal="dinner";
+  el("content").className="panel hidden";
+  var active=true,ready=false,uncertain=false,pollTimer=null,pollXHR=null,pollTimeout=null,pollSeq=0,manualDrafts={},lastRender="";
   var dates=node(p,"div",undefined,"week-days"),meals=node(p,"div",undefined,"meal-pick");
-  var dishes=field(p,"菜品（可点选或每行手动输入一个）","","textarea"),ingredients=field(p,"食材（可选，保留旧数据）","","textarea");
-  var picker=dishPicker(p,dishes),message=node(p,"p","","menu-editor-note");
+  var status=node(p,"p","正在同步…","menu-editor-note");status.id="quickStatus";status.setAttribute&&status.setAttribute("role","status");
+  var selected=node(p,"div",undefined,"shared-dishes"),manual=field(p,"手动添加菜品","","text",null,200);
+  manual.id="quickManual";
+  var chosen={value:""},picker=dishPicker(p,chosen,change);
+  btn(p,"添加菜品",function(){var name=manual.value.trim();if(name)change(name,true,true);});
   function key(){return selectedDay+"/"+selectedMeal;}
-  function stored(k){return original[k]||{dishes:"",ingredients:""};}
-  function capture(){var k=key(),base=stored(k),value={dishes:dishes.value,ingredients:ingredients.value};
-    if(value.dishes===base.dishes&&value.ingredients===base.ingredients)delete drafts[k];else drafts[k]=value;}
-  function draw(){
+  function current(){for(var i=0;i<menus.length;i++)if(menus[i].day===selectedDay&&menus[i].meal===selectedMeal)return menus[i];return null;}
+  function say(s){if(status.textContent!==s)status.textContent=s;}
+  function paint(force){
+    var m=current(),dishes=m?m.dishes:[],k=JSON.stringify([key(),dishes,m?m.ingredients:[]]);
+    if(!force&&k===lastRender)return;
+    lastRender=k;chosen.value=dishes.join("\n");picker.sync();clear(selected);
+    node(selected,"h3",selectedDay+" · "+mealNames[selectedMeal]+" · 已选 "+dishes.length+" 道");
+    if(!dishes.length)node(selected,"p","尚未点菜");
+    dishes.forEach(function(name){var n=node(selected,"div",undefined,"shared-dish");node(n,"span",name);btn(n,"取消",function(){change(name,false);});});
+  }
+  function drawNavigation(){
     clear(dates);clear(meals);
     days.forEach(function(d,i){var cell=node(dates,"span"),label="周"+"一二三四五六日".charAt(i)+"\n"+d.slice(5)+(d===data.date?"\n今日":"");
-      btn(cell,label,function(){capture();selectedDay=d;draw();}).className=d===selectedDay?"primary":"";});
-    ["breakfast","lunch","dinner"].forEach(function(m){btn(meals,mealNames[m],function(){capture();selectedMeal=m;draw();}).className=m===selectedMeal?"primary":"";});
-    var v=drafts[key()]||stored(key());dishes.value=v.dishes;ingredients.value=v.ingredients;
-    message.textContent=selectedDay+" · "+mealNames[selectedMeal]+(original[key()]?" · 已有菜单":"")+"；切换日期和餐次会保留本页草稿。";picker();
+      btn(cell,label,function(){manualDrafts[key()]=manual.value;selectedDay=d;manual.value=manualDrafts[key()]||"";drawNavigation();paint(true);}).className=d===selectedDay?"primary":"";});
+    ["breakfast","lunch","dinner"].forEach(function(m){btn(meals,mealNames[m],function(){manualDrafts[key()]=manual.value;selectedMeal=m;manual.value=manualDrafts[key()]||"";drawNavigation();paint(true);}).className=m===selectedMeal?"primary":"";});
   }
-  btn(p,"保存本餐菜单",function(){
-    capture();var k=key(),b={on:selectedDay,meal:selectedMeal,dishes:uniqueLines(dishes.value),ingredients:lines(ingredients.value)};
-    if(!b.dishes.length){note("请至少选择或输入一道菜；删除整餐请使用菜单列表。");return;}
-    b.expected=original[k]?{dishes:lines(original[k].dishes),ingredients:lines(original[k].ingredients)}:null;
-    req("menu/plan",b,function(ok,v){
-      if(!ok){note(v.error==="invalid_selection_or_request"?"菜单可能已被其他设备修改，或填写内容无效。请核对后重试；草稿仍保留。":"本餐保存未确认，请核对后重试；草稿仍保留。");return;}
-      original[k]={dishes:b.dishes.join("\n"),ingredients:b.ingredients.join("\n")};delete drafts[k];
-      menus=menus.filter(function(m){return m.day!==b.on||m.meal!==b.meal;});menus.push({day:b.on,meal:b.meal,dishes:b.dishes,ingredients:b.ingredients});
-      note("本餐已保存。");draw();
+  function cancelPoll(){
+    pollSeq++;clearTimeout(pollTimer);pollTimer=null;clearTimeout(pollTimeout);pollTimeout=null;
+    var x=pollXHR;pollXHR=null;if(x)try{x.abort();}catch(e){}
+  }
+  function schedule(){clearTimeout(pollTimer);pollTimer=null;if(active&&!document.hidden)pollTimer=setTimeout(poll,2000);}
+  function poll(){
+    if(!active||document.hidden)return;
+    if(busy||pollXHR){schedule();return;}
+    var x=new XMLHttpRequest(),seq=++pollSeq,g=epoch;pollXHR=x;
+    function finish(ok,v){
+      if(!active||seq!==pollSeq||g!==epoch)return;
+      pollSeq++;clearTimeout(pollTimeout);pollTimeout=null;pollXHR=null;
+      if(ok&&v&&Array.isArray(v.result)){
+        menus=v.result;ready=true;paint(false);say(uncertain?"已重新同步，请核对上次未确认操作。":"已同步 · 点菜自动保存");
+      }else{ready=false;say("连接异常 · 当前内容可能过时，恢复同步前不能点菜。");}
+      schedule();
+    }
+    try{
+      x.open("POST","/api/home/menu/list",true);
+      if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+      x.setRequestHeader("Content-Type","application/json");
+      x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}finish(x.status===200,v);};
+      pollTimeout=setTimeout(function(){finish(false,null);try{x.abort();}catch(e){}},6000);
+      x.send(JSON.stringify({first:days[0],last:days[6]}));
+    }catch(e){finish(false,null);}
+  }
+  function change(name,present,fromManual){
+    if(!active||document.hidden||!ready){say("请等待重新同步后再操作。");return;}
+    var m=current(),last=!present&&m&&m.dishes.filter(function(d){return d!==name;}).length===0;
+    if(last&&!window.confirm("这是最后一道菜，确认取消并清除本餐及其食材记录？"))return;
+    var on=selectedDay,meal=selectedMeal,b={on:on,meal:meal,name:name,present:present,confirm_empty:!!last,expected_ingredients:last?m.ingredients:null};
+    cancelPoll();say("正在保存…");uncertain=false;
+    req("menu/dish",b,function(ok,v){
+      if(!active)return;
+      var result=v&&v.result;
+      if(ok&&(result===null||(result&&result.day===on&&result.meal===meal&&Array.isArray(result.dishes)&&Array.isArray(result.ingredients)))){
+        menus=menus.filter(function(item){return item.day!==on||item.meal!==meal;});if(result)menus.push(result);
+        if(fromManual&&manual.value.trim()===name)manual.value="";
+        paint(false);say("已保存 · 正在同步");ready=true;
+      }else{ready=false;uncertain=true;say("操作未确认，正在回读；不会自动重复提交。");}
+      poll();
     });
-  }).className="primary";
-  btn(p,"完成排餐",function(){capture();if(Object.keys(drafts).length&&!window.confirm("还有 "+Object.keys(drafts).length+" 餐未保存，确认放弃这些草稿？"))return;closeEditor();render();});
-  draw();
+  }
+  stopQuick=function(){active=false;cancelPoll();};
+  resumeQuick=function(){cancelPoll();ready=false;if(!document.hidden){say("正在同步…");poll();}};
+  quickCanLeave=function(){
+    manualDrafts[key()]=manual.value;
+    return !Object.keys(manualDrafts).some(function(k){return manualDrafts[k].trim();})||window.confirm("还有未点击添加的菜名，确认离开？");
+  };
+  btn(p,"完成排餐",function(){if(!quickCanLeave())return;menuDate=selectedDay;closeEditor();render();}).className="primary";
+  drawNavigation();paint(true);poll();
 }
 function menuForm(m){
   var p=editor(m?"编辑菜单":"新增菜单"),on=field(p,"日期",m?m.day:menuDate,"date");
@@ -191,10 +250,10 @@ function menuForm(m){
   dishPicker(p,dishes);
   if(m)node(p,"p","可以调整日期和餐次；不会覆盖其他菜单。");
   actions(p,function(){
-    if(!m&&!window.confirm("保存此日期及餐次的菜单？若已有菜单，将替换该餐次。"))return;
-    var b={on:on.value,meal:meal.value,dishes:uniqueLines(dishes.value),ingredients:lines(ingredients.value)};
+    if(!m&&!window.confirm("保存此日期及餐次的新菜单？已有餐次不会被覆盖。"))return;
+    var b={on:on.value,meal:meal.value,dishes:uniqueLines(dishes.value),ingredients:lines(ingredients.value),expected:m?{dishes:m.dishes,ingredients:m.ingredients}:null};
     if(m){b.old_on=m.day;b.old_meal=m.meal;}
-    mutate(m?"menu/edit":"menu/set",b,function(){menuDate=b.on;});
+    mutate(m?"menu/move":"menu/plan",b,function(){menuDate=b.on;});
   });
 }
 function row(parent){return node(parent,"div",undefined,"item");}
@@ -232,7 +291,7 @@ function menuRows(p,arr,manage){
     if(day===data.date)node(heading,"span","今日","menu-today");
     days[day].sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
       var n=row(group);node(n,"strong",mealNames[m.meal]);node(n,"p",m.dishes.join("、"));
-      if(manage){node(n,"small","食材："+m.ingredients.join("、"));btn(n,"编辑",function(){menuForm(m);});btn(n,"删除",function(){remove("menu/delete",{on:m.day,meal:m.meal},"该餐次菜单");});}
+      if(manage){node(n,"small","食材："+m.ingredients.join("、"));btn(n,"编辑",function(){menuForm(m);});btn(n,"删除",function(){remove("menu/snapshot/delete",{on:m.day,meal:m.meal,expected:{dishes:m.dishes,ingredients:m.ingredients}},"该餐次菜单");});}
     });
   });
 }
@@ -265,7 +324,7 @@ function render(){
       readMenus(node(p,"div"));
     }else menuRows(p,data.week_menu,false);}
 }
-function canLeave(){return !editing||window.confirm("放弃未保存的编辑？");}
+function canLeave(){return !editing||(quickCanLeave?quickCanLeave():window.confirm("放弃未保存的编辑？"));}
 ["tasks","posters","menus","catalog","displaySettings"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;render();}};});
 var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/(?:^#|\/)return-(bus|tasks|posters|menus|auto)$/):null;
 var returnMode=returnMatch?returnMatch[1]:"tasks";
@@ -274,7 +333,8 @@ el("busTab").href="/bus#return-"+returnMode;
 el("returnLink").onclick=el("busTab").onclick=function(){return !busy&&canLeave();};
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";admin=el("mode").value==="admin";if(direct&&!token)token="local-direct";if(direct&&admin&&!openAdmin&&token==="local-direct"){note("请输入管理凭证。");return;}load();};
 el("refresh").onclick=function(){if(!busy&&canLeave()){closeEditor();load();}};
-el("logout").onclick=function(){if(canLeave())reset();};
+el("logout").onclick=function(){if(!busy&&canLeave())reset();};
 if(window.addEventListener)window.addEventListener("pagehide",reset,false);
+if(document.addEventListener)document.addEventListener("visibilitychange",function(){if(resumeQuick)resumeQuick();},false);
 if(direct){el("logout").textContent=openAdmin?"重新连接":"管理登录 / 退出";el("mode").value=openAdmin?"admin":"read";el("connect").onclick();}
 }());

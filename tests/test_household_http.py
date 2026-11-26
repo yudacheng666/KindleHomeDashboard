@@ -110,6 +110,20 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.assertEqual(self.req("GET","home/view",self.read_token)[0],404)
         self.assertEqual(self.req("POST","home/task/add",self.admin_token,{})[0],404)
 
+    def test_collaborative_dish_permissions_and_concurrency(self):
+        from concurrent.futures import ThreadPoolExecutor
+        b={"on":self.today,"meal":"dinner","name":"Example A","present":True,"confirm_empty":False,"expected_ingredients":None}
+        self.assertEqual(self.req("POST","home/menu/dish",self.read_token,b)[0],401)
+        def send(name):
+            return self.req("POST","home/menu/dish",self.admin_token,{**b,"name":name})[0]
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            self.assertEqual(list(pool.map(send,["Example A","Example B","Example A"])),[200,200,200])
+        self.assertEqual(set(self.view()["week_menu"][0]["dishes"]),{"Example A","Example B"})
+        self.post("menu/dish",{**b,"present":False})
+        self.post("menu/dish",{**b,"name":"Example B","present":False},400)
+        self.post("menu/dish",{**b,"name":"Example B","present":False,"confirm_empty":True,"expected_ingredients":[]})
+        self.assertEqual(self.view()["week_menu"],[])
+
     def test_quick_menu_snapshot_conflict(self):
         body={"on":self.today,"meal":"dinner","dishes":["Example dish"],"ingredients":[],"expected":None}
         self.assertEqual(self.req("POST","home/menu/plan",self.read_token,body)[0],401)
