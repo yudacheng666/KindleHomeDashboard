@@ -304,20 +304,19 @@ function acceptBus(v){
 
 function weatherNum(v,suffix){return typeof v==="number"&&isFinite(v)?Math.round(v)+suffix:"—";}
 function weatherTime(v){return typeof v==="string"?v.slice(0,16).replace("T"," ")+(v.slice(-1)==="Z"?" UTC":/[+-]\d\d:\d\d$/.test(v)?" "+v.slice(-6):""):"时间未知";}
-function weatherSource(groups,attrs,s,label){
+function weatherSource(groups,s,label){
   var time=weatherTime(s.fetched_at),key=(s.source==="Open-Meteo"?"模型估算 · ":"")+time;
   var group=null;
   groups.forEach(function(g){if(g.key===key)group=g;});
   if(!group){group={key:key,labels:[]};groups.push(group);}
   group.labels.push(label);
-  (s.attributions||[]).forEach(function(a){if(typeof a==="string"&&attrs.indexOf(a)<0)attrs.push(a);});
 }
-function weatherPart(root,sections,key,title,groups,attrs,missing,draw){
+function weatherPart(root,sections,key,title,groups,missing,draw){
   var s=sections[key];
   if(!s||s.status!=="available"){missing.push(title);return;}
   var block=append(root,"section","","weather-block");
   append(block,"h2",title);draw(block,s.data);
-  weatherSource(groups,attrs,s,title);
+  weatherSource(groups,s,title);
 }
 function weatherRain(block,r){
   append(block,"p",r.summary+" · 每5分钟预报");
@@ -357,7 +356,7 @@ function renderWeather(){
   var key=JSON.stringify([v,weatherCursor,weatherPages.length,otherAlerts]);
   if(key===lastRender)return;
   lastRender=key;txt("date","");txt("heading",v.name||"天气");txt("index",weatherPages.length>1?(weatherCursor+1)+" / "+weatherPages.length:"");
-  var root=el("body"),s=v.sections||{},attrs=[],groups=[],missing=[];clear(root);root.className="weather-page";
+  var root=el("body"),s=v.sections||{},groups=[],missing=[];clear(root);root.className="weather-page";
   if(v.status==="disabled"){append(root,"p","天气未启用，请前往设置。","note");return;}
   if(v.status==="storage_error"){append(root,"p","天气配置或限额记录异常，已暂停采集。","note");return;}
   var current=s.current;
@@ -367,12 +366,12 @@ function renderWeather(){
     var today=s.daily&&s.daily.status==="available"&&s.daily.data.length?s.daily.data[0]:null;
     if(today)append(root,"p","今日 "+weatherNum(today.min,"°")+" / "+weatherNum(today.max,"°"),"weather-summary");
     append(root,"p","体感 "+weatherNum(c.feels,"°C")+" · 湿度 "+weatherNum(c.humidity,"%")+" · 风速 "+weatherNum(c.wind," "+(c.wind_unit||"")),"weather-summary");
-    append(root,"p","观测 "+weatherTime(c.time),"weather-foot");weatherSource(groups,attrs,current,"实时");
+    append(root,"p","观测 "+weatherTime(c.time),"weather-foot");weatherSource(groups,current,"实时");
   }else append(root,"p","当前天气暂不可用","note");
   var air=s.air;
   if(air&&air.status==="available"){
     append(root,"p",air.data.map(function(a){return a.name+" "+a.aqi+" · "+a.category;}).join("；"),"weather-summary");
-    weatherSource(groups,attrs,air,"空气质量");
+    weatherSource(groups,air,"空气质量");
   }else missing.push("空气质量");
   var alerts=s.alerts;
   if(alerts&&alerts.status==="available"){
@@ -383,11 +382,11 @@ function renderWeather(){
       if(a.instruction)append(row,"p",a.instruction,"note");
     });
     else append(root,"p","本次未查到预警，以气象部门发布为准。","weather-foot");
-    weatherSource(groups,attrs,alerts,"预警");
+    weatherSource(groups,alerts,"预警");
   }else missing.push("预警");
   otherAlerts.forEach(function(a){append(root,"p",a,"weather-alert");});
-  weatherPart(root,s,"rain","未来2小时降水",groups,attrs,missing,weatherRain);
-  weatherPart(root,s,"hourly","未来12小时",groups,attrs,missing,function(block,rows){
+  weatherPart(root,s,"rain","未来2小时降水",groups,missing,weatherRain);
+  weatherPart(root,s,"hourly","未来12小时",groups,missing,function(block,rows){
     var samples=rows.slice(0,12).filter(function(h,i){return i%2===0;});
     weatherCurve(block,samples);
     var strip=append(block,"div","","weather-strip");
@@ -397,7 +396,7 @@ function renderWeather(){
     });
     append(block,"p","百分比为降水概率","weather-foot");
   });
-  weatherPart(root,s,"daily","未来7天",groups,attrs,missing,function(block,rows){
+  weatherPart(root,s,"daily","未来7天",groups,missing,function(block,rows){
     var strip=append(block,"div","","weather-strip");
     rows.slice(0,7).forEach(function(d){var cell=append(strip,"div","","weather-cell");
       append(cell,"p",d.time.slice(5,10));append(cell,"p",d.text);
@@ -406,13 +405,7 @@ function renderWeather(){
   });
   if(missing.length)append(root,"p",missing.join("、")+"：暂不可用","weather-foot");
   groups.forEach(function(g){append(root,"p",g.labels.join("、")+" · "+g.key,"weather-foot");});
-  attrs.forEach(function(a){append(root,"p",a,"weather-foot");});
-  if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="QWeather";})){
-    var attribution=append(root,"a","和风天气","weather-source");attribution.href="https://www.qweather.com";attribution.rel="noreferrer";
-  }
-  if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="Open-Meteo";})){
-    var meteoLink=append(root,"a"," · Open-Meteo (CC BY 4.0)","weather-source");meteoLink.href="https://open-meteo.com/";meteoLink.rel="noreferrer";
-  }
+
 }
 function acceptWeather(v){
   data=null;pages=[];cursor=0;stopAge();
@@ -558,7 +551,7 @@ el("weatherSearch").onclick=function(){
     if(!ok||!v||v.status!=="ok"||!Array.isArray(v.locations)){
       txt("weatherSearchStatus",v&&messages[v.status]||"搜索失败，请检查名称或稍后重试。");return;
     }
-    txt("weatherSearchStatus",v.locations.length?"请选择地点（和风天气）":"未找到地点，请换个名称。");
+    txt("weatherSearchStatus",v.locations.length?"请选择地点":"未找到地点，请换个名称。");
     v.locations.forEach(function(item){
       var button=append(el("weatherResults"),"button",item.name);
       button.type="button";append(button,"small",item.region);
@@ -605,7 +598,7 @@ function renderDrivingGroups(root,v,limit,summary){
       var group=append(root,"section","","driving-group");append(group,"h2",g.name);
       var pair=append(group,"div","","driving-pair"),map=append(pair,"div","","driving-map"),list=append(pair,"div","","driving-routes");
       if(typeof g.image==="string"&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(g.image)){
-        var image=append(map,"img","");image.alt=g.name+" 高德路线地图";image.src=g.image;
+        var image=append(map,"img","");image.alt=g.name+" 路线地图";image.src=g.image;
       }else append(map,"p","地图暂不可用","note");
       (g.routes||[]).forEach(function(r,i){
         var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
@@ -810,8 +803,6 @@ function renderOverviewWeather(){
     append(root,"p",weatherNum(c.data.temp,"°")+"　"+c.data.text,"weather-main");
     append(root,"p","体感 "+weatherNum(c.data.feels,"°")+" · 湿度 "+weatherNum(c.data.humidity,"%"),"weather-summary");
     append(root,"p","观测 "+weatherTime(c.data.time),"weather-foot");
-    if(c.source==="QWeather"){var a=append(root,"a","和风天气","weather-source");a.href="https://www.qweather.com";a.rel="noreferrer";}
-    if(c.source==="Open-Meteo"){var b=append(root,"a","Open-Meteo (CC BY 4.0)","weather-source");b.href="https://open-meteo.com/";b.rel="noreferrer";}
   }else append(root,"p","当前天气暂不可用","note");
   weatherPages.forEach(function(p){var a=p.sections&&p.sections.alerts;
     if(a&&a.status==="available"&&a.data.length)a.data.forEach(function(x){append(root,"p",(p.name||"")+"："+(x.type==="cancel"?"解除信息 · ":"")+x.headline,"weather-alert");});

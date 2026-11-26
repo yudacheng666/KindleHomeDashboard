@@ -19,7 +19,7 @@ const shopping={id:"test-item",label:"Example ingredient",completed:0};
 const sample={date,tasks:[task],posters:[poster],today_menu:[meal],week_menu:[meal],shopping:[shopping]};
 const bus={trip:{line:{name:"Example line"},boarding:{name:"A"},destination:{name:"B"}},snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:0,fetched_at:"2026-01-05T00:00:00+00:00"}};
 let data=sample,fail=0,requests=0,clock=0,nextId=1,busRequests=0,busData=bus, autoMode="family", autoRequests=0;
-const weatherExample={status:"ready",name:"Example",sections:{current:{status:"available",source:"QWeather",fetched_at:"2026-01-05T00:00:00Z",attributions:[],data:{temp:20,text:"晴",time:"2026-01-05T00:00:00Z"}}}};
+const weatherExample={status:"ready",name:"Example",sections:{current:{status:"available",source:"QWeather",fetched_at:"2026-01-05T00:00:00Z",attributions:["Example data provider"],data:{temp:20,text:"晴",time:"2026-01-05T00:00:00Z"}}}};
 let weatherData=weatherExample;
 const timers=new Map();
 class FakeDate extends Date {static now(){return Date.parse(bus.snapshot.fetched_at)+clock;}}
@@ -68,11 +68,11 @@ assert.ok(descendants(el("body")).some(n=>n.textContent==="另 1 个目的地 ·
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example dish"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example task"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="20°　晴"));
-assert.ok(descendants(el("body")).some(n=>n.tag==="a"&&n.textContent==="和风天气"&&n.href==="https://www.qweather.com"));
-assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.equal(descendants(el("body")).filter(n=>n.textContent.indexOf("和风天气")>=0).length,1);
+assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data provider/.test(n.textContent)||/qweather\.com|open-meteo\.com/.test(n.href||"")));
+assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));
 click("settings");assert.equal(el("manageLink").href,"/bus#return-overview");click("returnDisplay");
 data=sample;weatherData=weatherExample;
-click("weatherMode");heading("Example");assert.ok(descendants(el("body")).some(n=>n.tag==="a"&&n.textContent==="和风天气"&&n.href==="https://www.qweather.com"));assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
+click("weatherMode");heading("Example");assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data provider/.test(n.textContent)||/qweather\.com|open-meteo\.com/.test(n.href||"")));assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
 advance(240000);heading("Example");assert.equal(el("index").textContent,"");
 weatherData={...weatherExample,additional:[{...weatherExample,name:"Example second",sections:{current:{...weatherExample.sections.current,data:{...weatherExample.sections.current.data,temp:25}}}}]};
 advance(30000);heading("Example");assert.equal(el("index").textContent,"1 / 2");

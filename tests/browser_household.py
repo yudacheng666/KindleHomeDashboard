@@ -294,7 +294,7 @@ def main():
                 weather.step()
                 click("returnDisplay");click("tasksMode");click("weatherMode")
                 wait(lambda:text_in("body","20°C"))
-                assert text_in("body","和风天气") and len(weather_calls)==2
+                assert not text_in("body","和风天气") and len(weather_calls)==2
                 click("settings");click("weatherLoad")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))
                 assert js("return document.getElementById('weatherEnabled').checked")
