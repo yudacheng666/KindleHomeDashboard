@@ -18,12 +18,13 @@ class BudgetWait(BusError):
 
 class RequestGate:
     def __init__(self, store, *, enabled=False, daily_limit=1000, min_gap=2,
-                 request=post, clock=lambda: datetime.now(timezone.utc)):
+                 request=post, clock=lambda: datetime.now(timezone.utc), disabled_code="bus_disabled"):
         if (type(daily_limit) is not int or not 1 <= daily_limit <= 1000
                 or type(min_gap) is not int or not 2 <= min_gap <= 3600):
             raise ValueError("Invalid local request budget")
         self.enabled, self.daily_limit, self.min_gap = enabled, daily_limit, min_gap
         self.request, self.clock = request, clock
+        self.disabled_code = disabled_code
         self.lock = RLock()
         self.path = store.path.parent / "bus-budget.sqlite3"
         # Keep the DB in the already validated private volume. Use 0600 from
@@ -66,7 +67,7 @@ class RequestGate:
     def __call__(self, path, body, city):
         with self.lock:
             if not self.enabled:
-                raise BudgetWait("Provider disabled", "bus_disabled")
+                raise BudgetWait("Provider disabled", self.disabled_code)
             now = self.clock()
             day, timestamp = now.astimezone(timezone.utc).date().isoformat(), now.timestamp()
             eta = path == "/traffic/v1/getbusstoparrivedetails"
