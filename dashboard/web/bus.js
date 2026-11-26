@@ -63,17 +63,18 @@ function updateEta(rows,s,now){
   });
   return valid;
 }
-function stopAge(){clearTimeout(ageTimer);ageTimer=null;collectedAt=null;etaSnapshot=null;etaRows=[];txt("updated","");}
+function stopAge(){clearTimeout(ageTimer);ageTimer=null;collectedAt=null;etaSnapshot=null;txt("updated","");txt("clock","");}
 function paintAge(){
   clearTimeout(ageTimer);ageTimer=null;if(!etaSnapshot||document.hidden)return;
-  var now=Date.now(),n=Math.floor((now-collectedAt)/1000),valid=updateEta(etaRows,etaSnapshot,now);
+  var now=Date.now(),n=Math.floor((now-collectedAt)/1000),valid=updateEta(etaRows,etaSnapshot,now);txt("clock",clockTime(now,now));
+  if(etaRows.length)txt("status",valid?(etaSnapshot.status==="stale"?"数据暂未更新 · 以下为旧数据":"实时预计到站"):"数据时间异常或已过期 · 以下为旧位置");
   txt("updated",!isFinite(collectedAt)||n<0?"更新时间未知（请检查设备时间）":(admin?n+" 秒前刷新":"数据更新于 "+clockTime(collectedAt,now))+(valid?"":" · 数据已失去时效"));
   ageTimer=setTimeout(paintAge,admin?5000:15000);
 }
 function setAge(s){clearTimeout(ageTimer);ageTimer=null;etaSnapshot=null;collectedAt=null;if(["live","stale","no_live_data"].indexOf(s.status)>=0){etaSnapshot=s;collectedAt=Date.parse(s.fetched_at);paintAge();}else txt("updated","");}
 function hideData(message){
   stopAge();
-  lastKey="";clear(el("vehicles"));txt("updated","");txt("schedule","");
+  lastKey="";etaRows=[];clear(el("vehicles"));txt("updated","");txt("schedule","");
   txt("status",message);
 }
 function render(data){
