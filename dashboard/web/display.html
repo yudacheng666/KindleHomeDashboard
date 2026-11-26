@@ -51,14 +51,114 @@ label{display:block;margin:8px 0}a{color:#111}button.selected{background:#111;co
 @media(max-width:360px){.display-nav button{font-size:14px}.weather-strip{font-size:12px}}
 .driving-group{border-top:1px solid #555;padding:4px 0}.driving-group h2{font-size:18px;margin:0 0 3px}
 .driving-pair{display:table;width:100%;table-layout:fixed}.driving-map,.driving-routes{display:table-cell;vertical-align:middle}.driving-map{width:60%;padding-right:5px}.driving-map img{display:block;width:100%;height:auto}.driving-routes{font-size:13px}.driving-routes p{margin:1px 0;line-height:1.3}.driving-fast{font-size:19px;font-weight:bold}.driving-foot{font-size:11px;margin:3px 0;color:#444}.driving-fields{border:1px solid #999;padding:8px;margin:8px 0}.driving-fields input[type=text]{width:100%;display:block}.driving-fields h3{font-size:18px;margin:4px 0}.driving-fields label{font-size:16px}.driving-days label{display:inline-block;margin:3px}.driving-result button{display:block;width:100%;text-align:left;font-size:15px}
+
+/* Kindle portrait overview: fixed two-column arrival/weather row, two map rows, then menus and tasks. */
+#displayNav{margin:8px 0}.display-nav button{white-space:normal;min-height:44px}
+html,body{height:100%}body{box-sizing:border-box}
+#displayContent{min-height:100%;min-height:calc(100vh - 16px);max-width:600px;margin:0 auto;box-sizing:border-box}
+.overview-header{display:table;table-layout:fixed;width:100%;height:34px;border-bottom:1px solid #444;box-sizing:border-box}
+.overview-header>*{display:table-cell;vertical-align:middle}.overview-header>.hidden{display:none}
+#overviewDate{font-size:14px;font-weight:bold;white-space:nowrap;text-align:left}
+#overviewTime{font-size:25px;line-height:1;text-align:center}
+#overviewBack,#settings{margin:0;padding:0;border:0;border-radius:0;min-height:30px;width:34px;font-size:23px;line-height:1}
+#overviewBack{font-size:25px}
+#settings{font-size:22px}
+#overview{min-height:92vh;min-height:calc(100vh - 50px);width:100%;border:1px solid #555;box-sizing:border-box;font-size:14px;line-height:1.25}
+.overview-top-row{display:table;width:100%;height:14vh;table-layout:fixed;border-bottom:1px solid #555;box-sizing:border-box}
+.overview-half{display:table-cell;width:50%;vertical-align:middle;box-sizing:border-box;padding:3px 5px;overflow:hidden}
+.overview-bus{border-right:1px solid #777}
+.overview-top-icon{float:left;width:22%;max-width:42px;height:auto;margin:3px 5px 0 0}
+.overview-content{overflow:hidden;min-width:0}
+.overview-bus-main{font-size:27px;line-height:1.05;font-weight:bold;word-wrap:break-word}.overview-bus-main.overview-bus-state{font-size:17px}
+.overview-bus-sub{font-size:13px;line-height:1.2;margin-top:3px;word-wrap:break-word}
+.overview-bus-next{font-size:14px;font-weight:bold;line-height:1.2;margin-top:3px}
+.overview-bus-foot{font-size:10px;color:#555;line-height:1.15;margin-top:2px}
+.overview-weather-name{font-size:11px;line-height:1.1;white-space:normal;word-wrap:break-word}
+.overview-weather-main{font-size:25px;line-height:1.05;font-weight:bold;white-space:nowrap}
+.overview-weather-meta{font-size:12px;line-height:1.2;word-wrap:break-word}
+.overview-weather-alert{font-size:11px;font-weight:bold;margin-top:2px;word-wrap:break-word}
+.overview-map-slot{min-height:20vh;width:100%;border-bottom:1px solid #777;box-sizing:border-box}
+.overview-map-panel{display:table;width:100%;height:20vh;table-layout:fixed}
+.overview-map-image{display:table-cell;width:70%;height:100%;vertical-align:middle;overflow:hidden}
+.overview-map-image img{display:block;width:100%;height:auto;object-fit:contain}
+.overview-map-empty{font-size:12px;text-align:center;color:#444}
+.overview-map-stats{display:table-cell;width:30%;vertical-align:middle;padding:2px 5px;box-sizing:border-box;overflow:hidden}
+.overview-map-name{font-size:11px;line-height:1.1;white-space:normal;word-wrap:break-word}
+.overview-route-main{font-size:22px;font-weight:bold;line-height:1.1;white-space:nowrap}
+.overview-route-distance{font-size:12px;line-height:1.15}
+.overview-route-alt{font-size:11px;line-height:1.2;white-space:nowrap}
+.overview-route-state{font-size:10px;line-height:1.15;color:#444}
+.overview-map-more{font-size:10px;line-height:1.1;text-decoration:underline;min-height:26px;padding:2px;margin:2px 0}
+.overview-lower{display:table;width:100%;table-layout:fixed;box-sizing:border-box;overflow:hidden;padding:3px 5px}
+.overview-menus{height:20vh;border-bottom:1px solid #777}
+.overview-tasks{height:24vh}
+.overview-icon-cell{display:table-cell;width:14%;vertical-align:middle;text-align:center}
+.overview-lower-icon{width:32px;max-width:90%;height:auto}
+.overview-menu-day{margin:1px 0 3px}
+.overview-menu-date{font-size:13px;font-weight:bold;line-height:1.1;margin-bottom:1px}
+.overview-menu-meal{font-size:13px;line-height:1.25;word-wrap:break-word;white-space:normal}
+.overview-task-day{margin:1px 0 3px}
+.overview-task-date{font-size:13px;font-weight:bold;line-height:1.1;margin-bottom:1px}
+.overview-task-row{display:table;width:100%;table-layout:fixed;font-size:13px;line-height:1.2}
+.overview-task-text{display:table-cell;vertical-align:middle;word-wrap:break-word;padding-right:4px}
+.overview-task-action{display:table-cell;width:30px;vertical-align:middle;text-align:right}
+.overview-task-action button{font-size:13px;min-height:27px;width:27px;padding:0;margin:0;border:1px solid #aaa;color:#555;background:#fff}
+.overview-note{font-size:10px;color:#555;line-height:1.1}
+@media(max-width:360px){
+  #overviewDate{font-size:12px}
+  #overviewTime{font-size:21px}
+  .overview-bus-main{font-size:23px}
+  .overview-bus-sub,.overview-bus-next{font-size:11px}
+  .overview-weather-main{font-size:22px}
+  .overview-weather-meta,.overview-menu-meal,.overview-task-row{font-size:11px}
+  .overview-route-main{font-size:18px}
+  .overview-route-distance,.overview-route-alt{font-size:10px}
+  .overview-lower-icon{width:27px}
+}
+@media(max-height:420px){
+  #displayContent{min-height:calc(100vh - 8px)}
+  #overview{font-size:12px}
+  .overview-top-row{height:auto}
+  .overview-map-slot{min-height:80px}
+  .overview-menus,.overview-tasks{height:auto}
+}
 </style></head>
 <body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button></div>
 <p id="status" class="status" role="status"></p>
 <div id="display" class="hidden">
-<div id="displayNav"><div class="display-nav"><span><button id="busMode" type="button">公交</button></span><span><button id="tasksMode" type="button">待办</button></span><span><button id="postersMode" type="button">海报</button></span><span><button id="menusMode" type="button">菜单</button></span><span><button id="drivingMode" type="button">驾驶</button></span><span><button id="weatherMode" type="button">天气</button></span><span><button id="settings" type="button" aria-label="设置" title="设置">设置</button></span></div></div>
-<div id="displayContent"><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
+
+<div id="displayContent">
+<div class="overview-header">
+<button id="overviewBack" class="hidden" type="button" aria-label="返回综合看板">‹</button>
+<span id="overviewDate"></span><strong id="overviewTime"></strong>
+<button id="settings" type="button" aria-label="设置" title="设置">⚙</button>
+</div>
+<div id="overview" class="overview">
+<div class="overview-top-row">
+<div id="overviewBus" class="overview-half overview-bus">
+<svg class="overview-top-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="7" y="5" width="34" height="34" rx="5" fill="none" stroke="#111" stroke-width="4"/><path d="M12 17h24M14 9h20" fill="none" stroke="#111" stroke-width="3"/><circle cx="15" cy="40" r="4" fill="#111"/><circle cx="33" cy="40" r="4" fill="#111"/></svg>
+<div id="overviewBusContent" class="overview-content"></div>
+</div>
+<div id="overviewWeather" class="overview-half overview-weather">
+<svg class="overview-top-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M11 34h25a8 8 0 0 0 1-16 13 13 0 0 0-25-1 9 9 0 0 0-1 17z" fill="none" stroke="#111" stroke-width="3.5" stroke-linejoin="round"/></svg>
+<div id="overviewWeatherContent" class="overview-content"></div>
+</div>
+</div>
+<div id="overviewMap1" class="overview-map-slot"></div>
+<div id="overviewMap2" class="overview-map-slot"></div>
+<div id="overviewMenus" class="overview-lower overview-menus">
+<div class="overview-icon-cell"><svg class="overview-lower-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M10 5v14m-5-14v8c0 5 10 5 10 0V5m-5 14v24M30 5c-8 9-8 19 0 20v18m0-38v20" fill="none" stroke="#111" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+<div id="overviewMenuContent" class="overview-content"></div>
+</div>
+<div id="overviewTasks" class="overview-lower overview-tasks">
+<div class="overview-icon-cell"><svg class="overview-lower-icon" viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="7" width="32" height="38" rx="3" fill="none" stroke="#111" stroke-width="3.5"/><path d="M17 7V4h14v3M14 18l3 3 5-6m3 5h9M14 30l3 3 5-6m3 5h9" fill="none" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div id="overviewTaskContent" class="overview-content"></div>
+</div>
+</div>
+<div id="legacyDisplay" class="hidden"><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
+</div>
 <div id="settingsPanel" class="hidden"><button id="returnDisplay" type="button">返回看板</button><h1>设置</h1>
-<h2>显示设置</h2><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
+<h2>查看完整信息</h2><div id="displayNav" class="hidden"><div class="display-nav"><span><button id="busMode" type="button">公交</button></span><span><button id="tasksMode" type="button">待办</button></span><span><button id="postersMode" type="button">海报</button></span><span><button id="menusMode" type="button">菜单</button></span><span><button id="drivingMode" type="button">驾驶</button></span><span><button id="weatherMode" type="button">天气</button></span></div></div><h2>显示设置</h2><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">返回综合看板</button>
 <div id="weatherDisplayControls" class="hidden"><p class="status">天气地点轮播 · 每2分钟</p><button id="weatherNext" type="button">下一地点并返回看板</button></div>
 <div id="familyControls" class="hidden"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button><button id="pause" type="button">开始轮播</button></div>
 <div id="options" class="hidden"><label for="seconds">本次海报停留时间</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select><p class="status">本次调整不修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>

@@ -83,6 +83,8 @@ def main():
                 def js(script, args=()):
                     return wd("/session/"+sid+"/execute/sync", {"script":script,"args":list(args)})
                 def go(path):
+                    # Force a new document even when only the hash changes. The access mode is injected at page load.
+                    wd("/session/"+sid+"/url", {"url":"about:blank"})
                     wd("/session/"+sid+"/url", {"url":"http://127.0.0.1:"+str(server.server_port)+path})
                     wait(lambda:js("return !!document.getElementById('connect').onclick"))
                 def click(id):
@@ -236,7 +238,7 @@ def main():
                 assert home.menus_between("2026-01-07","2026-01-07")[0]["dishes"]==["Fictional new meal"]
                 click("logout")
                 wait(lambda:js("return document.getElementById('home').className==='hidden'"))
-                go("/")
+                go("/display#tasks")
                 js("document.getElementById('token').value=arguments[0]",[reader])
                 click("connect")
                 wait(lambda:text_in("heading","待办清单"))
@@ -268,7 +270,7 @@ def main():
                 # pages must open without typing credentials.
                 server.api.direct = True
                 server.api.admin_token = None
-                go("/display")
+                go("/display#tasks")
                 wait(lambda:text_in("heading","待办清单"))
                 click("weatherMode")
                 wait(lambda:text_in("body","天气未启用"))
@@ -361,7 +363,7 @@ def main():
                 js("Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'))")
                 wait(lambda:text_in("heading","Fictional reminder"))
                 assert text_in("pause","开始轮播")
-                go("/display")
+                go("/display#posters")
                 wait(lambda:text_in("heading","Fictional reminder"))
                 assert text_in("pause","开始轮播")
                 click("busMode")
@@ -461,23 +463,22 @@ def main():
                 click("scheduleCancel")
                 print("Real Chromium schedule enable/save/readback/reopen/disable and durable restore PASS")
                 go("/auto")
-                wait(lambda:text_in("modeStatus","自动分时"))
-                wait(lambda:text_in("heading","待办清单"))
-                click("busMode")
+                wait(lambda:text_in("modeStatus","综合看板"))
+                wait(lambda:text_in("overviewBusContent","未启用"))
+                assert js("return getComputedStyle(document.getElementById('overview')).display!=='none' && getComputedStyle(document.getElementById('displayNav')).display==='none'")
+                assert js("return document.querySelectorAll('#overview .overview-map-image img').length===2")
+                assert js("return document.documentElement.scrollWidth<=window.innerWidth")
+                assert not text_in("overviewWeatherContent","未来")
+                click("settings");click("busMode")
                 wait(lambda:text_in("body","公交采集未启用"))
-                assert text_in("modeStatus","手动显示")
-                click("settings")
-                click("autoMode")
-                wait(lambda:text_in("heading","待办清单"))
-                assert text_in("modeStatus","自动分时")
-                click("settings")
-                click("manageLink")
-                wait(lambda:js("var n=document.getElementById(\'dashboard\');return !!n&&n.className!==\'hidden\'"))
-                assert js("return document.getElementById(\'returnLink\').getAttribute(\'href\')===\'/auto\'")
+                click("overviewBack")
+                wait(lambda:text_in("overviewBusContent","未启用"))
+                click("settings");click("manageLink")
+                wait(lambda:js("var n=document.getElementById('dashboard');return !!n&&n.className!=='hidden'"))
+                assert js("return document.getElementById('returnLink').getAttribute('href')==='/auto'")
                 click("returnLink")
-                wait(lambda:js("return location.pathname===\'/auto\'"))
-                wait(lambda:text_in("heading","待办清单"))
-                assert text_in("modeStatus","自动分时")
+                wait(lambda:js("return location.pathname==='/auto'"))
+                wait(lambda:text_in("overviewBusContent","未启用"))
                 # Exercise actual HTML select elements with a fictional upstream.
                 from dashboard.runtime import Window
                 from datetime import timedelta
@@ -538,7 +539,7 @@ def main():
                     && document.documentElement.scrollWidth<=window.innerWidth;
                 })()"""
                 assert js(layout)
-                go("/display")
+                go("/display#tasks")
                 wait(lambda:text_in("heading","待办清单"))
                 click("busMode")
                 wait(lambda:text_in("body","4 分钟"))
@@ -554,7 +555,7 @@ def main():
                 assert js(layout)
                 assert len(calls)==3
                 print("Real Chromium bus selection PASS: one route, explicit direction, verified stations, relative age, local reads.")
-                print("Real Chromium automatic entry PASS: direct startup, manual override, resume automatic")
+                print("Real Chromium overview entry PASS: default layout, two maps, details and management return")
                 print("Real Chromium direct access PASS: display, management without login, bus settings")
                 print("Real Chromium PASS: create task, persisted content, linked poster, menu, saved rotation, single-session module switch and logout")
             finally:

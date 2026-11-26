@@ -148,5 +148,71 @@ class DirectTests(unittest.TestCase):
                         lan_host="192.168.99.20",lan_network="192.168.99.0/24")
 
 
+    def test_overview_uses_cached_services_and_limits_the_compact_payload(self):
+        now = datetime(2026, 1, 5, 0, 0, tzinfo=timezone.utc)
+        self.runtime.clock = lambda: now
+        self.runtime.bus.clock = lambda: now
+        today, tomorrow, later = "2026-01-05", "2026-01-06", "2026-01-07"
+        self.home.add_task("Fictional task", today, "once")
+        self.home.set_menu(today, "lunch", ["Fictional lunch"])
+        self.home.set_menu(tomorrow, "dinner", ["Fictional dinner"])
+        self.home.set_menu(later, "lunch", ["Not in overview"])
+        weather = Mock()
+        weather.read.return_value = {
+            "status": "ready", "name": "Fictional place",
+            "sections": {
+                "current": {"status": "available", "data": {"temp": 18}},
+                "alerts": {"status": "available", "data": []},
+                "hourly": {"status": "available", "data": [{"temp": 99}]},
+                "daily": {"status": "available", "data": [{"max": 99}]},
+                "rain": {"status": "available", "data": {"summary": "future rain"}}
+            },
+            "additional": [{
+                "status": "ready", "name": "Second fictional place",
+                "sections": {"current": {"status": "available", "data": {"temp": 20}},
+                             "hourly": {"status": "available", "data": [{"temp": 99}]}}
+            }]
+        }
+        driving = Mock()
+        driving.read.return_value = {
+            "enabled": True,
+            "groups": [{"name": "Fictional destination "+str(i), "status": "ok",
+                        "routes": [], "image": None} for i in range(3)]
+        }
+        server = self.start(API(self.runtime, None, None, household=self.home,
+                                direct=True, weather=weather, driving=driving))
+        status, body = self.request(server, "/api/display/overview")
+        self.assertEqual(status, 200)
+        result = json.loads(body)
+        self.assertEqual(result["bus"]["snapshot"]["server_now_ms"], int(now.timestamp()*1000))
+        self.assertEqual(set(result["weather"]["sections"]), {"current", "alerts"})
+        self.assertEqual(set(result["weather"]["additional"][0]["sections"]), {"current"})
+        self.assertEqual(result["driving"]["group_count"], 3)
+        self.assertEqual([g["name"] for g in result["driving"]["groups"]],
+                         ["Fictional destination 0", "Fictional destination 1"])
+        self.assertEqual([m["day"] for m in result["home"]["week_menu"]], [today, tomorrow])
+        self.assertTrue(result["home"]["can_complete"])
+        self.assertEqual(result["home"]["upcoming_tasks"][0]["title"], "Fictional task")
+        weather.read.assert_called_once()
+        driving.read.assert_called_once()
+
+    def test_overview_requires_read_access_and_keeps_task_write_permission_separate(self):
+        reader, admin = token_urlsafe(32), token_urlsafe(32)
+        weather, driving = Mock(), Mock()
+        weather.read.return_value = {"status": "disabled", "sections": {}}
+        driving.read.return_value = {"enabled": False, "groups": []}
+        server = self.start(API(self.runtime, reader, admin, household=self.home,
+                                weather=weather, driving=driving))
+        self.assertEqual(self.request(server, "/api/display/overview")[0], 401)
+        status, body = self.request(server, "/api/display/overview",
+                                    extra={"Authorization": "Bearer "+reader})
+        self.assertEqual(status, 200)
+        self.assertFalse(json.loads(body)["home"]["can_complete"])
+        status, body = self.request(server, "/api/display/overview",
+                                    extra={"Authorization": "Bearer "+admin})
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["home"]["can_complete"])
+
+
 if __name__ == "__main__":
     unittest.main()
