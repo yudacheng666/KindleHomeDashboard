@@ -18,6 +18,7 @@ const sample={date,tasks:[task],posters:[poster],today_menu:[meal],week_menu:[me
 const bus={trip:{line:{name:"Example line"},boarding:{name:"A"},destination:{name:"B"}},snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:0,fetched_at:"2026-01-05T00:00:00+00:00"}};
 let data=sample,fail=0,requests=0,clock=0,nextId=1,busRequests=0,busData=bus, autoMode="family", autoRequests=0;
 const timers=new Map();
+class FakeDate extends Date {static now(){return Date.parse(bus.snapshot.fetched_at)+clock;}}
 function setTimer(fn,delay){const id=nextId++;timers.set(id,{at:clock+delay,fn});return id;}
 function clearTimer(id){timers.delete(id);}
 function advance(ms){
@@ -35,7 +36,7 @@ class XHR {
   send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;this.responseText=JSON.stringify(fail?{}:this.path==="/api/bus/view"?busData:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?busData:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
-vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,setTimeout:setTimer,clearTimeout:clearTimer});
+vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
 function click(id){el(id).onclick();}
 function heading(expected){assert.equal(el("heading").textContent,expected);}
 el("token").value="example-display-token";click("connect");heading("今日生活");
@@ -62,9 +63,9 @@ fail=0;advance(30000);heading("今日生活");
 click("busMode");heading("Example line");assert.equal(el("familyControls").className,"hidden");
 assert.ok(el("body").children.some(n=>n.textContent==="4 分钟"));
 assert.ok(el("body").children.some(n=>n.textContent==="9 分钟"));
-const oldBus=busRequests;advance(15000);assert.equal(busRequests,oldBus+1);
+const oldBus=busRequests;const ageBefore=el("body").children.at(-1).textContent;assert.ok(ageBefore.endsWith("秒前刷新"));advance(5000);assert.equal(busRequests,oldBus);assert.notEqual(el("body").children.at(-1).textContent,ageBefore);advance(10000);assert.equal(busRequests,oldBus+1);
 busData={...bus,snapshot:{...bus.snapshot,status:"expired",vehicles:[]}};advance(15000);
-assert.ok(!el("body").children.some(n=>n.className==="eta"));
+assert.ok(!el("body").children.some(n=>n.className==="eta"));assert.ok(!el("body").children.some(n=>n.textContent.includes("秒前刷新")));
 click("familyMode");heading("今日生活");assert.equal(el("familyControls").className,"");
 const endBus=busRequests;advance(60000);assert.equal(busRequests,endBus);
 fail=401;advance(30000);assert.equal(el("display").className,"hidden");assert.equal(el("login").className,"");

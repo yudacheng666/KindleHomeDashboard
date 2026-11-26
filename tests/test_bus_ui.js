@@ -12,10 +12,14 @@ const nodes = {};
 const doc = {getElementById(id){return nodes[id]||(nodes[id]=new Node());},
              createElement(){return new Node();}};
 const line={line_id:"sample",name:"Example",direction:"0",first:"A",last:"C",city_code:"310100"};
+const reverse={...line,line_id:"reverse",direction:"1",first:"C",last:"A"};
+const other={...line,line_id:"other",name:"Other"};
 const stops=["A","B","C"].map(n=>({name:n,stop_id:n}));
 const view={trip:{line,boarding:stops[0],destination:stops[2],board_index:0,destination_index:2},
   snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:1,fetched_at:"2026-01-01T00:00:00+00:00"}};
 const calls=[];
+let clock=Date.parse(view.snapshot.fetched_at)+5000,ageTick=null;
+class FakeDate extends Date {static now(){return clock;}}
 let failed=false, searchError="";
 class XHR {
   open(method,path){this.method=method;this.path=path;}
@@ -25,8 +29,8 @@ class XHR {
     let data;
     if(this.path==="/api/bus/view")data=view;
     if(this.path==="/api/bus/schedule")data={editable:true,enabled:false,timezone:"UTC",windows:[]};
-    if(this.path==="/api/bus/search")data={lines:[line]};
-    if(this.path==="/api/bus/route")data={selection:"example-handle",route:{line,stops}};
+    if(this.path==="/api/bus/search")data={lines:[line,reverse,other]};
+    if(this.path==="/api/bus/route")data={selection:"example-handle",route:{line:JSON.parse(body).line,stops}};
     if(this.path==="/api/bus/save")data=view;
     const error=this.path==="/api/bus/search"&&searchError?searchError:failed?"service_error":"";
     this.status=error?503:200;this.responseText=JSON.stringify(error?{error}:data);
@@ -34,21 +38,25 @@ class XHR {
   }
   abort(){}
 }
-vm.runInNewContext(fs.readFileSync("dashboard/web/bus.js","utf8"),{document:doc,XMLHttpRequest:XHR,setTimeout:()=>1,clearTimeout:()=>{}});
+vm.runInNewContext(fs.readFileSync("dashboard/web/bus.js","utf8"),{document:doc,XMLHttpRequest:XHR,Date:FakeDate,setTimeout:(fn,delay)=>{if(delay===5000)ageTick=fn;return 1;},clearTimeout:()=>{}});
 const el=id=>doc.getElementById(id);
 el("token").value="example-ui-token";el("mode").value="admin";el("connect").onclick();
 assert.equal(el("token").value,"");
 assert.equal(el("vehicles").children.length,2);
 assert.equal(el("vehicles").children[0].children[1].textContent,"4 分钟");
+assert.equal(el("updated").textContent,"5 秒前刷新");const reads=calls.length;clock+=5000;ageTick();assert.equal(el("updated").textContent,"10 秒前刷新");assert.equal(calls.length,reads);
 el("settings").onclick();el("keyword").value="Example";
 for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
 searchError="";el("search").onclick();
+assert.deepEqual(el("route").children.map(n=>n.textContent),["请选择线路","Example","Other"]);assert.equal(el("directionStep").className,"hidden");
+el("route").value="0";el("route").onchange();assert.equal(el("directionStep").className,"");assert.equal(el("direction").value,"");
 el("direction").value="1";el("direction").onchange();el("search").onclick();
 assert.equal(el("direction").value,"1");
 assert.deepEqual(calls[calls.length-1][2],{keyword:"Example"});
 assert.ok(!nodes.broadSearch);
 el("detail").onclick();
 assert.equal(calls[calls.length-1][2].direction,"1");
+assert.equal(calls[calls.length-1][2].line.line_id,"reverse");
 
 assert.equal(el("board").children.length,2);
 el("board").value="1";el("board").onchange();
@@ -67,7 +75,7 @@ row.children[0].children[0].checked=true;
 row.children[7].children[1].value="10:00";row.children[8].children[1].value="11:00";
 el("scheduleSave").onclick();
 assert.ok(calls.some(c=>c[1]==="/api/bus/schedule"&&c[0]==="POST"&&c[2].enabled===true&&c[2].windows[0].start===600));
-failed=true;el("refresh").onclick();assert.equal(el("vehicles").children.length,0);
+failed=true;el("refresh").onclick();assert.equal(el("vehicles").children.length,0);assert.equal(el("updated").textContent,"");
 el("logout").onclick();assert.equal(el("dashboard").className,"hidden");
 assert.equal(el("trip").textContent,"");
 console.log("Browser logic simulation passed: selection, ETA, disconnect and logout.");

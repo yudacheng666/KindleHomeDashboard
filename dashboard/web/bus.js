@@ -3,7 +3,7 @@
 "use strict";
 var access=typeof window!=="undefined"&&window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", admin=false, busy=false, generation=0, configuring=false;
-var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false, searchedKeyword="";
+var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false, searchedKeyword="", groups=[], choices=[], ageTimer=null, collectedAt=null;
 function el(id){return document.getElementById(id);}
 function txt(id,value){var n=el(id);if(n.textContent!==value)n.textContent=value;}
 function show(id,visible){el(id).className=visible?"":"hidden";}
@@ -41,11 +41,15 @@ function request(method,path,body,done){
   }catch(e){finish(false,{});}
 }
 function resetSelection(){
-  lines=[];stops=[];handle="";
+  lines=[];groups=[];choices=[];stops=[];handle="";
   clear(el("route"));clear(el("board"));clear(el("destination"));
-  show("results",false);show("stations",false);txt("selection-summary","");
+  clear(el("direction"));show("directionStep",false);show("results",false);show("stations",false);txt("selection-summary","");
 }
+function stopAge(){clearTimeout(ageTimer);ageTimer=null;collectedAt=null;txt("updated","");}
+function paintAge(){clearTimeout(ageTimer);ageTimer=null;if(collectedAt===null||document.hidden)return;var n=Math.floor((Date.now()-collectedAt)/1000);txt("updated",n<0?"更新时间未知（请检查设备时间）":n+" 秒前刷新");ageTimer=setTimeout(paintAge,5000);}
+function setAge(s){stopAge();if(["live","stale","no_live_data"].indexOf(s.status)>=0){var t=Date.parse(s.fetched_at);if(isFinite(t)){collectedAt=t;paintAge();}}}
 function hideData(message){
+  stopAge();
   lastKey="";clear(el("vehicles"));txt("updated","");txt("schedule","");
   txt("status",message);
 }
@@ -56,8 +60,8 @@ function render(data){
   txt("trip",trip?trip.boarding.name+" → "+trip.destination.name+" · "+(trip.destination_index-trip.board_index)+"站":"");
   var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查采集时间设置或 Docker 日志",unconfigured:"请先设置线路和站点",unverified:"正在核对保存的线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
   var vehicles=(s.status==="live"||s.status==="stale")?s.vehicles:[];
-  var key=JSON.stringify([trip,s.status,vehicles,s.scheduled_departures,vehicles.length?s.fetched_at:""]);
-  if(key===lastKey)return;lastKey=key;
+  var key=JSON.stringify([trip,s.status,vehicles,s.scheduled_departures,["live","stale","no_live_data"].indexOf(s.status)>=0?s.fetched_at:""]);
+  if(key===lastKey){if(collectedAt===null)setAge(s);return;}lastKey=key;
   txt("status",labels[s.status]||"状态未知");
   var root=el("vehicles");clear(root);
   for(var i=0;i<vehicles.length;i++){
@@ -69,10 +73,10 @@ function render(data){
     info.textContent=parts.join(" · ");row.appendChild(label);row.appendChild(eta);row.appendChild(info);root.appendChild(row);
   }
   txt("schedule",s.scheduled_departures&&s.status!=="stale"?"计划待发车 "+s.scheduled_departures+" 辆（非实时 ETA）":"");
-  txt("updated",vehicles.length?"最近有效采集（UTC）："+s.fetched_at.replace("T"," ").slice(0,19):"");
+  setAge(s);
 }
 function read(){
-  if(!token||configuring||busy)return;
+  if(!token||configuring||busy||document.hidden)return;
   request("GET","/api/bus/view",null,function(ok,data){
     if(ok)render(data);else{hideData("连接异常 · 实时数据已隐藏");note(errorMessage(data.error));}
   });
@@ -96,7 +100,7 @@ el("connect").onclick=function(){
   });
 };
 el("logout").onclick=exit;el("refresh").onclick=read;
-if(document.addEventListener)document.addEventListener("visibilitychange",function(){if(!document.hidden&&token&&!configuring){hideData("正在重新读取");read();}},false);
+if(document.addEventListener)document.addEventListener("visibilitychange",function(){if(document.hidden){stopAge();}else if(token&&!configuring){hideData("正在重新读取");read();}},false);
 function scheduleTime(n){return ("0"+Math.floor(n/60)).slice(-2)+":"+("0"+n%60).slice(-2);}
 function timeMinutes(s){var m=/^([0-9]{2}):([0-9]{2})$/.exec(s);if(!m||Number(m[2])>59)return -1;return Number(m[1])*60+Number(m[2]);}
 function addScheduleRow(w){
@@ -118,7 +122,7 @@ el("scheduleSettings").onclick=function(){
   configuring=true;
   request("GET","/api/bus/schedule",null,function(ok,data){
     if(!ok){configuring=false;note(errorMessage(data.error));return;}
-    resetSelection();show("config",false);show("view",false);show("scheduleConfig",true);clear(el("scheduleRows"));scheduleRows=[];
+    stopAge();resetSelection();show("config",false);show("view",false);show("scheduleConfig",true);clear(el("scheduleRows"));scheduleRows=[];
     scheduleEditable=data.editable===true;el("scheduleEnabled").value=data.enabled?"1":"0";
     txt("scheduleZone","时区："+data.timezone+(scheduleEditable?"":" · 请先修正 Docker 中的请求上限设置"));
     el("scheduleEnabled").disabled=!scheduleEditable;el("scheduleAdd").disabled=!scheduleEditable;el("scheduleSave").disabled=!scheduleEditable;
@@ -141,31 +145,54 @@ el("scheduleSave").onclick=function(){
     if(!ok){note(errorMessage(data.error));return;}closeSchedule();note("采集设置已保存。");
   });
 };
-el("settings").onclick=function(){if(busy)return;searchedKeyword="";show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];configuring=true;resetSelection();show("view",false);show("config",true);};
+el("settings").onclick=function(){if(busy)return;stopAge();searchedKeyword="";show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];configuring=true;resetSelection();show("view",false);show("config",true);};
 el("cancel").onclick=function(){configuring=false;resetSelection();hideData("正在重新读取");show("config",false);show("view",true);read();};
+function groupLines(){
+  groups=[];
+  lines.forEach(function(line){
+    var g=null;for(var i=0;i<groups.length;i++)if(groups[i].name===line.name&&groups[i].city===line.city_code){g=groups[i];break;}
+    if(!g){g={name:line.name,city:line.city_code,rows:[]};groups.push(g);}
+    g.rows.push(line);
+  });
+}
+function chooseLine(preferred){
+  clearStops();clear(el("direction"));choices=[];
+  var value=el("route").value,g=value===""?null:groups[Number(value)];
+  show("directionStep",!!g);if(!g)return;
+  option(el("direction"),"","请选择方向");
+  ["0","1"].forEach(function(dir){
+    var rows=g.rows.filter(function(x){return x.direction===dir;});
+    var label=dir==="0"?"上行":"下行";
+    if(!rows.length&&g.rows.length===1){
+      choices.push({line:g.rows[0],direction:dir,key:dir});
+      option(el("direction"),dir,label+"（待查询确认）");
+    }else rows.forEach(function(line,i){
+      var key=rows.length===1?dir:dir+":"+i;
+      choices.push({line:line,direction:dir,key:key});
+      option(el("direction"),key,label+" · "+line.first+" → "+line.last);
+    });
+  });
+  el("direction").value="";
+  if(preferred)choices.forEach(function(c){if(c.direction===preferred.direction&&c.line.line_id===preferred.line.line_id&&c.line.direction===preferred.line.direction)el("direction").value=c.key;});
+}
+function currentChoice(){var v=el("direction").value;for(var i=0;i<choices.length;i++)if(choices[i].key===v)return choices[i];return null;}
 el("search").onclick=function(){
   if(busy)return;
-  var keyword=el("keyword").value, previous=lines[Number(el("route").value)], direction=el("direction").value;
-  var preserve=keyword===searchedKeyword&&previous;
+  var keyword=el("keyword").value, old=el("route").value===""?null:groups[Number(el("route").value)], previous=currentChoice();
+  var preserve=keyword===searchedKeyword&&old;
   resetSelection();
   request("POST","/api/bus/search",{keyword:keyword},function(ok,data){
     if(!ok){note(errorMessage(data.error));return;}
-    searchedKeyword=keyword;lines=data.lines||[];
-    var selected=0, found=false;
-    for(var i=0;i<lines.length;i++){
-      var item=lines[i];
-      option(el("route"),i,item.name+" · "+item.first+" → "+item.last+" · "+(item.direction==="0"?"上行":"下行"));
-      if(preserve&&item.line_id===previous.line_id&&item.direction===previous.direction){selected=i;found=true;}
-    }
-    show("results",lines.length>0);
-    if(lines.length){
-      el("route").value=String(selected);
-      el("direction").value=preserve&&found?direction:lines[selected].direction;
-    }else note("没有匹配线路，请尝试输入完整名称。");
+    searchedKeyword=keyword;lines=data.lines||[];groupLines();
+    option(el("route"),"","请选择线路");
+    var selected="";
+    groups.forEach(function(g,i){option(el("route"),i,g.name);if(preserve&&g.name===old.name&&g.city===old.city)selected=String(i);});
+    show("results",groups.length>0);el("route").value=selected;
+    if(groups.length)chooseLine(preserve?previous:null);else note("没有匹配线路，请尝试输入完整名称。");
   });
 };
 function clearStops(){stops=[];handle="";show("stations",false);clear(el("board"));clear(el("destination"));}
-el("route").onchange=function(){clearStops();el("direction").value=lines[Number(el("route").value)].direction;};
+el("route").onchange=function(){chooseLine(null);};
 el("direction").onchange=clearStops;
 function summary(){var a=Number(el("board").value),b=Number(el("destination").value);txt("selection-summary",stops[a].name+" → "+stops[b].name+" · "+(b-a)+"站");}
 function destinations(){
@@ -176,8 +203,8 @@ function destinations(){
 el("board").onchange=destinations;el("destination").onchange=summary;
 el("detail").onclick=function(){
   if(busy)return;clearStops();
-  var line=lines[Number(el("route").value)],direction=el("direction").value;
-  if(!line)return;
+  var choice=currentChoice();if(!choice){note("请先选择行驶方向。");return;}
+  var line=choice.line,direction=choice.direction;
   request("POST","/api/bus/route",{line:line,direction:direction},function(ok,data){
     if(!ok){note(errorMessage(data.error));return;}
     stops=data.route.stops;handle=data.selection;

@@ -173,6 +173,60 @@ def main():
                 click("autoMode")
                 wait(lambda:text_in("heading","今日生活"))
                 assert text_in("modeStatus","自动分时")
+                # Exercise actual HTML select elements with a fictional upstream.
+                from dashboard.runtime import Window
+                from datetime import timedelta
+                bus.set_enabled(True)
+                runtime.windows=(Window(tuple(range(7)),0,1440),)
+                stamp=datetime.now(timezone.utc)-timedelta(seconds=10)
+                bus.clock=bus.gate.clock=lambda:stamp
+                forward={"lineId":"fiction-a","lineName":"Example bus","upDown":0,
+                         "startStopName":"A","endStopName":"C"}
+                reverse={"lineId":"fiction-b","lineName":"Example bus","upDown":1,
+                         "startStopName":"C","endStopName":"A"}
+                calls=[]
+                def provider(path,body,city):
+                    calls.append((path,body))
+                    if path.endswith("querytrafficline"):
+                        return {"errCode":0,"data":{"trafficStop":[{"stopLineInfo":[forward,reverse]}]}}
+                    if path.endswith("querybusline"):
+                        assert body["lineId"]=="fiction-b" and body["direction"]=="1"
+                        return {"errCode":0,"data":{"busLine":{**reverse,"stop":[
+                            {"stopId":n,"stopName":n,"upDown":1} for n in "CBA"]}}}
+                    return {"errCode":0,"data":{"stopArriveInfo":{"currentBusArriveTime":"4","nextBusArriveTime":"9"}}}
+                bus.gate.request=provider
+                go("/")
+                wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
+                click("settings")
+                js("document.getElementById('keyword').value='Example bus'")
+                click("search")
+                wait(lambda:js("return document.getElementById('route').options.length===2"))
+                assert js("return document.getElementById('route').options[1].textContent==='Example bus' && document.getElementById('directionStep').className==='hidden'")
+                js("var e=document.getElementById('route');e.value='0';e.dispatchEvent(new Event('change'))")
+                assert js("return document.getElementById('directionStep').className!== 'hidden'")
+                js("var e=document.getElementById('direction');e.value='1';e.dispatchEvent(new Event('change'))")
+                stamp+=timedelta(seconds=3)
+                click("detail")
+                wait(lambda:js("return document.getElementById('stations').className!=='hidden'"))
+                assert js("return document.getElementById('board').options[0].textContent.indexOf('C')>=0")
+                click("save")
+                wait(lambda:bus.trip is not None)
+                assert bus.trip.line.direction=="1" and bus.trip.line.line_id=="fiction-b"
+                # Use a current timestamp for realistic relative-age rendering.
+                stamp+=timedelta(seconds=3)
+                bus.tick()
+                wait(lambda:js("return document.getElementById('config').className==='hidden'"))
+                click("refresh")
+                wait(lambda:text_in("vehicles","4 分钟"))
+                wait(lambda:text_in("updated","秒前刷新"))
+                assert len(calls)==3
+                go("/display")
+                wait(lambda:text_in("heading","今日生活"))
+                click("busMode")
+                wait(lambda:text_in("body","4 分钟"))
+                wait(lambda:text_in("body","秒前刷新"))
+                assert len(calls)==3
+                print("Real Chromium bus selection PASS: one route, explicit direction, verified stations, relative age, local reads.")
                 print("Real Chromium automatic entry PASS: direct startup, manual override, resume automatic")
                 print("Real Chromium direct access PASS: display, management without login, bus settings")
                 print("Real Chromium PASS: create task, persisted content, linked poster, menu, saved rotation, single-session module switch and logout")
