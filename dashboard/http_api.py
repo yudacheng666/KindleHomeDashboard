@@ -53,8 +53,9 @@ def _token(value):
 
 
 class API:
-    def __init__(self, runtime, read_token, admin_token, household=None, *, direct=False):
+    def __init__(self, runtime, read_token, admin_token, household=None, *, direct=False, weather=None):
         self.runtime = runtime
+        self.weather = weather
         self.direct = direct
         self.household = HouseholdAPI(household, runtime) if household is not None else None
         self.read_token = None if direct else _token(read_token)
@@ -101,6 +102,8 @@ class API:
         with self.lock:
             if path in POST_PATHS and self.household is not None:
                 return self.household.post(path, body)
+            if path == "/api/weather/settings" and self.weather is not None:
+                return self.weather.configure(body)
             bus = self.runtime.bus
             if path == "/api/bus/schedule":
                 result = self.runtime.configure_schedule(body)
@@ -199,14 +202,18 @@ class Handler(BaseHTTPRequestHandler):
             if self.guard(True):
                 self.send_json(200, {"admin": True})
             return
-        if not self.guard(self.path in (MANAGE, "/api/bus/schedule")):
+        if not self.guard(self.path in (MANAGE, "/api/bus/schedule", "/api/weather/settings")):
             return
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
-        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/bus/schedule") and not home:
+        weather = self.path in ("/api/weather/view", "/api/weather/settings") and self.server.api.weather is not None
+        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/bus/schedule") and not home and not weather:
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            if self.path == "/api/bus/schedule":
+            if weather:
+                payload = (self.server.api.weather.settings_view() if self.path == "/api/weather/settings"
+                           else self.server.api.weather.read())
+            elif self.path == "/api/bus/schedule":
                 payload = self.server.api.runtime.schedule_view()
             elif self.path == "/api/display/auto":
                 payload = self.server.api.automatic_view()
@@ -226,7 +233,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self.guard(True):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
-        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home:
+        weather = self.path == "/api/weather/settings" and self.server.api.weather is not None
+        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home and not weather:
             self.send_json(404, {"error": "not_found"})
             return
         if self.headers.get("Transfer-Encoding") is not None or self.headers.get_content_type() != "application/json":
