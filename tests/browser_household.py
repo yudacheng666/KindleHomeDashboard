@@ -56,6 +56,8 @@ def main():
         weather_calls=[]
         def fake_weather(url, headers):
             weather_calls.append(url)
+            if "/geo/v2/city/lookup" in url:
+                return {"code":"200","location":[{"name":"Fictional district","adm1":"Fictional province","lat":"1.23","lon":"2.34"},{"name":"Fictional district","adm1":"Other province","lat":"3.45","lon":"4.56"}]}
             return q_current(now)
         weather=WeatherService(directory,ENV,clock=lambda:now,q_transport=fake_weather)
         with LocalServer(API(runtime, reader, admin, household=home, weather=weather), 0) as server:
@@ -266,14 +268,21 @@ def main():
                 wait(lambda:text_in("body","天气未启用"))
                 click("settings");click("weatherLoad")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))
-                js("document.getElementById('weatherName').value='Fictional district';document.getElementById('weatherLat').value='1.23';document.getElementById('weatherLon').value='2.34';document.getElementById('weatherEnabled').checked=true;document.getElementById('weatherConsent').checked=true")
+                js("document.getElementById('weatherKeyword').value='Fictional';document.getElementById('weatherEnabled').checked=true;document.getElementById('weatherConsent').checked=true")
+                click("weatherSearch")
+                wait(lambda:text_in("weatherResults","Fictional province"))
+                assert text_in("weatherResults","Other province")
+                js("document.querySelector('#weatherResults button').click()")
+                assert text_in("weatherSelected","Fictional district")
+                assert js("return document.getElementById('weatherLat').value==='1.23'")
+                assert len(weather_calls)==1
                 click("weatherSave")
                 wait(lambda:text_in("weatherSettingStatus","已保存"))
-                assert weather.settings_view()["enabled"] and not weather_calls
+                assert weather.settings_view()["enabled"] and len(weather_calls)==1
                 weather.step()
                 click("returnDisplay");click("tasksMode");click("weatherMode")
                 wait(lambda:text_in("body","20°C"))
-                assert text_in("body","和风天气") and len(weather_calls)==1
+                assert text_in("body","和风天气") and len(weather_calls)==2
                 click("settings");click("weatherLoad")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))
                 assert js("return document.getElementById('weatherEnabled').checked")

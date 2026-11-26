@@ -204,6 +204,8 @@ class WeatherService:
         self.backup_blocked = False
         self.ledger = None
         self.generation = 0
+        self.search_busy = False
+        self.search_after = None
         self.records = {}
         self.failures = {}
         self.due = {}
@@ -238,6 +240,33 @@ class WeatherService:
             usage = self.ledger.usage() if self.ledger else None
             return {**self.settings, "primary_configured":self.primary is not None,
                     "error":self.error, "budget":usage}
+
+    def search_locations(self, body):
+        # Explicit user request, independent of scheduled collection. No
+        # household search terms are stored or logged.
+        if set(body) != {"keyword", "consent"} or body["consent"] is not True or not isinstance(body["keyword"], str):
+            raise ValueError("invalid_city_search")
+        with self.lock:
+            if not self.ledger or self.stop.is_set():
+                return {"status": "unavailable", "locations": []}
+            if self.primary is None:
+                return {"status": "not_configured", "locations": []}
+            if self.search_busy or (self.search_after is not None and self.monotonic() < self.search_after):
+                return {"status": "wait", "locations": []}
+            primary = self.primary
+            self.search_busy = True
+        try:
+            return {"status": "ok", "locations": primary.search(body["keyword"])}
+        except WeatherBlocked:
+            return {"status": "blocked", "locations": []}
+        except WeatherBudget:
+            return {"status": "budget", "locations": []}
+        except WeatherError:
+            return {"status": "unavailable", "locations": []}
+        finally:
+            with self.lock:
+                self.search_after = self.monotonic() + 3
+                self.search_busy = False
 
     def configure(self, value):
         value = config(value)

@@ -97,6 +97,8 @@ class API:
         return {"mode": "bus", "view": self.bus_view(bus)}
 
     def dispatch(self, path, body):
+        if path == "/api/weather/search" and self.weather is not None:
+            return self.weather.search_locations(body)
         # Single selection session: a newer route preview invalidates the old
         # handle, preventing a stale form from silently saving another route.
         with self.lock:
@@ -233,7 +235,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.guard(True):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
-        weather = self.path == "/api/weather/settings" and self.server.api.weather is not None
+        weather = self.path in ("/api/weather/settings", "/api/weather/search") and self.server.api.weather is not None
         if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home and not weather:
             self.send_json(404, {"error": "not_found"})
             return

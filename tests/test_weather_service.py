@@ -52,6 +52,8 @@ class WeatherServiceTests(unittest.TestCase):
             self.calls.append(url)
             if self.block: raise WeatherBlocked("provider_blocked")
             if self.failure: raise WeatherError("test_unavailable")
+            if "/geo/v2/city/lookup" in url:
+                return {"code":"200","location":[{"name":"Fictional district","adm1":"Fictional province","lat":"1.234","lon":"2.345"},{"name":"Fictional district","adm1":"Other province","lat":"3.456","lon":"4.567"}]}
             if "/weather/v1/current" in url: return q_current(self.clock)
             if "/weather/v1/hourly" in url:
                 return {"hours":[{"forecastTime":(self.clock+timedelta(hours=1)).isoformat(),
@@ -137,6 +139,20 @@ class WeatherServiceTests(unittest.TestCase):
         self.service.step()
         self.assertEqual(self.service.read()["status"],"disabled")
         self.assertEqual(len(self.calls),1)
+    def test_city_search_consent_quota_and_selection(self):
+        with self.assertRaises(ValueError):
+            self.service.search_locations({"keyword":"Fictional","consent":False})
+        self.assertEqual(self.calls,[])
+        result=self.service.search_locations({"keyword":"Fictional","consent":True})
+        self.assertEqual(result["status"],"ok")
+        self.assertEqual(len(result["locations"]),2)
+        self.assertEqual(result["locations"][0]["latitude"],1.23)
+        self.assertNotEqual(result["locations"][0]["region"],result["locations"][1]["region"])
+        self.assertEqual(self.service.ledger.usage()["used"],1)
+        self.assertEqual(self.service.search_locations({"keyword":"Fictional","consent":True})["status"],"wait")
+        self.assertFalse(self.service.settings_view()["enabled"])
+        self.assertEqual(len(self.calls),1)
+
     def test_http_auth_and_no_external_calls(self):
         reader,admin=token_urlsafe(32),token_urlsafe(32)
         api=API(Runtime(BusService(self.tmp.name,enabled=False)),reader,admin,weather=self.service)
@@ -154,6 +170,10 @@ class WeatherServiceTests(unittest.TestCase):
                 with self.assertRaises(HTTPError) as err:
                     req("/api/weather/settings",reader,CONFIG)
                 self.assertEqual(err.exception.code,401)
+                with self.assertRaises(HTTPError) as err:
+                    req("/api/weather/search",reader,{"keyword":"Fictional","consent":True})
+                self.assertEqual(err.exception.code,401)
+                err.exception.close()
                 self.assertEqual(req("/api/weather/view",reader)["status"],"disabled")
                 self.assertTrue(req("/api/weather/settings",admin,CONFIG)["enabled"])
                 self.assertEqual(req("/api/weather/view",reader)["status"],"waiting")
