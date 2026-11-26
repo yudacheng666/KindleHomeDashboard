@@ -11,7 +11,9 @@ from .bus import AccessBlocked, BusError, post
 
 
 class BudgetWait(BusError):
-    pass
+    def __init__(self, message, code="local_budget_wait"):
+        super().__init__(message)
+        self.code = code
 
 
 class RequestGate:
@@ -64,7 +66,7 @@ class RequestGate:
     def __call__(self, path, body, city):
         with self.lock:
             if not self.enabled:
-                raise BudgetWait("Provider disabled")
+                raise BudgetWait("Provider disabled", "bus_disabled")
             now = self.clock()
             day, timestamp = now.astimezone(timezone.utc).date().isoformat(), now.timestamp()
             eta = path == "/traffic/v1/getbusstoparrivedetails"
@@ -76,8 +78,10 @@ class RequestGate:
                     raise AccessBlocked("Provider access restricted")
                 if day > old_day:
                     used, old_day = 0, day
-                if timestamp < next_at or used >= self.daily_limit or (eta and timestamp < eta_next_at):
-                    raise BudgetWait("Local request budget reached")
+                if used >= self.daily_limit:
+                    raise BudgetWait("Local daily request limit reached", "local_daily_limit")
+                if timestamp < next_at or (eta and timestamp < eta_next_at):
+                    raise BudgetWait("Local request interval", "local_request_gap")
                 # Reserve before making the network request: failed attempts
                 # and restarts must not reset the budget.
                 db.execute("UPDATE budget SET day=?, used=?, next_at=?, eta_next_at=? WHERE id=1",
