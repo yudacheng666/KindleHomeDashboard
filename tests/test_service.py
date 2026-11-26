@@ -124,6 +124,42 @@ class ServiceTests(unittest.TestCase):
             restored.search_lines("Example")
         self.assertEqual(len(self.calls), count)
 
+    def test_abbreviations_share_cached_query_but_rank_independently(self):
+        s = self.service()
+        def provider(path, body, city):
+            self.calls.append((path, body))
+            return {"errCode":0,"data":{"trafficStop":[
+                {"lineInfo":{"lineId":"c","lineName":"示例82路C","upDown":0,"startStopName":"A","endStopName":"D"}},
+                {"lineInfo":{"lineId":"d","lineName":"示例82路D","upDown":0,"startStopName":"B","endStopName":"E"}}]}}
+        s.gate.request=provider
+        self.assertEqual(s.search_lines("示82C")[0].line_id,"c")
+        self.assertEqual(s.search_lines("示82D")[0].line_id,"d")
+        self.assertEqual(len(self.calls),1)
+        self.assertEqual(self.calls[0][1]["keywords"],"82")
+
+    def test_reverse_uses_returned_opposite_id(self):
+        s = self.service()
+        def provider(path, body, city):
+            self.calls.append((path, body))
+            if path.endswith("querytrafficline"):
+                return {"errCode":0,"data":{"trafficStop":[
+                    {"lineInfo":{"lineId":"out","lineName":"Example","upDown":0,"startStopName":"A","endStopName":"D"}},
+                    {"lineInfo":{"lineId":"back","lineName":"Example","upDown":1,"startStopName":"D","endStopName":"A"}}]}}
+            self.assertEqual(body["lineId"],"back")
+            self.assertEqual(body["direction"],"1")
+            return {"errCode":0,"data":{"busLine":{"lineId":"back","lineName":"Example","upDown":1,
+                "stop":[{"stopId":n,"stopName":n,"upDown":1} for n in "DXA"]}}}
+        s.gate.request=provider
+        lines=s.search_lines("Example")
+        self.advance(2)
+        route=s.get_route(lines[0],"1")
+        self.assertEqual(route.line.line_id,"back")
+        self.assertEqual(route.line.direction,"1")
+        self.assertEqual([stop.name for stop in route.stops],list("DXA"))
+        s.save_trip(route,0,2)
+        self.assertEqual(s.trip.line.direction,"1")
+        self.assertEqual(len(self.calls),2)
+
     def test_search_result_expires(self):
         s = self.service()
         line = s.search_lines("Example")[0]

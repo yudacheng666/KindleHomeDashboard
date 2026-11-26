@@ -3,7 +3,7 @@
 "use strict";
 var access=typeof window!=="undefined"&&window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", admin=false, busy=false, generation=0, configuring=false;
-var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false;
+var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false, searchedKeyword="";
 function el(id){return document.getElementById(id);}
 function txt(id,value){var n=el(id);if(n.textContent!==value)n.textContent=value;}
 function show(id,visible){el(id).className=visible?"":"hidden";}
@@ -16,7 +16,7 @@ function disable(value){
   for(var i=0;i<ids.length;i++)el(ids[i]).disabled=value;
 }
 function errorMessage(code){
-  var messages={unauthorized:"令牌无效或没有管理权限。",provider_blocked:"公交服务已限制访问，停止请求。",local_budget_wait:"请求间隔或本地额度限制，请稍后手动重试。",bus_disabled:"公交采集未启用，请打开采集时间设置。",bus_config_error:"公交配置错误，采集已暂停，请检查采集时间设置或 Docker 日志。",local_request_gap:"请求过快，请等几秒再手动重试。",local_daily_limit:"已达到软件每日请求上限（UTC 日期），请次日再试；不是第三方额度。",provider_error:"公交接口暂不可用。",invalid_selection_or_request:"选择无效或已过期，请重新搜索。",service_error:"本地服务异常。"};
+  var messages={unauthorized:"令牌无效或没有管理权限。",provider_blocked:"公交服务已限制访问，停止请求。",local_budget_wait:"请求间隔或本地额度限制，请稍后手动重试。",bus_disabled:"公交采集未启用，请打开采集时间设置。",bus_config_error:"公交配置错误，采集已暂停，请检查采集时间设置或 Docker 日志。",local_request_gap:"请求过快，请等几秒再手动重试。",local_daily_limit:"已达到软件每日请求上限（UTC 日期），请次日再试；不是第三方额度。",provider_error:"公交接口暂不可用或未返回可识别结果。可尝试输入完整线路名称。",direction_unavailable:"接口未返回所选方向的有效站点，请核对线路方向后再试。",invalid_selection_or_request:"选择无效或已过期，请重新搜索。",service_error:"本地服务异常。"};
   return messages[code]||"连接失败，请检查本机服务。";
 }
 function request(method,path,body,done){
@@ -141,15 +141,27 @@ el("scheduleSave").onclick=function(){
     if(!ok){note(errorMessage(data.error));return;}closeSchedule();note("采集设置已保存。");
   });
 };
-el("settings").onclick=function(){if(busy)return;show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];configuring=true;resetSelection();show("view",false);show("config",true);};
+el("settings").onclick=function(){if(busy)return;searchedKeyword="";show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];configuring=true;resetSelection();show("view",false);show("config",true);};
 el("cancel").onclick=function(){configuring=false;resetSelection();hideData("正在重新读取");show("config",false);show("view",true);read();};
 el("search").onclick=function(){
-  if(busy)return;resetSelection();
-  request("POST","/api/bus/search",{keyword:el("keyword").value},function(ok,data){
+  if(busy)return;
+  var keyword=el("keyword").value, previous=lines[Number(el("route").value)], direction=el("direction").value;
+  var preserve=keyword===searchedKeyword&&previous;
+  resetSelection();
+  request("POST","/api/bus/search",{keyword:keyword},function(ok,data){
     if(!ok){note(errorMessage(data.error));return;}
-    lines=data.lines||[];
-    for(var i=0;i<lines.length;i++)option(el("route"),i,lines[i].name+" · "+lines[i].first+" → "+lines[i].last);
-    show("results",lines.length>0);if(lines.length)el("direction").value=lines[0].direction;else note("没有匹配线路。");
+    searchedKeyword=keyword;lines=data.lines||[];
+    var selected=0, found=false;
+    for(var i=0;i<lines.length;i++){
+      var item=lines[i];
+      option(el("route"),i,item.name+" · "+item.first+" → "+item.last+" · "+(item.direction==="0"?"上行":"下行"));
+      if(preserve&&item.line_id===previous.line_id&&item.direction===previous.direction){selected=i;found=true;}
+    }
+    show("results",lines.length>0);
+    if(lines.length){
+      el("route").value=String(selected);
+      el("direction").value=preserve&&found?direction:lines[selected].direction;
+    }else note("没有匹配线路，请尝试输入完整名称。");
   });
 };
 function clearStops(){stops=[];handle="";show("stations",false);clear(el("board"));clear(el("destination"));}
@@ -169,7 +181,7 @@ el("detail").onclick=function(){
   request("POST","/api/bus/route",{line:line,direction:direction},function(ok,data){
     if(!ok){note(errorMessage(data.error));return;}
     stops=data.route.stops;handle=data.selection;
-    txt("endpoints",data.route.line.first+" → "+data.route.line.last);
+    txt("endpoints",(data.route.line.direction==="0"?"上行":"下行")+" · "+data.route.line.first+" → "+data.route.line.last);
     for(var i=0;i<stops.length-1;i++)option(el("board"),i,(i+1)+". "+stops[i].name);
     destinations();show("stations",true);
   });

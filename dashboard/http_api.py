@@ -13,7 +13,7 @@ from threading import Lock
 
 from .budget import BudgetWait
 from .bus import AccessBlocked, BusError
-from .routes import Line
+from .routes import Line, DirectionUnavailable
 from .trip_store import TripStore
 from .household_api import HouseholdAPI, READ, MANAGE, POST_PATHS
 
@@ -227,6 +227,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(503, {"error": "provider_blocked"})
         except BudgetWait as exc:
             self.send_json(503 if exc.code in ("bus_disabled", "bus_config_error") else 429, {"error": exc.code})
+        except DirectionUnavailable:
+            self.send_json(502, {"error": "direction_unavailable"})
         except BusError:
             self.send_json(502, {"error": "provider_error"})
         except (ValueError, TypeError, KeyError, RecursionError):
