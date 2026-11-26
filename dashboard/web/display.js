@@ -1,4 +1,4 @@
-/* Read-only display. ES5/XHR; optional tab-local direct-mode resume metadata only. */
+/* Display with explicitly authorized task completion. ES5/XHR; optional tab-local direct-mode resume metadata only. */
 (function(){
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
@@ -38,13 +38,13 @@ function useSaved(v){
 }
 function makePages(v){
   var p=[];
-  if(section==="tasks")return [{id:"tasks",title:"待办清单",lines:v.tasks.length?v.tasks.map(function(t){return "□ "+t.title;}):["暂无待办"],note:""}];
+  if(section==="tasks")return [{id:"tasks",title:"待办清单",lines:v.tasks.length?v.tasks.map(function(t){return "□ "+t.title;}):["暂无待办"],note:"",tasks:v.tasks,canComplete:v.can_complete===true}];
   if(section==="posters"){
     v.posters.forEach(function(t){p=p.concat(posterPages(t));});
     return p.length?p:[{id:"posters",title:"海报",lines:["暂无有效海报"],note:""}];
   }
-  var meals={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"};
-  return [{id:"week",title:"本周菜单",lines:v.week_menu.length?v.week_menu.map(function(m){return m.day+" · "+meals[m.meal]+"\n"+m.dishes.join("、");}):["暂无本周菜单"],note:""}];
+  var settings=v.menu_display||{mode:"week",days:7},title=settings.mode==="week"?"本周菜单":"未来"+settings.days+"天菜单";
+  return [{id:"week",title:title,menus:v.week_menu,lines:["暂无"+title],note:""}];
 }
 function eligible(p){return section==="posters";}
 function tabs(){
@@ -56,7 +56,7 @@ function tabs(){
 function updateManagementLinks(){
   var target=automatic?"auto":mode==="bus"?"bus":section;
   el("manageLink").href="/bus#return-"+target;
-  ["tasks","posters","menus","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
+  ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
 function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);if(open)updateManagementLinks();}
 function render(){
@@ -64,11 +64,58 @@ function render(){
   var key=JSON.stringify([data.date,p,cursor,pages.length]);
   if(key!==lastRender){
     lastRender=key;txt("date",data.date);txt("heading",p.title);
-    var root=el("body");clear(root);p.lines.forEach(function(line){append(root,"p",line,p.poster?(line.length>38?"poster compact":line.length>18?"poster medium":"poster"):"");});
+    var root=el("body");clear(root);
+    if(p.tasks&&p.tasks.length&&p.canComplete){
+      var displayedDate=data.date;
+      p.tasks.forEach(function(t){
+        var row=append(root,"div","","task-row");append(row,"span",t.title,"task-text");
+        var action=append(row,"span","","task-action"),button=append(action,"button","完成","task-complete");
+        button.type="button";button.onclick=function(){completeTask(t,displayedDate,button);};
+      });
+    }else if(p.menus&&p.menus.length){
+      var days={},names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
+      p.menus.forEach(function(m){(days[m.day]||(days[m.day]=[])).push(m);});
+      Object.keys(days).sort().forEach(function(day){
+        var group=append(root,"section","","menu-day"),heading=append(group,"h2",day,"menu-date");
+        if(day===data.date)append(heading,"span","今日","menu-today");
+        days[day].sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
+          var meal=append(group,"div","","menu-meal");
+          append(meal,"span",names[m.meal],"menu-meal-label");
+          append(meal,"span",m.dishes.join("、"),"menu-dishes");
+        });
+      });
+    }else p.lines.forEach(function(line){append(root,"p",line,p.poster?(line.length>38?"poster compact":line.length>18?"poster medium":"poster"):"");});
     if(p.note)append(root,"p",p.note,"note");
     txt("index",section==="posters"?(cursor+1)+" / "+pages.length:"");
   }
   txt("pause",running?"暂停轮播":"开始轮播");
+}
+function completeTask(t,on,button){
+  if(!token||!data||data.date!==on||data.can_complete!==true||section!=="tasks"||mode!=="family"||settingsOpen)return;
+  if(busy){txt("status","正在同步，请稍后再试。");return;}
+  if(!window.confirm("确认完成「"+t.title+"」？完成后保留历史记录。"))return;
+  var g=epoch,x=new XMLHttpRequest(),ended=false,timer;
+  busy=true;button.disabled=true;clearTimeout(refreshTimer);refreshTimer=null;
+  function finish(ok){
+    if(ended)return;ended=true;clearTimeout(timer);if(g!==epoch)return;
+    busy=false;button.disabled=false;
+    if(ok&&data&&data.date===on){
+      data.tasks=data.tasks.filter(function(item){return item.id!==t.id;});
+      data.posters=data.posters.filter(function(item){return item.task_id!==t.id;});
+      accept(data);refresh();
+    }else{
+      txt("status","完成未确认成功，请刷新核对后再试。");
+      refreshTimer=setTimeout(refresh,30000);
+    }
+  }
+  try{x.open("POST","/api/home/task/complete",true);
+    if(token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+    x.setRequestHeader("Content-Type","application/json");
+    x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
+      finish(x.status===200&&v&&v.result===null);};
+    timer=setTimeout(function(){finish(false);try{x.abort();}catch(e){}},12000);
+    x.send(JSON.stringify({key:t.id,on:on,completed:true}));
+  }catch(e){finish(false);}
 }
 // Never store credentials or page contents. The direct manual display can resume
 // after a mobile browser reload; token-authenticated and /auto entries cannot.

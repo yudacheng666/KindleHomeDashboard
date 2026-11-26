@@ -10,12 +10,16 @@ input,select,textarea{display:block;width:100%;margin:4px 0 12px}label{display:b
 textarea{min-height:90px}.panel{border-top:2px solid #333;padding:12px 0}.item{border-bottom:1px solid #aaa;padding:8px 0}
 .primary{background:#222;color:#fff}.hidden{display:none}.poster{font-size:28px;font-weight:bold;white-space:pre-wrap;overflow-wrap:break-word}
 small{color:#555}a{color:#222}.tablink{display:inline-block;border:1px solid #444;border-radius:4px;padding:9px;text-decoration:none;margin:4px 6px 4px 0}
+.menu-day{border-bottom:1px solid #aaa;padding:8px 0}.menu-date{margin:4px 0}.menu-today{font-size:13px;font-weight:normal;color:#555;margin-left:9px}.menu-day .item{border-bottom:0;padding:5px 0}
+.catalog-layout{display:table;table-layout:fixed;width:100%}.catalog-nav{display:table-cell;width:100px;vertical-align:top;padding-right:6px}.catalog-nav button{width:100%;margin-right:0;word-wrap:break-word}.catalog-body{display:table-cell;vertical-align:top;word-wrap:break-word}.dish-pick{margin:3px;padding:8px}.dish-selected{background:#222;color:#fff}.week-days{display:table;table-layout:fixed;width:100%}.week-days span{display:table-cell;width:14.28%;vertical-align:top}.week-days button{width:100%;padding:4px 0;margin:0;font-size:14px;white-space:pre-line}.meal-pick{margin:5px 0}.menu-editor-note{font-size:14px;color:#555}.catalog-tools{margin-bottom:8px}
+.shared-dish{display:table;width:100%;table-layout:fixed;border-bottom:1px solid #ccc}.shared-dish span{display:table-cell;vertical-align:middle;word-wrap:break-word}.shared-dish button{font-size:14px;color:#555;float:right}.shared-dishes h3{margin:8px 0}
+.week-nav{display:flex;align-items:center;justify-content:space-between;gap:4px}.week-nav span{font-size:14px;flex:1;text-align:center}.dish-check{display:block}.dish-check input{display:inline-block;width:auto;margin:4px 8px 4px 0;vertical-align:middle}
 </style></head>
 <body><h1>设置 · 内容管理</h1><p><a id="returnLink" href="/display">返回看板</a></p>
 <div id="login" class="panel"><label for="token">访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off">
 <label for="mode">访问方式</label><select id="mode"><option value="read">仅查看</option><option value="admin">内容管理</option></select><button id="connect" type="button" class="primary">连接</button></div>
 <p id="message" role="status" aria-live="polite"></p>
 <div id="home" class="hidden"><p id="date"></p><button id="refresh" type="button">刷新</button><button id="logout" type="button">退出</button>
-<div id="tabs"><a id="busTab" class="tablink" href="/bus">公交设置</a><button id="tasks" type="button">待办清单</button><button id="posters" type="button">海报</button><button id="menus" type="button">本周菜单</button><button id="displaySettings" type="button">显示设置</button></div>
+<div id="tabs"><a id="busTab" class="tablink" href="/bus">公交设置</a><button id="tasks" type="button">待办清单</button><button id="posters" type="button">海报</button><button id="menus" type="button">本周菜单</button><button id="catalog" type="button">家庭菜单维护</button><button id="displaySettings" type="button">显示设置</button></div>
 <div id="editor" class="hidden"></div><div id="content" class="panel"></div>
 </div><script src="/access-mode.js"></script><script src="/home.js"></script></body></html>

@@ -110,6 +110,83 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.assertEqual(self.req("GET","home/view",self.read_token)[0],404)
         self.assertEqual(self.req("POST","home/task/add",self.admin_token,{})[0],404)
 
+    def test_manual_menu_range_and_batch_permissions(self):
+        body={"on":"2030-01-01","meal":"dinner","name":"Example manual dish"}
+        self.assertEqual(self.req("POST","home/menu/manual",self.read_token,body)[0],401)
+        self.post("menu/manual",body)
+        self.post("menu/manual",body)
+        catalog=self.manage()["catalog"]
+        other=next(c["id"] for c in catalog["categories"] if c["name"]=="其他")
+        self.assertEqual(len(catalog["dishes"]),1)
+        self.assertEqual(catalog["dishes"][0]["category"],other)
+        target=self.post("category/add",{"name":"Example destination"})
+        move={"keys":[catalog["dishes"][0]["id"]],"category":target}
+        self.assertEqual(self.req("POST","home/dish/move-other",self.read_token,move)[0],401)
+        self.post("dish/move-other",move)
+        self.assertEqual(self.manage()["catalog"]["dishes"][0]["category"],target)
+        self.post("dish/move-other",move,400)
+        self.post("category/delete",{"key":other,"confirm":True},400)
+        settings={"mode":"custom","days":10}
+        self.assertEqual(self.req("POST","home/menu/display",self.read_token,settings)[0],401)
+        self.post("menu/display",settings)
+        self.assertEqual(self.view()["menu_display"],settings)
+        self.assertEqual(self.view()["week_menu"],[])
+        self.assertEqual(len(self.post("menu/list",{"first":body["on"],"last":body["on"]})),1)
+
+    def test_collaborative_dish_permissions_and_concurrency(self):
+        from concurrent.futures import ThreadPoolExecutor
+        b={"on":self.today,"meal":"dinner","name":"Example A","present":True,"confirm_empty":False,"expected_ingredients":None}
+        self.assertEqual(self.req("POST","home/menu/dish",self.read_token,b)[0],401)
+        def send(name):
+            return self.req("POST","home/menu/dish",self.admin_token,{**b,"name":name})[0]
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            self.assertEqual(list(pool.map(send,["Example A","Example B","Example A"])),[200,200,200])
+        self.assertEqual(set(self.view()["week_menu"][0]["dishes"]),{"Example A","Example B"})
+        self.post("menu/dish",{**b,"present":False})
+        self.post("menu/dish",{**b,"name":"Example B","present":False},400)
+        self.post("menu/dish",{**b,"name":"Example B","present":False,"confirm_empty":True,"expected_ingredients":[]})
+        self.assertEqual(self.view()["week_menu"],[])
+
+    def test_quick_menu_snapshot_conflict(self):
+        body={"on":self.today,"meal":"dinner","dishes":["Example dish"],"ingredients":[],"expected":None}
+        self.assertEqual(self.req("POST","home/menu/plan",self.read_token,body)[0],401)
+        self.post("menu/plan",body)
+        self.post("menu/plan",{**body,"dishes":["Other dish"]},400)
+        self.assertEqual(self.view()["week_menu"][0]["dishes"],["Example dish"])
+        self.post("menu/plan",{**body,"dishes":["Other dish"],"expected":{"dishes":["Example dish"],"ingredients":[]}})
+        self.assertEqual(self.view()["week_menu"][0]["dishes"],["Other dish"])
+
+    def test_catalog_permissions_and_menu_independence(self):
+        c=self.post("category/add",{"name":"Example category"})
+        b={"name":"Example dish","category":c}
+        self.assertEqual(self.req("POST","home/dish/add",self.read_token,b)[0],401)
+        d=self.post("dish/add",b)
+        self.post("dish/add",b,400)
+        self.post("menu/set",{"on":self.today,"meal":"dinner","dishes":["Example dish"],"ingredients":[]})
+        self.assertNotIn("catalog",self.view())
+        self.assertEqual(self.manage()["catalog"]["dishes"][0]["id"],d)
+        self.post("category/delete",{"key":c,"confirm":True},400)
+        self.post("dish/delete",{"key":d},400)
+        self.post("dish/delete",{"key":d,"confirm":True})
+        self.post("category/delete",{"key":c,"confirm":True})
+        self.assertEqual(self.view()["week_menu"][0]["dishes"],["Example dish"])
+
+    def test_completion_permission_and_history(self):
+        key=self.task()
+        self.assertFalse(self.view()["can_complete"])
+        self.assertTrue(self.req("GET","home/view",self.admin_token)[1]["can_complete"])
+        body={"key":key,"on":self.today,"completed":True}
+        self.assertEqual(self.req("POST","home/task/complete",self.read_token,body)[0],401)
+        self.post("task/complete",body)
+        self.assertEqual(self.view()["tasks"],[])
+        record=self.manage()["history"][0]
+        self.assertIsNotNone(record["completed_at"])
+        self.assertNotIn("history",self.view())
+        self.post("history/delete",{"key":key,"occurrence":self.today},400)
+        self.post("history/delete",{"key":key,"occurrence":self.today,"confirm":True})
+        self.assertEqual(self.manage()["history"],[])
+        self.assertEqual(self.view()["tasks"],[])
+
     def test_task_edit_and_history(self):
         key = self.task()
         self.post("task/edit",{"key":key,"title":"Revised","start":self.today,"repeat":"weekly"})
