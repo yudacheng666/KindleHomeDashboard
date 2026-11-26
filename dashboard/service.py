@@ -9,7 +9,7 @@ from threading import RLock
 
 from .budget import RequestGate
 from .bus import BusError, Poller, Snapshot, parse, post
-from .routes import Line, Route, Trip, search, detail, revalidate
+from .routes import Line, Route, Trip, search, search_keyword, detail, revalidate
 from .trip_store import TripStore
 
 
@@ -50,13 +50,13 @@ class BusService:
             self.search_cache = None
             self.route_cache = None
 
-    def search_lines(self, keyword, city="310100"):
+    def search_lines(self, keyword, city="310100", *, broad=False):
         with self.lock:
             now = self.clock()
-            key = (keyword, city)
+            key = (search_keyword(keyword, broad), city)
             if self.search_cache and self.search_cache[0] == key and now < self.search_cache[1]:
                 return self.search_cache[2]
-            lines = search(keyword, city, request=self.gate)
+            lines = search(keyword, city, request=self.gate, broad=broad)
             self.search_cache = (key, now + timedelta(seconds=60), lines)
             return lines
 
@@ -65,6 +65,17 @@ class BusService:
             now = self.clock()
             if not self.search_cache or now >= self.search_cache[1] or line not in self.search_cache[2]:
                 raise ValueError("Search for this route first")
+            if direction is not None and direction != line.direction:
+                # Prefer an explicitly returned opposite-direction record, including
+                # providers which give different IDs to the two directions.
+                opposite = [candidate for candidate in self.search_cache[2]
+                            if candidate.direction == direction
+                            and candidate.name == line.name
+                            and candidate.city_code == line.city_code
+                            and (candidate.line_id == line.line_id
+                                 or (candidate.first, candidate.last) == (line.last, line.first))]
+                if len(opposite) == 1:
+                    line = opposite[0]
             key = (line, direction)
             if self.route_cache and self.route_cache[0] == key and now < self.route_cache[1]:
                 return self.route_cache[2]
