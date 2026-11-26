@@ -60,6 +60,16 @@ class PrivateSettingsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             startup_settings(args(enable_household=True),{"KHD_TIMEZONE":"not/a/zone"})
 
+    def test_valid_ceiling_preserved_when_window_invalid(self):
+        a = args(enable_household=True)
+        error = startup_settings(a, {"KHD_BUS_ENABLED":"1","KHD_BUS_WINDOWS":"invalid",
+                                     "KHD_BUS_DAILY_LIMIT":"42"})
+        self.assertTrue(error.startswith("KHD_BUS_WINDOWS"))
+        self.assertEqual(a.daily_limit,42)
+        a = args(enable_household=True)
+        error = startup_settings(a, {"KHD_BUS_ENABLED":"1","KHD_BUS_DAILY_LIMIT":"0"})
+        self.assertTrue(error.startswith("KHD_BUS_DAILY_LIMIT"))
+
     def test_existing_cli_and_conflict(self):
         a=apply_private_settings(args(enable_bus=True,window=[window_arg("2:15:00-16:00")],
                                       timezone="UTC",daily_limit=20),{})
