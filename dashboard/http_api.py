@@ -216,6 +216,10 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             self.send_json(503, {"error": "service_error"})
             return
+        if self.path == READ or (self.path == "/api/display/auto" and payload["mode"] == "family"):
+            view = payload if self.path == READ else payload["view"]
+            headers = self.headers.get_all("Authorization") or []
+            view["can_complete"] = self.server.api.authorized(headers[0] if headers else None, True)
         self.send_json(200, payload)
 
     def do_POST(self):

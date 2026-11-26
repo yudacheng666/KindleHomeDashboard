@@ -10,11 +10,27 @@ OPERATIONS = {
     "task/add": ("add_task", ("title","start","repeat")),
     "task/edit": ("edit_task", ("key","title","start","repeat")),
     "task/delete": ("delete_task", ("key",)),
+    "history/delete": ("delete_history", ("key","occurrence")),
     "task/complete": ("complete", ("key","on","completed")),
     "poster/add": ("add_poster", ("title","body","start","end","note","task_id")),
     "poster/edit": ("edit_poster", ("key","title","body","start","end","note","task_id")),
     "poster/enable": ("enable_poster", ("key","enabled")),
     "poster/delete": ("delete_poster", ("key",)),
+    "category/add": ("add_category", ("name",)),
+    "category/edit": ("edit_category", ("key","name")),
+    "category/delete": ("delete_category", ("key",)),
+    "dish/add": ("add_dish", ("name","category")),
+    "dish/edit": ("edit_dish", ("key","name","category")),
+    "dish/delete": ("delete_dish", ("key",)),
+    "dish/import": ("add_dishes", ("names","category")),
+    "dish/move-other": ("move_other_dishes", ("keys","category")),
+    "menu/display": ("set_menu_display", ("mode","days")),
+    "menu/sync": ("sync_menus", ("first","last","catalog_revision")),
+    "menu/manual": ("add_manual_menu_dish", ("on","meal","name")),
+    "menu/dish": ("change_menu_dish", ("on","meal","name","present","confirm_empty","expected_ingredients")),
+    "menu/move": ("edit_menu", ("old_on","old_meal","on","meal","dishes","ingredients","expected")),
+    "menu/snapshot/delete": ("delete_menu", ("on","meal","expected")),
+    "menu/plan": ("plan_menu", ("on","meal","dishes","ingredients","expected")),
     "menu/set": ("set_menu", ("on","meal","dishes","ingredients")),
     "menu/edit": ("edit_menu", ("old_on","old_meal","on","meal","dishes","ingredients")),
     "menu/delete": ("delete_menu", ("on","meal")),
@@ -55,11 +71,16 @@ class HouseholdAPI:
         args = {k:body[k] for k in fields}
         if "key" in args and (not isinstance(args["key"],str) or len(args["key"]) != 32):
             raise ValueError("Invalid item ID")
+        if "category" in args and (not isinstance(args["category"],str) or len(args["category"]) != 32):
+            raise ValueError("Invalid category ID")
         if "task_id" in args and args["task_id"] is not None and (
                 not isinstance(args["task_id"],str) or len(args["task_id"]) != 32):
             raise ValueError("Invalid task ID")
         if name == "task/complete" and day(args["on"]) != self.today():
             # A stale screen must not complete tomorrow's recurrence.
             raise ValueError("Day changed; refresh before completing")
+        if name == "task/complete":
+            # Actual completion time comes from the NAS, not the client.
+            args["completed_at"] = self.runtime.clock().astimezone(self.runtime.zone).isoformat(timespec="seconds")
         result = getattr(self.home, method)(**args)
         return {"result": result}

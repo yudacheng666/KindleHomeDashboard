@@ -4,6 +4,7 @@ const vm = require("node:vm");
 const assert = require("node:assert/strict");
 class Node {
   constructor(){this.children=[];this.textContent="";this.value="";this.className="";this.disabled=false;}
+  setAttribute(name,value){this[name]=value;}
   get firstChild(){return this.children[0];}
   appendChild(n){if(!this.children.length)this.value=n.value;this.children.push(n);}
   removeChild(n){this.children.splice(this.children.indexOf(n),1);if(!this.children.length)this.value="";}
@@ -87,9 +88,13 @@ assert.ok(el("scheduleMessage").textContent.includes("至少"));assert.ok(el("sc
 el("scheduleAdd").onclick();
 const row=el("scheduleRows").children[0];
 row.children[0].children[0].checked=true;
-row.children[7].children[1].value="10:00";row.children[8].children[1].value="11:00";
+const startHour=row.children[7].children[1],startMinute=row.children[7].children[3],endHour=row.children[8].children[1],endMinute=row.children[8].children[3];
+assert.equal(startHour.children.length,25);assert.equal(startMinute.children.length,61);assert.equal(endHour.children.length,26);
+assert.equal(startHour.value,"");el("scheduleSave").onclick();assert.ok(el("scheduleMessage").textContent.includes("有效时间"));
+startHour.value="10";startMinute.value="07";endHour.value="24";endHour.onchange();assert.equal(endMinute.value,"00");
+endMinute.value="01";el("scheduleSave").onclick();assert.ok(el("scheduleMessage").textContent.includes("有效时间"));endMinute.value="00";
 el("scheduleSave").onclick();
-assert.ok(calls.some(c=>c[1]==="/api/bus/schedule"&&c[0]==="POST"&&c[2].enabled===true&&c[2].windows[0].start===600));
+assert.ok(calls.some(c=>c[1]==="/api/bus/schedule"&&c[0]==="POST"&&c[2].enabled===true&&c[2].windows[0].start===607&&c[2].windows[0].end===1440));
 assert.equal(el("scheduleConfig").className,"");assert.equal(el("scheduleEnabled").value,"1");
 assert.ok(el("scheduleStored").textContent.includes("开启"));assert.ok(el("scheduleMessage").textContent.includes("已保存并确认"));
 assert.deepEqual(calls.slice(-2).map(c=>c.slice(0,2)),[["POST","/api/bus/schedule"],["GET","/api/bus/schedule"]]);
@@ -99,6 +104,9 @@ scheduleMismatch=false;scheduleReadFail=true;el("scheduleSave").onclick();
 assert.ok(el("scheduleMessage").textContent.includes("未能读取确认"));assert.ok(el("scheduleStored").textContent.includes("未确认"));
 scheduleReadFail=false;el("scheduleCancel").onclick();el("scheduleSettings").onclick();
 assert.equal(el("scheduleEnabled").value,"0");assert.ok(el("scheduleStored").textContent.includes("关闭"));
+const restoredRow=el("scheduleRows").children[0];
+assert.equal(restoredRow.children[7].children[1].value,"10");assert.equal(restoredRow.children[7].children[3].value,"07");
+assert.equal(restoredRow.children[8].children[1].value,"24");assert.equal(restoredRow.children[8].children[3].value,"00");
 el("scheduleEnabled").value="1";el("scheduleSave").onclick();assert.ok(el("scheduleMessage").textContent.includes("已保存并确认"));
 el("scheduleCancel").onclick();el("scheduleSettings").onclick();assert.equal(el("scheduleEnabled").value,"1");el("scheduleCancel").onclick();
 failed=true;el("refresh").onclick();assert.equal(el("vehicles").children.length,0);assert.equal(el("updated").textContent,"");

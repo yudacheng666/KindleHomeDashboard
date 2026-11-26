@@ -164,17 +164,32 @@ el("connect").onclick=function(){
 };
 el("logout").onclick=exit;el("refresh").onclick=read;
 if(document.addEventListener)document.addEventListener("visibilitychange",function(){if(document.hidden){stopAge();}else if(token&&!configuring){hideData("正在重新读取");read();}},false);
-function scheduleTime(n){return ("0"+Math.floor(n/60)).slice(-2)+":"+("0"+n%60).slice(-2);}
-function timeMinutes(s){var m=/^([0-9]{2}):([0-9]{2})$/.exec(s);if(!m||Number(m[2])>59)return -1;return Number(m[1])*60+Number(m[2]);}
+function twoDigits(n){return ("0"+n).slice(-2);}
+function timeMinutes(field){
+  var h=field.hour.value,m=field.minute.value;
+  if(!/^[0-9]{2}$/.test(h)||!/^[0-9]{2}$/.test(m)||Number(m)>59||Number(h)>24||Number(h)===24&&Number(m)!==0)return -1;
+  return Number(h)*60+Number(m);
+}
 function addScheduleRow(w){
   var root=document.createElement("div");root.className="schedule-row";el("scheduleRows").appendChild(root);
   var row={root:root,days:[]}, names=["周一","周二","周三","周四","周五","周六","周日"];
   for(var i=0;i<7;i++){var label=document.createElement("label"),box=document.createElement("input"),span=document.createElement("span");
     box.type="checkbox";box.checked=w.days.indexOf(i)>=0;box.disabled=!scheduleEditable;
     span.textContent=names[i];label.appendChild(box);label.appendChild(span);root.appendChild(label);row.days.push(box);}
-  function field(name,value){var l=document.createElement("label"),n=document.createElement("input"),sp=document.createElement("span");
-    sp.textContent=name;n.type="text";n.maxLength=5;n.placeholder="HH:MM";n.value=value;n.disabled=!scheduleEditable;l.appendChild(sp);l.appendChild(n);root.appendChild(l);return n;}
-  row.start=field("开始 ",w.start===null?"":scheduleTime(w.start));row.end=field("结束 ",w.end===null?"":scheduleTime(w.end));
+  function field(name,value,isEnd){
+    var l=document.createElement("span"),sp=document.createElement("span"),h=document.createElement("select"),m=document.createElement("select"),colon=document.createElement("span");
+    l.className="schedule-time";sp.textContent=name+" ";colon.textContent=" : ";
+    h.setAttribute("aria-label",name+"小时");m.setAttribute("aria-label",name+"分钟");
+    option(h,"","时");option(m,"","分");
+    for(var j=0;j<=(isEnd?24:23);j++)option(h,twoDigits(j),twoDigits(j));
+    for(var j=0;j<60;j++)option(m,twoDigits(j),twoDigits(j));
+    h.value=value===null?"":twoDigits(Math.floor(value/60));m.value=value===null?"":twoDigits(value%60);
+    h.disabled=m.disabled=!scheduleEditable;
+    if(isEnd)h.onchange=function(){if(h.value==="24")m.value="00";};
+    l.appendChild(sp);l.appendChild(h);l.appendChild(colon);l.appendChild(m);root.appendChild(l);
+    return {hour:h,minute:m};
+  }
+  row.start=field("开始",w.start,false);row.end=field("结束",w.end,true);
   var remove=document.createElement("button");remove.type="button";remove.textContent="删除时段";remove.disabled=!scheduleEditable;
   remove.onclick=function(){if(busy)return;el("scheduleRows").removeChild(root);scheduleRows.splice(scheduleRows.indexOf(row),1);};
   root.appendChild(remove);scheduleRows.push(row);
@@ -215,7 +230,7 @@ el("scheduleSave").onclick=function(){
   var enabled=choice==="1";
   for(var i=0;i<scheduleRows.length;i++){var row=scheduleRows[i],days=[];
     for(var j=0;j<7;j++)if(row.days[j].checked)days.push(j);
-    var start=timeMinutes(row.start.value),end=timeMinutes(row.end.value);
+    var start=timeMinutes(row.start),end=timeMinutes(row.end);
     if(!days.length||start<0||start>=1440||end<0||end>1440||start===end){scheduleFeedback("保存失败：请为每个时段选择星期和有效时间。");return;}
     windows.push({days:days,start:start,end:end});
   }

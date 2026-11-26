@@ -9,7 +9,7 @@ body{margin:0 auto;padding:18px;max-width:560px;background:#fff;color:#111;font:
 h1{font-size:26px;margin:0} h2{font-size:22px;margin:12px 0}
 p{margin:8px 0} label{display:block;margin:12px 0 4px}
 input,select,button{box-sizing:border-box;font:inherit;color:#111;background:#fff;border:1px solid #444;border-radius:4px;padding:10px;max-width:100%}
-input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} button:disabled{color:#777} input[type=checkbox]{width:auto;margin-right:6px} .schedule-row{border:1px solid #aaa;padding:10px;margin:10px 0} .schedule-row label{display:inline-block;margin:4px 10px 4px 0} .schedule-row input[type=text]{width:90px}
+input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} button:disabled{color:#777} input[type=checkbox]{width:auto;margin-right:6px} .schedule-row{border:1px solid #aaa;padding:10px;margin:10px 0} .schedule-row label{display:inline-block;margin:4px 10px 4px 0} .schedule-time{display:inline-block;white-space:nowrap;margin:4px 10px 4px 0}.schedule-time select{width:auto;min-width:56px;padding:8px;min-height:44px}
 .primary{background:#222;color:#fff} .small{font-size:14px;color:#555}
 .panel{border-top:2px solid #222;margin-top:18px;padding-top:14px}
 .vehicle{padding:12px 0;border-bottom:1px solid #777}.eta{font-size:52px;font-weight:bold;line-height:1.1}
@@ -56,7 +56,7 @@ input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} but
 <p class="small" id="scheduleZone"></p>
 <label for="scheduleEnabled">公交联网采集</label>
 <select id="scheduleEnabled"><option value="0">关闭</option><option value="1">开启</option></select>
-<p class="small">选择星期及开始、结束时间。时间为 24 小时制，结束早于开始表示跨午夜。仅在指定时段自动采集；手动线路搜索也会消耗本地额度。</p>
+<p class="small">选择星期、开始和结束的小时及分钟。采用24小时制，结束可选24:00；结束早于开始表示跨午夜。仅在指定时段自动采集；手动线路搜索也会消耗本地额度。</p>
 <div id="scheduleRows"></div>
 <button id="scheduleAdd" type="button">添加时段</button>
 <p id="scheduleStored" class="small"></p>
