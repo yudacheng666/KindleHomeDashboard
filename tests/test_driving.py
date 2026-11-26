@@ -52,6 +52,7 @@ class DrivingTests(unittest.TestCase):
         self.assertTrue(params["paths"].split("|")[-1].startswith("7,0x000000"))
         self.assertIn("1,0,1,16,0xFFFFFF,0x000000:",params["labels"])
         self.assertNotIn("location",params)
+        self.assertEqual(params["size"],"600*200")
 
     def test_account_caps_persist(self):
         with sqlite3.connect(self.ledger.path) as db:
