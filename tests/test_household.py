@@ -76,6 +76,31 @@ class HouseholdTests(unittest.TestCase):
         self.assertEqual([m["meal"] for m in v["today_menu"]],["breakfast","dinner"])
         self.assertEqual([m["day"] for m in v["week_menu"]],[self.today,self.today,"2026-01-11"])
 
+    def test_move_menu_preserves_purchases_and_rejects_conflicts(self):
+        other = "2026-01-06"
+        self.home.set_menu(self.today,"lunch",["Example dish"],["Example ingredient"])
+        self.home.import_ingredients(self.today,self.today)
+        item = self.home.view(self.today)["shopping"][0]
+        self.home.complete_shopping(item["id"])
+        self.home.set_menu(other,"breakfast",["Other dish"])
+        before = self.home.menus_between(self.today,other)
+        with self.assertRaises(ValueError):
+            self.home.edit_menu(self.today,"lunch",other,"breakfast",["Example dish"],[])
+        self.assertEqual(self.home.menus_between(self.today,other),before)
+        self.home.edit_menu(self.today,"lunch",other,"dinner",["Changed dish"],["Example ingredient"])
+        self.assertEqual(self.home.view(self.today)["today_menu"],[])
+        moved = self.home.view(other)["today_menu"]
+        self.assertEqual([(m["meal"],m["dishes"]) for m in moved],
+                         [("breakfast",["Other dish"]),("dinner",["Changed dish"])])
+        self.home.edit_menu(other,"dinner",other,"dinner",["Edited dish"],[])
+        self.assertEqual(self.home.view(other)["today_menu"][1]["dishes"],["Edited dish"])
+        self.assertEqual(self.home.view(other)["shopping"],[{**item,"completed":1}])
+        with self.assertRaises(ValueError):
+            self.home.edit_menu(self.today,"lunch",other,"lunch",["Missing"],[])
+        with self.assertRaises(ValueError):
+            self.home.edit_menu(other,"dinner",self.today,"lunch",[],[])
+        self.assertEqual(self.home.view(other)["today_menu"][1]["dishes"],["Edited dish"])
+
     def test_explicit_import_and_preserve_completed(self):
         manual=self.home.add_shopping("Example manual")
         self.home.set_menu(self.today,"dinner",["Example dish"],["Example ingredient"])

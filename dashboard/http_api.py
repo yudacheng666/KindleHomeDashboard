@@ -68,7 +68,7 @@ class API:
         if self.household is not None and not self.runtime.active():
             return {"mode": "family", "view": self.household.get(READ)}
         bus = self.runtime.read()
-        if self.household is not None and (bus.trip is None or bus.snapshot.status == "disabled"):
+        if self.household is not None and (bus.trip is None or bus.snapshot.status in ("disabled", "config_error")):
             return {"mode": "family", "view": self.household.get(READ)}
         # During the configured commute, keep bus failures visible rather than
         # silently presenting a timetable or hiding the failure.
@@ -81,6 +81,10 @@ class API:
             if path in POST_PATHS and self.household is not None:
                 return self.household.post(path, body)
             bus = self.runtime.bus
+            if path == "/api/bus/schedule":
+                result = self.runtime.configure_schedule(body)
+                self.selection = None
+                return result
             if path == "/api/bus/search":
                 if set(body) != {"keyword"}:
                     raise ValueError("Invalid search")
@@ -174,14 +178,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.guard(True):
                 self.send_json(200, {"admin": True})
             return
-        if not self.guard(self.path == MANAGE):
+        if not self.guard(self.path in (MANAGE, "/api/bus/schedule")):
             return
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
-        if self.path not in ("/api/bus/view", "/api/display/auto") and not home:
+        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/bus/schedule") and not home:
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            if self.path == "/api/display/auto":
+            if self.path == "/api/bus/schedule":
+                payload = self.server.api.runtime.schedule_view()
+            elif self.path == "/api/display/auto":
                 payload = self.server.api.automatic_view()
             else:
                 payload = (self.server.api.household.get(self.path) if home
@@ -195,7 +201,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.guard(True):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
-        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save") and not home:
+        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home:
             self.send_json(404, {"error": "not_found"})
             return
         if self.headers.get("Transfer-Encoding") is not None or self.headers.get_content_type() != "application/json":
@@ -219,8 +225,8 @@ class Handler(BaseHTTPRequestHandler):
             result = self.server.api.dispatch(self.path, body)
         except AccessBlocked:
             self.send_json(503, {"error": "provider_blocked"})
-        except BudgetWait:
-            self.send_json(429, {"error": "local_budget_wait"})
+        except BudgetWait as exc:
+            self.send_json(503 if exc.code in ("bus_disabled", "bus_config_error") else 429, {"error": exc.code})
         except BusError:
             self.send_json(502, {"error": "provider_error"})
         except (ValueError, TypeError, KeyError, RecursionError):

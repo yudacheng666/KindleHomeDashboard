@@ -221,6 +221,28 @@ class Household:
             db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
                        (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
 
+    def edit_menu(self, old_on, old_meal, on, meal, dishes, ingredients):
+        """Move or edit one menu atomically without overwriting another meal."""
+        old_on, on = day(old_on), day(on)
+        if old_meal not in MEALS or meal not in MEALS:
+            raise ValueError("Invalid meal")
+        dishes, ingredients = strings(dishes), strings(ingredients,80)
+        if not dishes:
+            raise ValueError("At least one dish required")
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if not db.execute("SELECT 1 FROM menus WHERE day=? AND meal=?",
+                              (old_on, old_meal)).fetchone():
+                raise ValueError("Unknown menu")
+            if (old_on, old_meal) != (on, meal) and db.execute(
+                    "SELECT 1 FROM menus WHERE day=? AND meal=?", (on, meal)).fetchone():
+                raise ValueError("Target meal already exists")
+            db.execute("UPDATE menus SET day=?,meal=?,dishes=?,ingredients=? WHERE day=? AND meal=?",
+                       (on, meal, json.dumps(dishes,ensure_ascii=False),
+                        json.dumps(ingredients,ensure_ascii=False), old_on, old_meal))
+            # Shopping entries are independent snapshots; preserve labels,
+            # sources and completed states just as with menu replacement/deletion.
+
     def delete_menu(self, on, meal):
         on = day(on)
         if meal not in MEALS:

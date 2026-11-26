@@ -130,3 +130,69 @@ print("Docker direct mode PASS: isolated network client, no credentials, private
 PY
 docker stop -t 35 "$direct" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$direct")" = 0
+
+# Invalid optional bus settings must not interrupt the household service.
+docker rm "$direct" >/dev/null
+docker run -d --name "$direct" --network "$net" --ip 172.30.99.20 --read-only --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus .5 --pids-limit 32 --mount "type=bind,source=$KHD_DATA_DIR,target=/var/lib/khd" --no-healthcheck -e KHD_BUS_ENABLED=1 -e KHD_BUS_WINDOWS=invalid-fictional-value -e KHD_TIMEZONE=Asia/Shanghai kindle-home-dashboard:dev --directory /var/lib/khd --enable-household --lan-host 172.30.99.20 --lan-network 172.30.99.0/24 --open-admin >/dev/null
+docker run --rm -i --network "$net" --entrypoint python kindle-home-dashboard:dev - <<'PY'
+import json,time
+from urllib.request import urlopen,Request
+from urllib.error import HTTPError
+base="http://172.30.99.20:8080"
+for _ in range(30):
+    try:
+        with urlopen(base+"/api/home/view",timeout=3) as r:
+            view=json.load(r)
+        break
+    except OSError:
+        time.sleep(1)
+else:
+    raise RuntimeError("Household unavailable after invalid bus config")
+assert len(view["tasks"])==2
+with urlopen(base+"/api/bus/view",timeout=3) as r:
+    assert json.load(r)["snapshot"]["status"]=="config_error"
+with urlopen(base+"/api/display/auto",timeout=3) as r:
+    assert json.load(r)["mode"]=="family"
+try:
+    urlopen(Request(base+"/api/bus/search",data=b'{"keyword":"Example"}',headers={"Content-Type":"application/json"}),timeout=3)
+except HTTPError as e:
+    assert e.code==503 and json.load(e)["error"]=="bus_config_error"
+else:
+    raise AssertionError("Invalid config allowed a search")
+print("Docker invalid bus configuration PASS: family retained, provider disabled.")
+# Recover through the local settings API, without changing the container environment.
+body={"enabled":True,"windows":[{"days":[1],"start":780,"end":840}]}
+with urlopen(Request(base+"/api/bus/schedule",data=json.dumps(body).encode(),headers={"Content-Type":"application/json"}),timeout=3) as r:
+    assert json.load(r)["enabled"] is True
+with urlopen(base+"/api/bus/view",timeout=3) as r:
+    assert json.load(r)["snapshot"]["status"]=="unconfigured"
+PY
+docker logs "$direct" 2>&1 | grep -F 'Bus disabled; household remains available: KHD_BUS_WINDOWS: invalid format or time'
+if docker logs "$direct" 2>&1 | grep -Fq 'invalid-fictional-value'; then exit 1; fi
+docker stop -t 35 "$direct" >/dev/null
+test "$(docker inspect --format '{{.State.ExitCode}}' "$direct")" = 0
+
+# Restart with the same malformed bootstrap window: saved settings take precedence.
+docker start "$direct" >/dev/null
+docker run --rm -i --network "$net" --entrypoint python kindle-home-dashboard:dev - <<'PY'
+import json,time
+from urllib.request import urlopen
+base="http://172.30.99.20:8080"
+for _ in range(30):
+    try:
+        with urlopen(base+"/api/bus/schedule",timeout=3) as r:
+            settings=json.load(r)
+        break
+    except OSError:
+        time.sleep(1)
+else:
+    raise RuntimeError("Saved schedule unavailable after restart")
+assert settings["enabled"] is True and settings["windows"]==[{"days":[1],"start":780,"end":840}]
+with urlopen(base+"/api/home/view",timeout=3) as r:
+    assert len(json.load(r)["tasks"])==2
+with urlopen(base+"/api/bus/view",timeout=3) as r:
+    assert json.load(r)["snapshot"]["status"]=="unconfigured"
+print("Docker web schedule PASS: saved locally, effective without rebuild, persists after restart.")
+PY
+docker stop -t 35 "$direct" >/dev/null
+test "$(docker inspect --format '{{.State.ExitCode}}' "$direct")" = 0

@@ -16,6 +16,7 @@ OPERATIONS = {
     "poster/enable": ("enable_poster", ("key","enabled")),
     "poster/delete": ("delete_poster", ("key",)),
     "menu/set": ("set_menu", ("on","meal","dishes","ingredients")),
+    "menu/edit": ("edit_menu", ("old_on","old_meal","on","meal","dishes","ingredients")),
     "menu/delete": ("delete_menu", ("on","meal")),
     "menu/list": ("menus_between", ("first","last")),
     "shopping/add": ("add_shopping", ("label",)),

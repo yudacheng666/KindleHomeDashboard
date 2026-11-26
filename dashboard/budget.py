@@ -4,6 +4,7 @@ One NAS service process owns the adapter. These are conservative LOCAL limits,
 not the provider's quota. No waiting, background threads or automatic unblock.
 """
 import sqlite3
+import json
 from datetime import datetime, timezone
 from threading import RLock
 
@@ -11,17 +12,20 @@ from .bus import AccessBlocked, BusError, post
 
 
 class BudgetWait(BusError):
-    pass
+    def __init__(self, message, code="local_budget_wait"):
+        super().__init__(message)
+        self.code = code
 
 
 class RequestGate:
     def __init__(self, store, *, enabled=False, daily_limit=1000, min_gap=2,
-                 request=post, clock=lambda: datetime.now(timezone.utc)):
+                 request=post, clock=lambda: datetime.now(timezone.utc), disabled_code="bus_disabled"):
         if (type(daily_limit) is not int or not 1 <= daily_limit <= 1000
                 or type(min_gap) is not int or not 2 <= min_gap <= 3600):
             raise ValueError("Invalid local request budget")
         self.enabled, self.daily_limit, self.min_gap = enabled, daily_limit, min_gap
         self.request, self.clock = request, clock
+        self.disabled_code = disabled_code
         self.lock = RLock()
         self.path = store.path.parent / "bus-budget.sqlite3"
         # Keep the DB in the already validated private volume. Use 0600 from
@@ -42,6 +46,30 @@ class RequestGate:
             if "eta_next_at" not in {r[1] for r in db.execute("PRAGMA table_info(budget)")}:
                 db.execute("ALTER TABLE budget ADD COLUMN eta_next_at REAL NOT NULL DEFAULT 0")
             db.execute("INSERT OR IGNORE INTO budget VALUES (1, '', 0, 0, 0, 0)")
+            db.execute("CREATE TABLE IF NOT EXISTS schedule (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)")
+
+    def load_schedule(self):
+        with self.lock, self._db() as db:
+            row = db.execute("SELECT payload FROM schedule WHERE id=1").fetchone()
+        if row is None:
+            return None
+        if len(row[0]) > 16384:
+            raise ValueError("Invalid stored bus schedule")
+        value = json.loads(row[0])
+        if not isinstance(value, dict):
+            raise ValueError("Invalid stored bus schedule")
+        return value
+
+    def save_schedule(self, value):
+        with self.lock, self._db() as db:
+            db.execute("INSERT OR REPLACE INTO schedule VALUES (1,?)",
+                       (json.dumps(value, separators=(",", ":")),))
+
+    def set_enabled(self, enabled, config_error=False):
+        with self.lock:
+            self.enabled = enabled and not config_error
+            self.disabled_code = "bus_config_error" if config_error else "bus_disabled"
+
 
     def _db(self):
         # A connection per operation, closed explicitly below.
@@ -64,7 +92,7 @@ class RequestGate:
     def __call__(self, path, body, city):
         with self.lock:
             if not self.enabled:
-                raise BudgetWait("Provider disabled")
+                raise BudgetWait("Provider disabled", self.disabled_code)
             now = self.clock()
             day, timestamp = now.astimezone(timezone.utc).date().isoformat(), now.timestamp()
             eta = path == "/traffic/v1/getbusstoparrivedetails"
@@ -76,8 +104,10 @@ class RequestGate:
                     raise AccessBlocked("Provider access restricted")
                 if day > old_day:
                     used, old_day = 0, day
-                if timestamp < next_at or used >= self.daily_limit or (eta and timestamp < eta_next_at):
-                    raise BudgetWait("Local request budget reached")
+                if used >= self.daily_limit:
+                    raise BudgetWait("Local daily request limit reached", "local_daily_limit")
+                if timestamp < next_at or (eta and timestamp < eta_next_at):
+                    raise BudgetWait("Local request interval", "local_request_gap")
                 # Reserve before making the network request: failed attempts
                 # and restarts must not reset the budget.
                 db.execute("UPDATE budget SET day=?, used=?, next_at=?, eta_next_at=? WHERE id=1",

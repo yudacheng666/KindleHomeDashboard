@@ -29,25 +29,12 @@ def window_arg(value):
         raise argparse.ArgumentTypeError("Invalid window") from None
 
 
+class BusSettingsError(ValueError):
+    """Safe diagnostic: fixed field name, never the supplied private value."""
+
+
 def apply_private_settings(args, env):
     """Read optional Compose settings without exposing private values in errors."""
-    enabled = env.get("KHD_BUS_ENABLED", "0")
-    if enabled not in ("0", "1"):
-        raise ValueError("Invalid bus enable flag")
-    raw = env.get("KHD_BUS_WINDOWS", "")
-    if len(raw) > 2048:
-        raise ValueError("Too many collection windows")
-    windows = raw.split(";") if raw else []
-    if len(windows) > 32 or (args.window and windows):
-        raise ValueError("Use one source of collection windows")
-    if windows:
-        try:
-            args.window = [window_arg(w.strip()) for w in windows]
-        except argparse.ArgumentTypeError:
-            raise ValueError("Invalid collection windows") from None
-    args.enable_bus = args.enable_bus or enabled == "1"
-    if args.enable_bus and not args.window:
-        raise ValueError("Explicit collection windows required")
     if args.timezone is None:
         args.timezone = env.get("KHD_TIMEZONE", "Asia/Shanghai")
     try:
@@ -57,11 +44,43 @@ def apply_private_settings(args, env):
     if args.daily_limit is None:
         value = env.get("KHD_BUS_DAILY_LIMIT", "1000")
         if not re.fullmatch(r"[0-9]{1,4}", value):
-            raise ValueError("Invalid local request limit")
+            raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
         args.daily_limit = int(value)
     if not 1 <= args.daily_limit <= 1000:
-        raise ValueError("Invalid local request limit")
+        raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
+    enabled = env.get("KHD_BUS_ENABLED", "0")
+    if enabled not in ("0", "1"):
+        raise BusSettingsError("KHD_BUS_ENABLED must be 0 or 1")
+    raw = env.get("KHD_BUS_WINDOWS", "")
+    if len(raw) > 2048:
+        raise BusSettingsError("KHD_BUS_WINDOWS too long")
+    windows = raw.split(";") if raw else []
+    if len(windows) > 32 or (args.window and windows):
+        raise BusSettingsError("KHD_BUS_WINDOWS: too many windows or conflicting CLI settings")
+    if windows:
+        try:
+            args.window = [window_arg(w.strip()) for w in windows]
+        except argparse.ArgumentTypeError:
+            raise BusSettingsError("KHD_BUS_WINDOWS: invalid format or time") from None
+    args.enable_bus = args.enable_bus or enabled == "1"
+    if args.enable_bus and not args.window:
+        raise BusSettingsError("KHD_BUS_WINDOWS required when bus enabled")
     return args
+
+
+def startup_settings(args, env):
+    """Keep household available if only the optional bus settings are invalid."""
+    try:
+        apply_private_settings(args, env)
+    except BusSettingsError as exc:
+        if not args.enable_household:
+            raise
+        args.enable_bus = False
+        args.window = []
+        if type(args.daily_limit) is not int or not 1 <= args.daily_limit <= 1000:
+            args.daily_limit = 1000
+        return str(exc)
+    return ""
 
 
 def main():
@@ -80,9 +99,9 @@ def main():
     parser.add_argument("--daily-limit", type=int)
     args = parser.parse_args()
     try:
-        apply_private_settings(args, os.environ)
-    except ValueError:
-        parser.error("Invalid private bus settings, collection windows, timezone or local request limit")
+        bus_config_error = startup_settings(args, os.environ)
+    except ValueError as exc:
+        parser.error(str(exc))
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error("Specify both TLS certificate and key")
     direct = bool(args.lan_host and args.lan_network)
@@ -99,8 +118,14 @@ def main():
         lock_fd = os.open(store.path.parent / "service.lock",
                           os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        bus = BusService(args.directory, enabled=args.enable_bus, daily_limit=args.daily_limit)
-        runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone)
+        bus = BusService(args.directory, enabled=args.enable_bus, daily_limit=args.daily_limit,
+                         config_error=bool(bus_config_error))
+        runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone,
+                          web_settings=not bus_config_error.startswith("KHD_BUS_DAILY_LIMIT"))
+        if bus_config_error:
+            prefix = ("Bus disabled; household remains available: " if bus.config_error else
+                      "Initial bus settings invalid; saved local settings restored: ")
+            print(prefix + bus_config_error, flush=True)
         household = Household(args.directory) if args.enable_household else None
         tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
         api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, direct=direct)

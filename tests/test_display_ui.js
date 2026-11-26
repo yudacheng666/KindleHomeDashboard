@@ -112,4 +112,42 @@ const asleep=autoRequests;advance(60000);assert.equal(autoRequests,asleep);
 autoMode="family";doc.hidden=false;events.visibilitychange();heading("今日生活");
 fail=503;advance(30000);heading("");fail=0;advance(30000);heading("今日生活");
 click("logout");assert.equal(timers.size,0);
+// Foregrounding must re-read fresh content without jumping to page one.
+data=sample;fail=0;el("token").value="example-display-token";click("connect");
+click("next");click("next");heading("Example reminder");
+doc.hidden=true;events.visibilitychange();const pausedRequests=requests;
+advance(300000);assert.equal(requests,pausedRequests);
+doc.hidden=false;events.visibilitychange();heading("Example reminder");
+assert.equal(el("pause").textContent,"开始轮播");
+click("pause");doc.hidden=true;events.visibilitychange();advance(300000);
+doc.hidden=false;events.visibilitychange();heading("Example reminder");
+assert.equal(el("pause").textContent,"暂停轮播");
+advance(180000);heading("今日菜单");
+click("previous");heading("Example reminder");
+doc.hidden=true;events.visibilitychange();data={...sample,posters:[]};
+doc.hidden=false;events.visibilitychange();heading("今日生活");
+click("logout");assert.equal(timers.size,0);
+// Direct manual display: a new script instance (mobile tab reload) restores
+// only tab-local page identity and rotation metadata after a fresh response.
+const storage=new Map();
+const sessionStorage={getItem(k){return storage.get(k)||null;},setItem(k,v){storage.set(k,v);},removeItem(k){storage.delete(k);}};
+function directDisplay(){
+  vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{
+    document:doc,window:{KHD_ACCESS:{direct:true},sessionStorage,addEventListener(n,f){windowEvents[n]=f;}},
+    location:{pathname:"/display"},XMLHttpRequest:XHR,setTimeout:setTimer,clearTimeout:clearTimer
+  });
+}
+data=sample;directDisplay();heading("今日生活");
+click("next");click("next");heading("Example reminder");
+click("pause");doc.hidden=true;events.visibilitychange();
+assert.equal(storage.size,1);
+const serialized=[...storage.values()][0];
+assert.ok(!serialized.includes("Line one")&&!serialized.includes("Example reminder")&&!serialized.includes("token"));
+windowEvents.pagehide();assert.equal(timers.size,0);
+doc.hidden=false;directDisplay();heading("Example reminder");
+assert.equal(el("pause").textContent,"暂停轮播");
+advance(180000);heading("今日菜单");
+windowEvents.pagehide();windowEvents.pageshow({persisted:true});heading("今日菜单");
+click("logout");assert.equal(storage.size,0);assert.equal(timers.size,0);
+directDisplay();heading("今日生活");click("logout");
 console.log("Household display simulation passed: automatic switching, override, saved settings, long poster preservation, unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");

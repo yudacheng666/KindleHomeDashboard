@@ -1,7 +1,10 @@
 """Private startup settings: no real schedule or network calls."""
 from argparse import Namespace
 import unittest
-from dashboard.__main__ import apply_private_settings, window_arg
+from dashboard.__main__ import apply_private_settings, startup_settings, window_arg
+from dashboard.service import BusService
+from dashboard.budget import BudgetWait
+from tempfile import TemporaryDirectory
 
 
 def args(**overrides):
@@ -34,6 +37,38 @@ class PrivateSettingsTests(unittest.TestCase):
             with self.subTest(keys=list(env)):
                 with self.assertRaises(ValueError):
                     apply_private_settings(args(),env)
+
+    def test_household_survives_invalid_bus_settings(self):
+        for env in ({"KHD_BUS_ENABLED":"yes"},{"KHD_BUS_ENABLED":"1"},
+                    {"KHD_BUS_WINDOWS":"invalid-private-value"},
+                    {"KHD_BUS_DAILY_LIMIT":"0"}):
+            a = args(enable_household=True)
+            error = startup_settings(a, env)
+            self.assertTrue(error.startswith("KHD_BUS_"))
+            self.assertNotIn("invalid-private-value",error)
+            self.assertFalse(a.enable_bus)
+            self.assertEqual(a.window,[])
+            self.assertEqual(a.daily_limit,1000)
+            with TemporaryDirectory() as directory:
+                bus=BusService(directory,enabled=a.enable_bus,config_error=True)
+                self.assertEqual(bus.read().snapshot.status,"config_error")
+                with self.assertRaises(BudgetWait) as caught:
+                    bus.search_lines("Example")
+                self.assertEqual(caught.exception.code,"bus_config_error")
+        with self.assertRaises(ValueError):
+            startup_settings(args(enable_household=False),{"KHD_BUS_ENABLED":"1"})
+        with self.assertRaises(ValueError):
+            startup_settings(args(enable_household=True),{"KHD_TIMEZONE":"not/a/zone"})
+
+    def test_valid_ceiling_preserved_when_window_invalid(self):
+        a = args(enable_household=True)
+        error = startup_settings(a, {"KHD_BUS_ENABLED":"1","KHD_BUS_WINDOWS":"invalid",
+                                     "KHD_BUS_DAILY_LIMIT":"42"})
+        self.assertTrue(error.startswith("KHD_BUS_WINDOWS"))
+        self.assertEqual(a.daily_limit,42)
+        a = args(enable_household=True)
+        error = startup_settings(a, {"KHD_BUS_ENABLED":"1","KHD_BUS_DAILY_LIMIT":"0"})
+        self.assertTrue(error.startswith("KHD_BUS_DAILY_LIMIT"))
 
     def test_existing_cli_and_conflict(self):
         a=apply_private_settings(args(enable_bus=True,window=[window_arg("2:15:00-16:00")],
