@@ -45,9 +45,8 @@ for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请�
 searchError="";el("search").onclick();
 el("direction").value="1";el("direction").onchange();el("search").onclick();
 assert.equal(el("direction").value,"1");
-el("broadSearch").onclick();
-assert.equal(calls[calls.length-1][2].broad,true);
-assert.equal(el("direction").value,"1");
+assert.deepEqual(calls[calls.length-1][2],{keyword:"Example"});
+assert.ok(!nodes.broadSearch);
 el("detail").onclick();
 assert.equal(calls[calls.length-1][2].direction,"1");
 
