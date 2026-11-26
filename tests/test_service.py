@@ -124,6 +124,29 @@ class ServiceTests(unittest.TestCase):
             restored.search_lines("Example")
         self.assertEqual(len(self.calls), count)
 
+    def test_reverse_uses_returned_opposite_id(self):
+        s = self.service()
+        def provider(path, body, city):
+            self.calls.append((path, body))
+            if path.endswith("querytrafficline"):
+                return {"errCode":0,"data":{"trafficStop":[
+                    {"lineInfo":{"lineId":"out","lineName":"Example","upDown":0,"startStopName":"A","endStopName":"D"}},
+                    {"lineInfo":{"lineId":"back","lineName":"Example","upDown":1,"startStopName":"D","endStopName":"A"}}]}}
+            self.assertEqual(body["lineId"],"back")
+            self.assertEqual(body["direction"],"1")
+            return {"errCode":0,"data":{"busLine":{"lineId":"back","lineName":"Example","upDown":1,
+                "stop":[{"stopId":n,"stopName":n,"upDown":1} for n in "DXA"]}}}
+        s.gate.request=provider
+        lines=s.search_lines("Example")
+        self.advance(2)
+        route=s.get_route(lines[0],"1")
+        self.assertEqual(route.line.line_id,"back")
+        self.assertEqual(route.line.direction,"1")
+        self.assertEqual([stop.name for stop in route.stops],list("DXA"))
+        s.save_trip(route,0,2)
+        self.assertEqual(s.trip.line.direction,"1")
+        self.assertEqual(len(self.calls),2)
+
     def test_search_result_expires(self):
         s = self.service()
         line = s.search_lines("Example")[0]
