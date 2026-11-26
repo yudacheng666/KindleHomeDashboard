@@ -52,6 +52,7 @@ class Household:
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version not in (0, 1):
                 raise ValueError("Unknown household schema")
+            seed_catalog = not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dish_categories'").fetchone()
             db.executescript("""
                 CREATE TABLE IF NOT EXISTS tasks (
                     id TEXT PRIMARY KEY, title TEXT NOT NULL,
@@ -69,6 +70,11 @@ class Household:
                     note TEXT NOT NULL, start TEXT NOT NULL, end TEXT,
                     task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
                     enabled INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS dish_categories (
+                    id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+                CREATE TABLE IF NOT EXISTS dishes (
+                    id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+                    category TEXT NOT NULL REFERENCES dish_categories(id) ON DELETE RESTRICT);
                 CREATE TABLE IF NOT EXISTS menus (
                     day TEXT NOT NULL, meal TEXT NOT NULL, dishes TEXT NOT NULL,
                     ingredients TEXT NOT NULL, PRIMARY KEY(day, meal));
@@ -83,6 +89,9 @@ class Household:
                 INSERT OR IGNORE INTO display_settings VALUES (1,180,0,0,0);
                 PRAGMA user_version=1;
             """)
+            if seed_catalog:
+                db.executemany("INSERT OR IGNORE INTO dish_categories VALUES (?,?)",
+                               [(uuid4().hex, name) for name in ("荤菜","素菜","半荤菜","汤羹","主食","早餐","其他")])
 
     @contextmanager
     def db(self):
@@ -237,6 +246,72 @@ class Household:
             if db.execute("UPDATE posters SET enabled=? WHERE id=?",(enabled,key)).rowcount!=1:
                 raise ValueError("Unknown poster")
 
+    def add_category(self, name):
+        name = text(name, 60)
+        key = uuid4().hex
+        with self.db() as db:
+            try:
+                db.execute("INSERT INTO dish_categories VALUES (?,?)", (key, name))
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("Duplicate category") from exc
+        return key
+
+    def edit_category(self, key, name):
+        name = text(name, 60)
+        with self.db() as db:
+            try:
+                if db.execute("UPDATE dish_categories SET name=? WHERE id=?", (name,key)).rowcount != 1:
+                    raise ValueError("Unknown category")
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("Duplicate category") from exc
+
+    def delete_category(self, key):
+        with self.db() as db:
+            try:
+                if db.execute("DELETE FROM dish_categories WHERE id=?", (key,)).rowcount != 1:
+                    raise ValueError("Unknown category")
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("Move dishes before deleting category") from exc
+
+    def add_dish(self, name, category):
+        name = text(name)
+        key = uuid4().hex
+        with self.db() as db:
+            try:
+                db.execute("INSERT INTO dishes VALUES (?,?,?)", (key,name,category))
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("Duplicate dish or unknown category") from exc
+        return key
+
+    def edit_dish(self, key, name, category):
+        name = text(name)
+        with self.db() as db:
+            try:
+                if db.execute("UPDATE dishes SET name=?,category=? WHERE id=?", (name,category,key)).rowcount != 1:
+                    raise ValueError("Unknown dish")
+            except sqlite3.IntegrityError as exc:
+                raise ValueError("Duplicate dish or unknown category") from exc
+
+    def delete_dish(self, key):
+        with self.db() as db:
+            if db.execute("DELETE FROM dishes WHERE id=?", (key,)).rowcount != 1:
+                raise ValueError("Unknown dish")
+
+    def add_dishes(self, names, category):
+        names = strings(names)
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if not db.execute("SELECT 1 FROM dish_categories WHERE id=?", (category,)).fetchone():
+                raise ValueError("Unknown category")
+            db.executemany("INSERT OR IGNORE INTO dishes VALUES (?,?,?)",
+                           [(uuid4().hex, name, category) for name in names])
+            return self._catalog(db)
+
+    @staticmethod
+    def _catalog(db):
+        return {"categories":[dict(r) for r in db.execute("SELECT * FROM dish_categories ORDER BY rowid")],
+                "dishes":[dict(r) for r in db.execute("SELECT * FROM dishes ORDER BY name,id")]}
+
     def set_menu(self, on, meal, dishes, ingredients=()):
         on = day(on)
         if meal not in MEALS:
@@ -363,7 +438,7 @@ class Household:
             for record in history:
                 record["restorable"] = by_id[record["id"]]["occurrence"] == record["occurrence"]
             return {"date": on, "display_settings": self._display_settings(db), "tasks": tasks,
-                    "history": history,
+                    "history": history, "catalog": self._catalog(db),
                     "posters": [dict(r) for r in db.execute("SELECT * FROM posters ORDER BY start,id")],
                     "shopping": [dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]}
 

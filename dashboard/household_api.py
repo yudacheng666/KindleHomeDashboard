@@ -16,6 +16,13 @@ OPERATIONS = {
     "poster/edit": ("edit_poster", ("key","title","body","start","end","note","task_id")),
     "poster/enable": ("enable_poster", ("key","enabled")),
     "poster/delete": ("delete_poster", ("key",)),
+    "category/add": ("add_category", ("name",)),
+    "category/edit": ("edit_category", ("key","name")),
+    "category/delete": ("delete_category", ("key",)),
+    "dish/add": ("add_dish", ("name","category")),
+    "dish/edit": ("edit_dish", ("key","name","category")),
+    "dish/delete": ("delete_dish", ("key",)),
+    "dish/import": ("add_dishes", ("names","category")),
     "menu/set": ("set_menu", ("on","meal","dishes","ingredients")),
     "menu/edit": ("edit_menu", ("old_on","old_meal","on","meal","dishes","ingredients")),
     "menu/delete": ("delete_menu", ("on","meal")),
@@ -56,6 +63,8 @@ class HouseholdAPI:
         args = {k:body[k] for k in fields}
         if "key" in args and (not isinstance(args["key"],str) or len(args["key"]) != 32):
             raise ValueError("Invalid item ID")
+        if "category" in args and (not isinstance(args["category"],str) or len(args["category"]) != 32):
+            raise ValueError("Invalid category ID")
         if "task_id" in args and args["task_id"] is not None and (
                 not isinstance(args["task_id"],str) or len(args["task_id"]) != 32):
             raise ValueError("Invalid task ID")

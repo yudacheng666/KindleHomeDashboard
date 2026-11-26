@@ -55,7 +55,7 @@ function tabs(){
 function updateManagementLinks(){
   var target=automatic?"auto":mode==="bus"?"bus":section;
   el("manageLink").href="/bus#return-"+target;
-  ["tasks","posters","menus","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
+  ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
 function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);if(open)updateManagementLinks();}
 function render(){

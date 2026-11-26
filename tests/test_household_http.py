@@ -110,6 +110,21 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.assertEqual(self.req("GET","home/view",self.read_token)[0],404)
         self.assertEqual(self.req("POST","home/task/add",self.admin_token,{})[0],404)
 
+    def test_catalog_permissions_and_menu_independence(self):
+        c=self.post("category/add",{"name":"Example category"})
+        b={"name":"Example dish","category":c}
+        self.assertEqual(self.req("POST","home/dish/add",self.read_token,b)[0],401)
+        d=self.post("dish/add",b)
+        self.post("dish/add",b,400)
+        self.post("menu/set",{"on":self.today,"meal":"dinner","dishes":["Example dish"],"ingredients":[]})
+        self.assertNotIn("catalog",self.view())
+        self.assertEqual(self.manage()["catalog"]["dishes"][0]["id"],d)
+        self.post("category/delete",{"key":c,"confirm":True},400)
+        self.post("dish/delete",{"key":d},400)
+        self.post("dish/delete",{"key":d,"confirm":True})
+        self.post("category/delete",{"key":c,"confirm":True})
+        self.assertEqual(self.view()["week_menu"][0]["dishes"],["Example dish"])
+
     def test_completion_permission_and_history(self):
         key=self.task()
         self.assertFalse(self.view()["can_complete"])

@@ -19,6 +19,28 @@ class HouseholdTests(unittest.TestCase):
         for key in ("tasks","posters","today_menu","week_menu","shopping"):
             self.assertEqual(view[key],[])
 
+    def test_catalog_crud_preserves_menu_snapshot(self):
+        c = self.home.add_category("Example category")
+        d = self.home.add_dish("Example dish", c)
+        self.home.set_menu(self.today,"dinner",["Example dish"],["Example ingredient"])
+        with self.assertRaises(ValueError):
+            self.home.add_dish("Example dish",c)
+        with self.assertRaises(ValueError):
+            self.home.delete_category(c)
+        with self.assertRaises(ValueError):
+            self.home.edit_dish(d,"Example dish","missing")
+        other = self.home.add_category("Another category")
+        self.home.edit_dish(d,"Revised dish",other)
+        self.home.edit_category(other,"Revised category")
+        self.home.delete_category(c)
+        self.home.add_dishes(["Example import","Example import","Revised dish"],other)
+        self.assertEqual(len(self.home.manage(self.today)["catalog"]["dishes"]),2)
+        self.home.delete_dish(d)
+        reopened=Household(self.temp.name)
+        self.assertEqual(reopened.manage(self.today)["catalog"]["dishes"][0]["name"],"Example import")
+        self.assertEqual(reopened.view(self.today)["week_menu"][0]["dishes"],["Example dish"])
+        self.assertNotIn("catalog",reopened.view(self.today))
+
     def test_private_directory_and_file(self):
         with self.assertRaises(ValueError):
             Household(SOURCE)
