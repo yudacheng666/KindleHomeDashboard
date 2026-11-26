@@ -40,7 +40,7 @@ class XHR {
   send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/driving/view"?{enabled:true,groups:["A","B","C"].map((name,i)=>({name,status:"ok",routes:[{seconds:600+i*60,meters:12000,congested_meters:1000,traffic_covered_meters:12000},{seconds:900,meters:15000,congested_meters:null,traffic_covered_meters:0}],image:"data:image/png;base64,c3ludGhldGlj",fetched_at:"2026-01-05T00:00:00+08:00"}))}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
-vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
+vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},location:{pathname:"/display",hash:"#tasks"},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
 function click(id){el(id).onclick();}
 function heading(expected){assert.equal(el("heading").textContent,expected);}
 el("token").value="example-display-token";click("connect");heading("待办清单");
@@ -190,7 +190,7 @@ const sessionStorage={getItem(k){return storage.get(k)||null;},setItem(k,v){stor
 function directDisplay(){
   vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{
     document:doc,window:{KHD_ACCESS:{direct:true},sessionStorage,addEventListener(n,f){windowEvents[n]=f;}},
-    location:{pathname:"/display"},XMLHttpRequest:XHR,setTimeout:setTimer,clearTimeout:clearTimer
+    location:{pathname:"/display",hash:"#tasks"},XMLHttpRequest:XHR,setTimeout:setTimer,clearTimeout:clearTimer
   });
 }
 data={...sample,posters:[poster,{...poster,id:"test-poster-2",title:"Second reminder"}]};directDisplay();heading("待办清单");
@@ -226,7 +226,7 @@ console.log("Household display simulation passed: automatic switching, override,
     }
     abort(){}
   }
-  vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{KHD_ACCESS:{direct:true,openAdmin:true},confirm:()=>confirmed,addEventListener(){}},XMLHttpRequest:TaskXHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
+  vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{KHD_ACCESS:{direct:true,openAdmin:true},confirm:()=>confirmed,addEventListener(){}},location:{pathname:"/display",hash:"#tasks"},XMLHttpRequest:TaskXHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
   const completeButton=()=>descendants(el("body")).find(n=>n.tag==="button"&&n.textContent==="完成");
   assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,1);assert.ok(completeButton());completeButton().onclick();assert.equal(posts,0);
   confirmed=true;completeButton().onclick();assert.equal(posts,1);assert.ok(completeButton());assert.ok(el("status").textContent.includes("未确认"));
