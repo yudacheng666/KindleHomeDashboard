@@ -6,7 +6,7 @@ var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
-var resumeKey="khd-display-resume-v1";
+var resumeKey="khd-display-resume-v1",ageTimer=null,ageNode=null,collectedAt=null;
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -114,14 +114,16 @@ function accept(v){
   if(!running||pages.filter(eligible).length<2)stopRotation();
   else if(rotationTimer===null||found<0)scheduleRotation();
 }
+function stopAge(){clearTimeout(ageTimer);ageTimer=null;ageNode=null;collectedAt=null;}
+function paintAge(){clearTimeout(ageTimer);ageTimer=null;if(!ageNode||collectedAt===null||document.hidden)return;var n=Math.floor((Date.now()-collectedAt)/1000),label=n<0?"更新时间未知（请检查设备时间）":n+" 秒前刷新";if(ageNode.textContent!==label)ageNode.textContent=label;ageTimer=setTimeout(paintAge,5000);}
 function acceptBus(v){
   data=null;pages=[];cursor=0;resumePage="";stopRotation();
   var s=v.snapshot,t=v.trip;
   var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查 Docker 日志",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
   var vehicles=(s.status==="live"||s.status==="stale")?s.vehicles:[];
-  var key=JSON.stringify([t,s.status,vehicles,s.scheduled_departures,vehicles.length?s.fetched_at:""]);
+  var key=JSON.stringify([t,s.status,vehicles,s.scheduled_departures,["live","stale","no_live_data"].indexOf(s.status)>=0?s.fetched_at:""]);
   if(key!==lastRender){
-    lastRender=key;txt("date","");txt("heading",t?t.line.name:"实时公交");txt("index","");
+    stopAge();lastRender=key;txt("date","");txt("heading",t?t.line.name:"实时公交");txt("index","");
     var root=el("body");clear(root);
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name);
     append(root,"p",labels[s.status]||"状态未知","note");
@@ -133,7 +135,7 @@ function acceptBus(v){
       if(a.length)append(root,"p",a.join(" · "),"note");
     });
     if(s.scheduled_departures&&s.status!=="stale")append(root,"p","计划待发车 "+s.scheduled_departures+" 辆（非实时 ETA）","note");
-    if(vehicles.length)append(root,"p","最近有效采集（UTC）："+s.fetched_at.replace("T"," ").slice(0,19),"note");
+    if(["live","stale","no_live_data"].indexOf(s.status)>=0){var stamp=Date.parse(s.fetched_at);if(isFinite(stamp)){collectedAt=stamp;ageNode=document.createElement("p");ageNode.className="note";root.appendChild(ageNode);paintAge();}}
   }
   show("login",false);show("display",true);txt("status","");
 }
@@ -154,6 +156,7 @@ function switchMode(next){
   show("familyControls",mode==="family");hide("正在读取");refresh();
 }
 function hide(reason){
+  stopAge();
   data=null;pages=[];cursor=0;lastRender="";stopRotation();
   txt("date","");txt("heading","");clear(el("body"));txt("index","");txt("status",reason);
 }
@@ -217,7 +220,7 @@ if(window.addEventListener){
 }
 if(document.addEventListener)document.addEventListener("visibilitychange",function(){
   if(document.hidden){
-    rememberResume();stopRotation();clearTimeout(refreshTimer);refreshTimer=null;epoch++;busy=false;
+    rememberResume();stopAge();stopRotation();clearTimeout(refreshTimer);refreshTimer=null;epoch++;busy=false;
   }
   else if(token){
     if(mode==="family"&&pages[cursor])resumePage=pages[cursor].id;
