@@ -160,8 +160,39 @@ except HTTPError as e:
 else:
     raise AssertionError("Invalid config allowed a search")
 print("Docker invalid bus configuration PASS: family retained, provider disabled.")
+# Recover through the local settings API, without changing the container environment.
+body={"enabled":True,"windows":[{"days":[1],"start":780,"end":840}]}
+with urlopen(Request(base+"/api/bus/schedule",data=json.dumps(body).encode(),headers={"Content-Type":"application/json"}),timeout=3) as r:
+    assert json.load(r)["enabled"] is True
+with urlopen(base+"/api/bus/view",timeout=3) as r:
+    assert json.load(r)["snapshot"]["status"]=="unconfigured"
 PY
 docker logs "$direct" 2>&1 | grep -F 'Bus disabled; household remains available: KHD_BUS_WINDOWS: invalid format or time'
 if docker logs "$direct" 2>&1 | grep -Fq 'invalid-fictional-value'; then exit 1; fi
+docker stop -t 35 "$direct" >/dev/null
+test "$(docker inspect --format '{{.State.ExitCode}}' "$direct")" = 0
+
+# Restart with the same malformed bootstrap window: saved settings take precedence.
+docker start "$direct" >/dev/null
+docker run --rm -i --network "$net" --entrypoint python kindle-home-dashboard:dev - <<'PY'
+import json,time
+from urllib.request import urlopen
+base="http://172.30.99.20:8080"
+for _ in range(30):
+    try:
+        with urlopen(base+"/api/bus/schedule",timeout=3) as r:
+            settings=json.load(r)
+        break
+    except OSError:
+        time.sleep(1)
+else:
+    raise RuntimeError("Saved schedule unavailable after restart")
+assert settings["enabled"] is True and settings["windows"]==[{"days":[1],"start":780,"end":840}]
+with urlopen(base+"/api/home/view",timeout=3) as r:
+    assert len(json.load(r)["tasks"])==2
+with urlopen(base+"/api/bus/view",timeout=3) as r:
+    assert json.load(r)["snapshot"]["status"]=="unconfigured"
+print("Docker web schedule PASS: saved locally, effective without rebuild, persists after restart.")
+PY
 docker stop -t 35 "$direct" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$direct")" = 0
