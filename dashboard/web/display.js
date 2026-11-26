@@ -43,8 +43,7 @@ function makePages(v){
     v.posters.forEach(function(t){p=p.concat(posterPages(t));});
     return p.length?p:[{id:"posters",title:"海报",lines:["暂无有效海报"],note:""}];
   }
-  var meals={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"};
-  return [{id:"week",title:"本周菜单",lines:v.week_menu.length?v.week_menu.map(function(m){return m.day+" · "+meals[m.meal]+"\n"+m.dishes.join("、");}):["暂无本周菜单"],note:""}];
+  return [{id:"week",title:"本周菜单",menus:v.week_menu,lines:["暂无本周菜单"],note:""}];
 }
 function eligible(p){return section==="posters";}
 function tabs(){
@@ -71,6 +70,18 @@ function render(){
         var row=append(root,"div","","task-row");append(row,"span",t.title,"task-text");
         var action=append(row,"span","","task-action"),button=append(action,"button","完成","task-complete");
         button.type="button";button.onclick=function(){completeTask(t,displayedDate,button);};
+      });
+    }else if(p.menus&&p.menus.length){
+      var days={},names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
+      p.menus.forEach(function(m){(days[m.day]||(days[m.day]=[])).push(m);});
+      Object.keys(days).sort().forEach(function(day){
+        var group=append(root,"section","","menu-day"),heading=append(group,"h2",day,"menu-date");
+        if(day===data.date)append(heading,"span","今日","menu-today");
+        days[day].sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
+          var meal=append(group,"div","","menu-meal");
+          append(meal,"span",names[m.meal],"menu-meal-label");
+          append(meal,"span",m.dishes.join("、"),"menu-dishes");
+        });
       });
     }else p.lines.forEach(function(line){append(root,"p",line,p.poster?(line.length>38?"poster compact":line.length>18?"poster medium":"poster"):"");});
     if(p.note)append(root,"p",p.note,"note");

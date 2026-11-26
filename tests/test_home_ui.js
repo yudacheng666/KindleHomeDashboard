@@ -18,7 +18,7 @@ class XHR {
   setRequestHeader(k,v){}
   send(body){
     calls.push([this.path,body&&JSON.parse(body)]);
-    let response=this.path.endsWith("/manage")?manage:this.path.endsWith("/view")?view:this.path.endsWith("/menu/list")?{result:[sampleMenu]}:{result:[]};
+    let response=this.path.endsWith("/manage")?manage:this.path.endsWith("/view")?view:this.path.endsWith("/menu/list")?{result:[sampleMenu,{...sampleMenu,meal:"dinner",dishes:["Example dinner"]},{...sampleMenu,day:"2026-01-06"}]}:{result:[]};
     this.status=fail?503:200;this.responseText=JSON.stringify(response);this.readyState=4;this.onreadystatechange();
   }
   abort(){}
@@ -43,7 +43,11 @@ confirmed=true;click(el("content"),"删除");assert.ok(calls.some(c=>c[0].endsWi
 el("posters").onclick();click(el("content"),"新增海报");
 const pi=all(el("editor"),n=>n.tag==="input");pi[0].value="Fictional poster";all(el("editor"),n=>n.tag==="textarea")[0].value="Line one\nLine two";
 click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/poster/add")&&c[1].body==="Line one\nLine two"));
-el("menus").onclick();click(el("content"),"新增菜单");const ta=all(el("editor"),n=>n.tag==="textarea");ta[0].value="Dish A\nDish B";ta[1].value="Ingredient A";
+el("menus").onclick();
+assert.deepEqual(all(el("content"),n=>n.className==="menu-date").map(n=>n.textContent),[date,"2026-01-06"]);
+assert.equal(all(el("content"),n=>n.className==="menu-today").length,1);
+assert.equal(all(el("content"),n=>n.className==="menu-date")[0].children[0].textContent,"今日");
+click(el("content"),"新增菜单");const ta=all(el("editor"),n=>n.tag==="textarea");ta[0].value="Dish A\nDish B";ta[1].value="Ingredient A";
 click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/menu/set")&&c[1].dishes.length===2));
 click(el("content"),"编辑");
 const menuOn=all(el("editor"),n=>n.tag==="input")[0],menuMeal=all(el("editor"),n=>n.tag==="select")[0];

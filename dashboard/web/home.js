@@ -114,8 +114,16 @@ function posters(p,arr,manage){
 }
 function menuRows(p,arr,manage){
   if(!arr.length)node(p,"p","暂无菜单");
-  arr.forEach(function(m){var n=row(p);node(n,"h3",m.day+" · "+mealNames[m.meal]);node(n,"p",m.dishes.join("、"));
-    if(manage){node(n,"small","食材："+m.ingredients.join("、"));btn(n,"编辑",function(){menuForm(m);});btn(n,"删除",function(){remove("menu/delete",{on:m.day,meal:m.meal},"该餐次菜单");});}});
+  var days={},order={breakfast:0,lunch:1,dinner:2};
+  arr.forEach(function(m){(days[m.day]||(days[m.day]=[])).push(m);});
+  Object.keys(days).sort().forEach(function(day){
+    var group=node(p,"section",undefined,"menu-day"),heading=node(group,"h3",day,"menu-date");
+    if(day===data.date)node(heading,"span","今日","menu-today");
+    days[day].sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
+      var n=row(group);node(n,"strong",mealNames[m.meal]);node(n,"p",m.dishes.join("、"));
+      if(manage){node(n,"small","食材："+m.ingredients.join("、"));btn(n,"编辑",function(){menuForm(m);});btn(n,"删除",function(){remove("menu/delete",{on:m.day,meal:m.meal},"该餐次菜单");});}
+    });
+  });
 }
 function readMenus(p){
   var monday=new Date(menuDate+"T00:00:00Z");

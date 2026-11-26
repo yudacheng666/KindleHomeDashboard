@@ -47,8 +47,20 @@ assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.eq
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);
 const before=requests;click("postersMode");heading("Example reminder");
 assert.equal(el("body").children[0].textContent,"Line one\nLine two");
-click("menusMode");heading("本周菜单");assert.ok(el("body").children[0].textContent.includes("Example dish"));
+click("menusMode");heading("本周菜单");assert.ok(descendants(el("body")).some(n=>n.textContent==="Example dish"));
+assert.equal(descendants(el("body")).filter(n=>n.className==="menu-today").length,1);
 assert.equal(requests,before);
+// Multiple meals share one date heading; today follows the NAS date, not the device clock.
+data={...sample,week_menu:[{...meal,day:"2026-01-06",dishes:["Next dish"]},meal,{...meal,meal:"breakfast",dishes:["Morning dish"]}]};
+advance(30000);
+let dates=descendants(el("body")).filter(n=>n.className==="menu-date");
+assert.deepEqual(dates.map(n=>n.textContent),[date,"2026-01-06"]);
+assert.equal(dates[0].children[0].textContent,"今日");
+assert.equal(dates[1].children.length,0);
+assert.deepEqual(descendants(el("body")).filter(n=>n.className==="menu-meal-label").map(n=>n.textContent),["早餐","晚餐","晚餐"]);
+data={...data,date:"2026-01-06"};advance(30000);
+dates=descendants(el("body")).filter(n=>n.className==="menu-date");
+assert.equal(dates[0].children.length,0);assert.equal(dates[1].children[0].textContent,"今日");
 click("postersMode");data={...sample,posters:[poster,{...poster,id:"test-poster-2",title:"Second reminder"}]};advance(30000);
 click("settings");el("seconds").value="120";click("apply");click("pause");
 advance(120000);heading("Second reminder");advance(120000);heading("Example reminder");
