@@ -193,12 +193,12 @@ class HTTPTests(unittest.TestCase):
 
     def test_budget_reasons(self):
         self.bus.gate.enabled = False
-        self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "A"}), (503, {"error": "bus_disabled"}))
+        self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "A"}), (503, {"error": "bus_disabled"}, "no-store"))
         self.bus.gate.enabled = True
         self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "A"})[0], 200)
-        self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "B"}), (429, {"error": "local_request_gap"}))
+        self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "B"}), (429, {"error": "local_request_gap"}, "no-store"))
         self.bus.gate.daily_limit = 1
-        self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "B"}), (429, {"error": "local_daily_limit"}))
+        self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "B"}), (429, {"error": "local_daily_limit"}, "no-store"))
         self.assertEqual(len(self.calls), 1)
 
     def test_local_budget_and_malformed_body(self):
