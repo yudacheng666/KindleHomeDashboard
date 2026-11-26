@@ -236,7 +236,7 @@ def main():
                 click("postersMode");assert text_in("heading","Fictional reminder")
                 assert text_in("pause","暂停轮播")
                 click("menusMode");assert text_in("body","Fictional dish")
-                assert js("return document.querySelectorAll('#body .menu-date').length===2 && document.querySelectorAll('#body .menu-today').length===1")
+                assert js("return document.querySelectorAll('#body .menu-date').length===3 && document.querySelectorAll('#body .menu-today').length===1")
                 assert js("return document.querySelector('#body .menu-date').textContent==='2026-01-05今日'")
                 assert not text_in("body","Fictional ingredient")
                 click("busMode")
