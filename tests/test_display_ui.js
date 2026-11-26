@@ -19,6 +19,8 @@ const shopping={id:"test-item",label:"Example ingredient",completed:0};
 const sample={date,tasks:[task],posters:[poster],today_menu:[meal],week_menu:[meal],shopping:[shopping]};
 const bus={trip:{line:{name:"Example line"},boarding:{name:"A"},destination:{name:"B"}},snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:0,fetched_at:"2026-01-05T00:00:00+00:00"}};
 let data=sample,fail=0,requests=0,clock=0,nextId=1,busRequests=0,busData=bus, autoMode="family", autoRequests=0;
+const weatherExample={status:"ready",name:"Example",sections:{current:{status:"available",source:"QWeather",fetched_at:"2026-01-05T00:00:00Z",attributions:[],data:{temp:20,text:"晴",time:"2026-01-05T00:00:00Z"}}}};
+let weatherData=weatherExample;
 const timers=new Map();
 class FakeDate extends Date {static now(){return Date.parse(bus.snapshot.fetched_at)+clock;}}
 function setTimer(fn,delay){const id=nextId++;timers.set(id,{at:clock+delay,fn});return id;}
@@ -35,14 +37,26 @@ function advance(ms){
 class XHR {
   open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto","/api/weather/view"].includes(path));this.path=path;}
   setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/weather/view"?{status:"ready",name:"Example",sections:{current:{status:"available",source:"QWeather",fetched_at:"2026-01-05T00:00:00Z",attributions:[],data:{temp:20,text:"晴",time:"2026-01-05T00:00:00Z"}}}}:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
+  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
 function click(id){el(id).onclick();}
 function heading(expected){assert.equal(el("heading").textContent,expected);}
 el("token").value="example-display-token";click("connect");heading("待办清单");
-click("weatherMode");heading("Example · 天气");assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent==="暂不可用"));click("tasksMode");heading("待办清单");
+click("weatherMode");heading("Example");assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
+advance(240000);heading("Example");assert.equal(el("index").textContent,"");
+weatherData={...weatherExample,additional:[{...weatherExample,name:"Example second",sections:{current:{...weatherExample.sections.current,data:{...weatherExample.sections.current.data,temp:25}}}}]};
+advance(30000);heading("Example");assert.equal(el("index").textContent,"1 / 2");
+const weatherFirst=el("body").children[0];advance(90000);heading("Example");assert.equal(el("body").children[0],weatherFirst);
+advance(30000);heading("Example second");assert.equal(el("index").textContent,"2 / 2");assert.ok(descendants(el("body")).some(n=>n.textContent==="25°C　晴"));
+assert.ok(!descendants(el("body")).some(n=>n.textContent==="20°C　晴"));
+click("settings");advance(240000);heading("Example second");click("returnDisplay");advance(120000);heading("Example");
+click("settings");click("weatherNext");heading("Example second");assert.equal(el("settingsPanel").className,"hidden");
+doc.hidden=true;events.visibilitychange();const weatherHidden=requests;advance(240000);assert.equal(requests,weatherHidden);
+doc.hidden=false;events.visibilitychange();heading("Example");
+weatherData=weatherExample;advance(30000);heading("Example");assert.equal(el("index").textContent,"");advance(240000);heading("Example");
+click("tasksMode");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");assert.equal(el("displayManage").href,"/home#display/return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);

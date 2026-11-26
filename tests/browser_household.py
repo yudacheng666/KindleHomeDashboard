@@ -291,14 +291,21 @@ def main():
                 click("weatherSave")
                 wait(lambda:text_in("weatherSettingStatus","已保存"))
                 assert weather.settings_view()["additional"]==[{"name":"Fictional custom","latitude":3.45,"longitude":4.56}]
-                for _ in range(9): weather.step()
+                for _ in range(12): weather.step()
                 click("returnDisplay");click("tasksMode");click("weatherMode")
-                wait(lambda:text_in("body","Fictional custom"))
+                wait(lambda:text_in("heading","Fictional district"))
+                assert text_in("index","1 / 2")
+                assert not text_in("body","Fictional custom")
                 assert weather.read()["additional"][0]["sections"]["current"]["status"]=="available"
+                click("settings");click("weatherNext")
+                wait(lambda:text_in("heading","Fictional custom"))
+                assert text_in("index","2 / 2")
+                assert not text_in("body","主地点")
+                assert not text_in("body","Fictional district")
                 click("settings");click("weatherLoad")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))
                 js("document.querySelectorAll('#weatherLocations button')[1].click()")
-                click("weatherMakePrimary");click("weatherSave")
+                click("weatherMoveUp");click("weatherSave")
                 wait(lambda:text_in("weatherSettingStatus","已保存"))
                 assert weather.settings_view()["name"]=="Fictional custom"
                 assert weather.settings_view()["additional"][0]["name"]=="Fictional district"
