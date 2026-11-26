@@ -43,6 +43,7 @@ function click(id){el(id).onclick();}
 function heading(expected){assert.equal(el("heading").textContent,expected);}
 el("token").value="example-display-token";click("connect");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
+assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);
 const before=requests;click("postersMode");heading("Example reminder");
 assert.equal(el("body").children[0].textContent,"Line one\nLine two");

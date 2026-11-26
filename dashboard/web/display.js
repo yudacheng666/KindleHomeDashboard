@@ -4,7 +4,7 @@
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
-var seconds=180, editing=false, section="tasks";
+var seconds=180, editing=false, section="tasks", settingsOpen=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
 var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null,busStatusNode=null,expiryTimer=null;
 function el(id){return document.getElementById(id);}
@@ -50,9 +50,15 @@ function eligible(p){return section==="posters";}
 function tabs(){
   var active=mode==="bus"?"bus":section;
   ["bus","tasks","posters","menus"].forEach(function(t){el(t+"Mode").className=t===active?"selected":"";});
-  el("manageLink").href=mode==="bus"?"/":"/home#"+section;
+  updateManagementLinks();
   show("familyControls",mode==="family"&&section==="posters");
 }
+function updateManagementLinks(){
+  var target=automatic?"auto":mode==="bus"?"bus":section;
+  el("manageLink").href="/bus#return-"+target;
+  ["tasks","posters","menus"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
+}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);if(open)updateManagementLinks();}
 function render(){
   var p=pages[cursor];if(!p||!data)return;
   var key=JSON.stringify([data.date,p,cursor,pages.length]);
@@ -91,7 +97,7 @@ function restoreResume(){
 }
 function stopRotation(){clearTimeout(rotationTimer);rotationTimer=null;}
 function scheduleRotation(){
-  stopRotation();if(mode!=="family"||section!=="posters"||!running||editing||!data||document.hidden||pages.filter(eligible).length<2)return;
+  stopRotation();if(mode!=="family"||section!=="posters"||!running||settingsOpen||editing||!data||document.hidden||pages.filter(eligible).length<2)return;
   rotationTimer=setTimeout(function(){
     rotationTimer=null;advance(1,true);scheduleRotation();
   },seconds*1000);
@@ -208,7 +214,7 @@ function acceptBus(v){
   show("login",false);show("display",true);txt("status","");
 }
 function modeLabel(){
-  txt("modeStatus",automatic?"自动分时 · 按 NAS 采集时段":"手动显示 · 不自动切换模块");
+  txt("modeStatus",automatic?"自动分时 · 按 NAS 采集时段":"手动显示 · 不自动切换模块");updateManagementLinks();
 }
 function manual(){
   if(!automatic)return;
@@ -217,7 +223,7 @@ function manual(){
 }
 function switchMode(next){
   if(!token)return;
-  manual();
+  if(settingsOpen)closeSettings();manual();
   if(next===mode)return;
   epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;editing=false;
   show("options",false);resumePage="";forgetResume();mode=next;
@@ -225,7 +231,7 @@ function switchMode(next){
 }
 function switchSection(next){
   if(!token)return;
-  manual();
+  if(settingsOpen)closeSettings();manual();
   if(mode==="bus"){section=next;switchMode("family");return;}
   if(section===next)return;
   section=next;editing=false;show("options",false);stopRotation();resumePage="";tabs();
@@ -266,12 +272,12 @@ function reset(keepResume){
   if(keepResume!==true)forgetResume();resumePage="";
   epoch++;busy=false;token="";automatic=false;modeLabel();mode="family";section="tasks";savedKey="";tabs();running=false;editing=false;seconds=180;
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
-  show("options",false);show("display",false);show("login",true);
+  panel(false);show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&hash==="#bus"){mode="bus";resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("autoMode").onclick=function(){
   if(!token)return;
-  automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";tabs();show("options",false);
+  panel(false);automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";tabs();show("options",false);
   clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
 };
 el("tasksMode").onclick=function(){switchSection("tasks");};
@@ -281,8 +287,9 @@ el("busMode").onclick=function(){switchMode("bus");};
 el("previous").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(-1,false);};
 el("next").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(1,false);};
 el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(running)manual();running=!running;render();scheduleRotation();};
-el("settings").onclick=function(){if(editing||mode!=="family"||section!=="posters")return;manual();editing=true;stopRotation();el("seconds").value=String(seconds);show("options",true);};
-function closeSettings(){editing=false;show("options",false);scheduleRotation();}
+el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
+function closeSettings(){editing=false;panel(false);show("options",false);scheduleRotation();}
+el("returnDisplay").onclick=closeSettings;
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;seconds=n;closeSettings();};
 el("cancel").onclick=closeSettings;
 el("logout").onclick=reset;

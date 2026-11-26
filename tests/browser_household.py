@@ -118,11 +118,17 @@ def main():
                 assert all(m["meal"]!="breakfast" for m in home.menus_between("2026-01-05","2026-01-05"))
                 click("logout")
                 wait(lambda:js("return document.getElementById('home').className==='hidden'"))
-                go("/display")
+                go("/")
                 js("document.getElementById('token').value=arguments[0]",[reader])
                 click("connect")
                 wait(lambda:text_in("heading","待办清单"))
                 assert text_in("body","Fictional browser task")
+                assert js("return getComputedStyle(document.getElementById(\'settingsPanel\')).display===\'none\'")
+                click("settings")
+                assert js("return getComputedStyle(document.getElementById(\'displayContent\')).display===\'none\' && getComputedStyle(document.getElementById(\'settingsPanel\')).display!==\'none\'")
+                assert js("return document.getElementById(\'manageLink\').getAttribute(\'href\')===\'/bus#return-tasks\'")
+                click("returnDisplay")
+                assert text_in("heading","待办清单")
                 click("postersMode");assert text_in("heading","Fictional reminder")
                 assert text_in("pause","暂停轮播")
                 click("menusMode");assert text_in("body","Fictional dish")
@@ -161,7 +167,7 @@ def main():
                 js("document.querySelector('#editor input').value='Fictional direct task'")
                 button("editor","保存")
                 wait(lambda:len(home.view("2026-01-05")["tasks"])==2)
-                go("/")
+                go("/bus")
                 wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
                 assert js("return document.getElementById('settings').className!=='hidden'")
                 go("/auto")
@@ -195,7 +201,7 @@ def main():
                             {"stopId":n,"stopName":n,"upDown":1} for n in "CBA"]}}}
                     return {"errCode":0,"data":{"stopArriveInfo":{"currentBusArriveTime":"4","nextBusArriveTime":"9"}}}
                 bus.gate.request=provider
-                go("/")
+                go("/bus")
                 wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
                 click("settings")
                 js("document.getElementById('keyword').value='Example bus'")
@@ -244,7 +250,7 @@ def main():
                 from dataclasses import replace
                 bus.poller.last=replace(bus.poller.last, vehicles=bus.poller.last.vehicles[:1],
                                         scheduled_departures=1, departure_plans=({"time":"23:59","imminent":False},))
-                go("/")
+                go("/bus")
                 wait(lambda:text_in("vehicles","首站计划发车"))
                 assert js(layout)
                 assert len(calls)==3

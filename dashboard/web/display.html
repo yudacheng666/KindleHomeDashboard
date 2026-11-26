@@ -2,11 +2,11 @@
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>家庭看板 · 展示</title>
 <style>
-body{max-width:600px;margin:0 auto;padding:16px;background:#fff;color:#111;font:20px/1.45 sans-serif}
+body{max-width:600px;margin:0 auto;padding:8px;background:#fff;color:#111;font:20px/1.45 sans-serif}
 h1{font-size:30px;margin:8px 0}h2{font-size:25px;margin:8px 0}p{margin:10px 0;white-space:pre-wrap;word-wrap:break-word}
 button,input,select{box-sizing:border-box;font:inherit;background:white;color:#111;border:1px solid #333;border-radius:3px;padding:9px;min-height:44px;max-width:100%}
 button{margin:4px 4px 4px 0}input[type=password]{display:block;width:100%;margin:8px 0}
-.hidden{display:none}.frame{border-top:2px solid #111;border-bottom:2px solid #111;min-height:220px;padding:16px 0}
+.hidden{display:none}.display-nav{display:table;table-layout:fixed;width:100%;border-bottom:1px solid #333}.display-nav span{display:table-cell;width:20%;vertical-align:middle}.display-nav button{width:100%;margin:0;border:0;border-radius:0;padding:6px 1px;font-size:16px;white-space:nowrap}.setting-list a{display:block;border-bottom:1px solid #aaa;padding:12px 0}#index:empty,#date:empty,#status:empty{display:none}#settingsPanel h2{font-size:20px}.frame{border-top:2px solid #111;border-bottom:2px solid #111;min-height:220px;padding:16px 0}
 .poster{text-align:center;font-size:38px;line-height:1.5;font-weight:bold}.poster.medium{font-size:30px}.poster.compact{font-size:24px}.note{font-size:16px;color:#333}.eta{font-size:44px;line-height:1.2;font-weight:bold}
 label{display:block;margin:8px 0}a{color:#111}button.selected{background:#111;color:#fff}.status{font-size:15px;color:#444}
 
@@ -27,13 +27,15 @@ label{display:block;margin:8px 0}a{color:#111}button.selected{background:#111;co
 .bus-next .bus-details,.bus-next .bus-slot-label{font-size:14px}
 @media(max-width:360px){.bus-first .eta{font-size:36px}.bus-first .eta.bus-state{font-size:24px}.bus-next .eta{font-size:21px}.bus-next .eta.bus-state{font-size:18px}.bus-time{font-size:18px}.bus-next .bus-time{font-size:15px}.bus-details{font-size:15px}}
 </style></head>
-<body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button><p><a href="/home#tasks">内容管理</a> · <a href="/">公交</a></p></div>
+<body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button></div>
 <p id="status" class="status" role="status"></p>
-<div id="display" class="hidden"><p><button id="busMode" type="button">公交</button><button id="tasksMode" type="button">待办清单</button><button id="postersMode" type="button">海报</button><button id="menusMode" type="button">本周菜单</button></p><p><button id="autoMode" type="button">自动分时</button><button id="logout" type="button">退出</button></p><p id="modeStatus" class="status"></p><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div>
-<p id="index" class="status"></p>
-<div id="familyControls"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button><button id="pause" type="button">开始轮播</button>
-<button id="settings" type="button">轮播设置</button>
-<div id="options" class="hidden"><label for="seconds">每页停留</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select>
-<p class="status">本次调整不会修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>
-</div><p><small><a href="/auto">自动显示入口</a> · <a id="manageLink" href="/home#tasks">内容管理</a> · <a href="/">公交页面</a></small></p>
+<div id="display" class="hidden">
+<div id="displayNav"><div class="display-nav"><span><button id="busMode" type="button">公交</button></span><span><button id="tasksMode" type="button">待办</button></span><span><button id="postersMode" type="button">海报</button></span><span><button id="menusMode" type="button">菜单</button></span><span><button id="settings" type="button" aria-label="设置" title="设置">设置</button></span></div></div>
+<div id="displayContent"><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
+<div id="settingsPanel" class="hidden"><button id="returnDisplay" type="button">返回看板</button><h1>设置</h1>
+<h2>显示设置</h2><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
+<div id="familyControls" class="hidden"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button><button id="pause" type="button">开始轮播</button></div>
+<div id="options" class="hidden"><label for="seconds">本次海报停留时间</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select><p class="status">本次调整不修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>
+<div class="setting-list"><a id="manageLink" href="/bus">公交设置 · 线路、站点及采集时段</a><a id="tasksManage" href="/home#tasks">待办清单管理</a><a id="postersManage" href="/home#posters">海报管理 · 保存默认轮播设置</a><a id="menusManage" href="/home#menus">本周菜单管理</a></div>
+<h2>连接</h2><p class="status">数据由本地 NAS 提供；各模块显示采集及错误状态。</p><button id="logout" type="button">退出连接</button></div>
 </div><script src="/access-mode.js"></script><script src="/display.js"></script></body></html>

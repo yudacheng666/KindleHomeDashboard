@@ -3,7 +3,7 @@
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false;
-function initialTab(){var h=typeof location!=="undefined"?location.hash:"";return h==="#posters"?"posters":h==="#menus"?"menus":"tasks";}
+function initialTab(){var h=typeof location!=="undefined"?location.hash.split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -128,7 +128,11 @@ function render(){
 }
 function canLeave(){return !editing||window.confirm("放弃未保存的编辑？");}
 ["tasks","posters","menus"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;render();}};});
-el("busTab").onclick=function(){return !busy&&canLeave();};
+var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/(?:^#|\/)return-(bus|tasks|posters|menus|auto)$/):null;
+var returnMode=returnMatch?returnMatch[1]:"tasks";
+el("returnLink").href=returnMode==="auto"?"/auto":"/display#"+returnMode;
+el("busTab").href="/bus#return-"+returnMode;
+el("returnLink").onclick=el("busTab").onclick=function(){return !busy&&canLeave();};
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";admin=el("mode").value==="admin";if(direct&&!token)token="local-direct";if(direct&&admin&&!openAdmin&&token==="local-direct"){note("请输入管理凭证。");return;}load();};
 el("refresh").onclick=function(){if(!busy&&canLeave()){closeEditor();load();}};
 el("logout").onclick=function(){if(canLeave())reset();};

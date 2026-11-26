@@ -19,7 +19,8 @@ from .household_api import HouseholdAPI, READ, MANAGE, POST_PATHS
 
 MAX_BODY = 16384
 WEB = Path(__file__).resolve().parent / "web"
-ASSETS = {"/": ("bus.html", "text/html; charset=utf-8"),
+ASSETS = {"/": ("display.html", "text/html; charset=utf-8"),
+          "/bus": ("bus.html", "text/html; charset=utf-8"),
           "/bus.js": ("bus.js", "application/javascript; charset=utf-8"),
           "/home": ("home.html", "text/html; charset=utf-8"),
           "/home.js": ("home.js", "application/javascript; charset=utf-8"),
