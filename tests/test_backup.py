@@ -54,6 +54,32 @@ class BackupTests(unittest.TestCase):
             for path in directory.iterdir():
                 self.assertEqual(path.stat().st_mode & 0o777,0o600)
 
+    def test_weather_budget_preserved_and_blocked(self):
+        from dashboard.weather_service import WeatherService
+        from dashboard.weather import RequestLedger, WeatherBlocked
+        from datetime import datetime,timezone
+        now=datetime(2026,1,5,tzinfo=timezone.utc)
+        service=WeatherService(str(self.source),{},clock=lambda:now)
+        service.configure({"enabled":True,"consent":True,"name":"Example district","latitude":1.23,"longitude":2.34})
+        service.ledger.reserve()
+        self.save()
+        restore(str(self.snapshot),str(self.restored))
+        restored=WeatherService(str(self.restored),{},clock=lambda:now)
+        self.assertFalse(restored.settings_view()["enabled"])
+        self.assertFalse(restored.settings_view()["consent"])
+        self.assertEqual(restored.settings_view()["name"],"Example district")
+        self.assertEqual(restored.settings_view()["budget"]["used"],1)
+        with self.assertRaises(WeatherBlocked):
+            restored.ledger.reserve()
+        self.assertFalse(service.ledger.usage()["blocked"])
+
+    def test_old_backup_weather_blocked(self):
+        from dashboard.weather import RequestLedger, WeatherBlocked
+        self.save()
+        restore(str(self.snapshot),str(self.restored))
+        with self.assertRaises(WeatherBlocked):
+            RequestLedger(str(self.restored)).reserve()
+
     def test_no_overwrite_or_nested_directory(self):
         self.save()
         with self.assertRaises(ValueError):

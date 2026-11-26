@@ -201,6 +201,7 @@ class WeatherService:
         self.error = ""
         self.primary = None
         self.primary_blocked = False
+        self.backup_blocked = False
         self.ledger = None
         self.generation = 0
         self.records = {}
@@ -223,6 +224,7 @@ class WeatherService:
             self.primary_blocked = self.primary_blocked
         except Exception:
             self.error = "storage_error"
+            self.ledger = None
             return
         try:
             host,key = env.get("KHD_QWEATHER_HOST",""),env.get("KHD_QWEATHER_KEY","")
@@ -277,7 +279,7 @@ class WeatherService:
         # Only the dedicated worker invokes this method. Never hold the lock
         # while doing network I/O; settings changes invalidate in-flight data.
         with self.lock:
-            if not self.settings["enabled"] or not self.settings["consent"] or not self.ledger:
+            if self.stop.is_set() or not self.settings["enabled"] or not self.settings["consent"] or not self.ledger:
                 return
             generation = self.generation
             lat,lon = self.settings["latitude"],self.settings["longitude"]
@@ -288,10 +290,13 @@ class WeatherService:
             if kind:
                 self.due[kind] = now + INTERVALS[kind]
             need_backup = (not primary or blocked or any(k in self.failures for k in CORE))
-            backup_due = need_backup and now >= self.backup_due
+            backup_due = not self.backup_blocked and need_backup and now >= self.backup_due
             if backup_due:
                 self.backup_due = now + BACKUP_INTERVAL
         if kind:
+            with self.lock:
+                if self.stop.is_set() or generation!=self.generation:
+                    return
             try:
                 data,attrs=q_normalize(kind,primary.fetch(kind,lat,lon))
                 if kind in ("current","rain"):
@@ -312,12 +317,12 @@ class WeatherService:
                         count=self.failures.get(kind,0)+1
                         self.failures[kind]=count
                         self.due[kind]=self.monotonic()+min(3600,INTERVALS[kind]*(2**min(count,4)))
-                        if kind in CORE and self.monotonic()>=self.backup_due:
+                        if kind in CORE and not self.backup_blocked and self.monotonic()>=self.backup_due:
                             self.backup_due=self.monotonic()+BACKUP_INTERVAL
                             backup_due=True
         if backup_due:
             with self.lock:
-                if generation != self.generation or not self.settings["enabled"]:
+                if self.stop.is_set() or generation != self.generation or not self.settings["enabled"]:
                     return
             try:
                 normalized=meteo_normalize(self.backup.fetch(lat,lon))
@@ -328,6 +333,11 @@ class WeatherService:
                 with self.lock:
                     if generation==self.generation:
                         self.backup_records=records
+            except WeatherBlocked:
+                self.ledger.block_backup()
+                with self.lock:
+                    self.backup_blocked=True
+                    self.backup_records.clear()
             except Exception:
                 pass
 

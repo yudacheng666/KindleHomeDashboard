@@ -113,6 +113,21 @@ class WeatherServiceTests(unittest.TestCase):
         self.assertEqual(len(self.calls),1)
         self.assertTrue(self.new().settings_view()["budget"]["blocked"])
         self.assertEqual(self.service.read()["sections"]["current"]["source"],"Open-Meteo")
+    def test_backup_access_restriction_persists(self):
+        self.block=True
+        def refused(url,headers):
+            self.fallback.append(url)
+            raise WeatherBlocked("provider_blocked")
+        self.backup=refused
+        self.service=self.new()
+        self.service.configure(CONFIG)
+        self.service.step()
+        self.assertTrue(self.service.settings_view()["budget"]["backup_blocked"])
+        self.mono+=4000
+        self.service.step()
+        self.assertEqual(len(self.fallback),1)
+        self.assertTrue(self.new().settings_view()["budget"]["backup_blocked"])
+
     def test_location_change_clears_cache(self):
         self.service.configure(CONFIG);self.service.step()
         self.assertEqual(self.service.read()["status"],"ready")

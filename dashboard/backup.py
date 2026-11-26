@@ -1,7 +1,7 @@
 """Offline private backup/restore. Never replace a live data directory.
 
 Only known application files are copied. Restore creates a fresh directory
-and conservatively blocks bus collection pending a reviewed reactivation.
+and conservatively blocks paid-capable providers pending a reviewed reactivation.
 """
 import argparse
 from contextlib import contextmanager, closing
@@ -16,7 +16,7 @@ import stat
 
 from .trip_store import TripStore
 
-FILES = ("bus-trip.json", "bus-budget.sqlite3", "household.sqlite3")
+FILES = ("bus-trip.json", "bus-budget.sqlite3", "household.sqlite3", "weather-settings.json", "weather-budget.sqlite3")
 MANIFEST = "manifest.json"
 MAX_FILE = 64 * 1024 * 1024
 
@@ -89,7 +89,12 @@ def validate(root, names):
     if "bus-trip.json" in names:
         if TripStore(str(root)).load() is None:
             raise ValueError("Missing trip")
-    for name in ("bus-budget.sqlite3", "household.sqlite3"):
+    if "weather-settings.json" in names:
+        from .weather_service import config
+        if "weather-budget.sqlite3" not in names:
+            raise ValueError("Missing weather budget")
+        config(json.loads(read_file(root/"weather-settings.json",8192)))
+    for name in ("bus-budget.sqlite3", "household.sqlite3", "weather-budget.sqlite3"):
         if name not in names:
             continue
         with closing(sqlite3.connect((root / name).as_uri() + "?mode=ro", uri=True)) as db:
@@ -105,6 +110,10 @@ def validate(root, names):
                     db.execute("SELECT * FROM " + table + " LIMIT 1").fetchone()
                 if db.execute("SELECT seconds,include_week,include_shopping,autoplay FROM display_settings WHERE id=1").fetchone() is None:
                     raise ValueError("Missing display settings")
+            elif name == "weather-budget.sqlite3":
+                if db.execute("SELECT last_day,blocked,backup_blocked FROM state WHERE id=1").fetchone() is None:
+                    raise ValueError("Missing weather budget state")
+                db.execute("SELECT day,used FROM request_days").fetchall()
             else:
                 if db.execute("SELECT day,used,next_at,blocked,eta_next_at FROM budget WHERE id=1").fetchone() is None:
                     raise ValueError("Missing request budget")
@@ -176,6 +185,20 @@ def restore(source, destination):
             db.execute("UPDATE budget SET blocked=1 WHERE id=1")
         with gate.path.open("rb") as stream:
             os.fsync(stream.fileno())
+        # A restored count may omit requests made after the backup. Block
+        # QWeather even for old backups that predate the weather module.
+        from .weather import RequestLedger
+        weather_ledger=RequestLedger(str(dest))
+        weather_ledger.block()
+        if "weather-settings.json" in hashes:
+            from .weather_service import config
+            weather_path=dest/"weather-settings.json"
+            settings=config(json.loads(read_file(weather_path,8192)))
+            settings.update(enabled=False,consent=False)
+            with weather_path.open("wb") as stream:
+                stream.write(json.dumps(settings,ensure_ascii=False).encode())
+                stream.flush()
+                os.fsync(stream.fileno())
 
 
 def main():
@@ -190,7 +213,7 @@ def main():
         print("Backup/restore failed. Check private paths, stopped service, integrity and destination.")
         return 1
     print("Private backup complete." if args.operation == "backup" else
-          "New restored volume ready. Bus access blocked pending review. Original volume unchanged.")
+          "New restored volume ready. Bus and QWeather access blocked pending review. Original volume unchanged.")
     return 0
 
 

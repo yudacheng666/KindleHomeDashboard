@@ -5,7 +5,6 @@ Never retry inside the HTTP transport or forward credentials on redirects.
 """
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 import gzip
 import io
 import json
@@ -54,14 +53,14 @@ class RequestLedger:
                 raise WeatherBudget("invalid_budget_storage")
             with closing(self._connect()) as db:
                 db.execute("SELECT day, used FROM request_days LIMIT 1")
-                if db.execute("SELECT last_day, blocked FROM state WHERE id=1").fetchone() is None:
+                if db.execute("SELECT last_day, blocked, backup_blocked FROM state WHERE id=1").fetchone() is None:
                     raise WeatherBudget("invalid_budget_storage")
         else:
             os.close(fd)
             with closing(self._connect()) as db, db:
                 db.execute("CREATE TABLE request_days(day TEXT PRIMARY KEY, used INTEGER NOT NULL CHECK(used BETWEEN 0 AND 40000))")
-                db.execute("CREATE TABLE state(id INTEGER PRIMARY KEY CHECK(id=1), last_day TEXT NOT NULL, blocked INTEGER NOT NULL CHECK(blocked IN (0,1)))")
-                db.execute("INSERT INTO state VALUES(1, '', 0)")
+                db.execute("CREATE TABLE state(id INTEGER PRIMARY KEY CHECK(id=1), last_day TEXT NOT NULL, blocked INTEGER NOT NULL CHECK(blocked IN (0,1)), backup_blocked INTEGER NOT NULL CHECK(backup_blocked IN (0,1)))")
+                db.execute("INSERT INTO state VALUES(1, '', 0, 0)")
 
     def _connect(self):
         db = sqlite3.connect(self.path, timeout=3)
@@ -96,14 +95,18 @@ class RequestLedger:
         with closing(self._connect()) as db, db:
             db.execute("UPDATE state SET blocked=1 WHERE id=1")
 
+    def block_backup(self):
+        with closing(self._connect()) as db, db:
+            db.execute("UPDATE state SET backup_blocked=1 WHERE id=1")
+
     def usage(self):
         day = self._day()
         with closing(self._connect()) as db:
             count = db.execute("SELECT COALESCE(SUM(used),0) FROM request_days WHERE day LIKE ?", (day.strftime("%Y-%m")+"%",)).fetchone()[0]
             rolling = db.execute("SELECT COALESCE(SUM(used),0) FROM request_days WHERE day>=?", ((day-timedelta(days=31)).isoformat(),)).fetchone()[0]
-            blocked = bool(db.execute("SELECT blocked FROM state WHERE id=1").fetchone()[0])
+            blocked, backup_blocked = db.execute("SELECT blocked,backup_blocked FROM state WHERE id=1").fetchone()
         return {"month": day.strftime("%Y-%m"), "used": count, "rolling_used": rolling,
-                "limit": LIMIT, "blocked": blocked}
+                "limit": LIMIT, "blocked": bool(blocked), "backup_blocked": bool(backup_blocked)}
 
 
 class NoRedirect(HTTPRedirectHandler):

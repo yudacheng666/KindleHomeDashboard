@@ -341,7 +341,7 @@ function weatherForm(v){
   el("weatherEnabled").checked=v.enabled===true;el("weatherConsent").checked=v.consent===true;
   el("weatherName").value=v.name||"";el("weatherLat").value=v.name?String(v.latitude):"";el("weatherLon").value=v.name?String(v.longitude):"";
   var b=v.budget;txt("weatherBudget",(v.primary_configured?"和风凭据已配置":"和风凭据未配置，仅可使用备用源")+
-    (b?" · 本月已计 "+b.used+" / "+b.limit+"，滚动32天 "+b.rolling_used+(b.blocked?" · 和风已阻断，需核查账户":""):" · 额度不可用"));
+    (b?" · 本月已计 "+b.used+" / "+b.limit+"，滚动32天 "+b.rolling_used+(b.blocked?" · 和风已阻断，需核查账户":"")+(b.backup_blocked?" · 备用源已阻断":""):" · 额度不可用"));
   show("weatherForm",true);
 }
 function weatherSettingsRequest(body){
