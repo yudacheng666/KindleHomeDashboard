@@ -9,7 +9,7 @@ from threading import RLock
 
 from .budget import RequestGate
 from .bus import BusError, Poller, Snapshot, parse, post
-from .routes import Line, Route, Trip, search, search_keyword, detail, revalidate
+from .routes import Line, Route, Trip, search, search_keyword, rank_lines, detail, revalidate
 from .trip_store import TripStore
 
 
@@ -50,13 +50,13 @@ class BusService:
             self.search_cache = None
             self.route_cache = None
 
-    def search_lines(self, keyword, city="310100", *, broad=False):
+    def search_lines(self, keyword, city="310100"):
         with self.lock:
             now = self.clock()
-            key = (search_keyword(keyword, broad), city)
+            key = (search_keyword(keyword), city)
             if self.search_cache and self.search_cache[0] == key and now < self.search_cache[1]:
-                return self.search_cache[2]
-            lines = search(keyword, city, request=self.gate, broad=broad)
+                return rank_lines(keyword, self.search_cache[2])
+            lines = search(keyword, city, request=self.gate)
             self.search_cache = (key, now + timedelta(seconds=60), lines)
             return lines
 
