@@ -329,7 +329,7 @@ el("save").onclick=function(){
     configuring=false;resetSelection();show("config",false);show("view",true);render(data);note("已保存。");
   });
 };
-var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/^#return-(bus|tasks|posters|menus|weather|driving|auto)$/):null;
+var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/^#return-(overview|bus|tasks|posters|menus|weather|driving|auto)$/):null;
 var returnMode=returnMatch?returnMatch[1]:"bus";
 el("returnLink").href=returnMode==="auto"?"/auto":"/display#"+returnMode;
 // Only an active editor can have unsaved changes. A read-only cache poll does not prevent navigation.

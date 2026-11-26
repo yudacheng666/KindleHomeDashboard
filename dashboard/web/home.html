@@ -15,6 +15,27 @@ small{color:#555}a{color:#222}.tablink{display:inline-block;border:1px solid #44
 .shared-dish{display:table;width:100%;table-layout:fixed;border-bottom:1px solid #ccc}.shared-dish span{display:table-cell;vertical-align:middle;word-wrap:break-word}.shared-dish button{font-size:14px;color:#555;float:right}.shared-dishes h3{margin:8px 0}
 .week-nav{display:flex;align-items:center;justify-content:space-between;gap:4px}.week-nav span{font-size:14px;flex:1;text-align:center}.dish-check{display:block}.dish-check input{display:inline-block;width:auto;margin:4px 8px 4px 0;vertical-align:middle}
 .menu-save-feedback{font-size:15px;font-weight:bold;min-height:1em;margin:8px 0}.menu-save-feedback:empty{display:none}
+
+body{max-width:960px;padding:12px 16px;background:#f5f6f8;color:#1f2937;font:16px/1.5 sans-serif}
+h1{font-size:24px;margin:8px 0}h2{font-size:20px}
+.panel{background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:12px}.item,.menu-day{border-color:#d1d5db}
+#tabs{margin:8px 0 12px}#tabs button,#tabs a{box-sizing:border-box;min-height:48px;margin:3px 4px 3px 0;padding:10px 12px;text-align:left;background:#fff;color:#1f2937;border:1px solid #777;border-radius:8px}
+#tabs button.primary{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+#editor:not(.hidden){background:#fff;padding:12px;border:1px solid #d1d5db;border-radius:8px}
+.dish-pick{min-height:48px}.dish-selected{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+.week-nav button{margin:3px 0}.week-days button{font-size:13px;padding:4px 0}.catalog-nav{width:88px}
+.menu-save-feedback{word-wrap:break-word}
+
+/* Shared visual rules for the existing settings surfaces; no UI library. */
+button,input,select,textarea{font-size:16px;min-height:48px;border-radius:8px;border-color:#777}
+button:focus,input:focus,select:focus,textarea:focus,a:focus{outline:2px solid #1d4ed8;outline-offset:2px}
+button:active{background:#e5e7eb;color:#111}button:disabled{opacity:.65}
+input[type=checkbox]{min-height:24px;width:24px;vertical-align:middle;margin:0 8px 0 0}
+.primary,button.selected{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
+label{line-height:1.5}input,select,textarea{background:#fff}
+@media(min-width:1024px){button,input,select{min-height:40px}input[type=checkbox]{min-height:24px}}
+
+@media(min-width:1024px){body{padding:24px 32px}#tabs{float:left;width:210px;margin:0}#tabs button,#tabs a{display:block;width:100%;margin:0 0 6px;min-height:44px}#content,#editor{margin-left:226px}#home:after{content:"";display:block;clear:both}.catalog-nav{width:120px}}
 </style></head>
 <body><h1>设置 · 内容管理</h1><p><a id="returnLink" href="/display">返回看板</a></p>
 <div id="login" class="panel"><label for="token">访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off">

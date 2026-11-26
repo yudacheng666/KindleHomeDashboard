@@ -7,6 +7,7 @@ var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automa
 var seconds=180, editing=false, section="tasks", settingsOpen=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
 var weatherPages=[],weatherCursor=0,weatherOrder="",WEATHER_SECONDS=120;
+var overviewTimers={},overviewPending={},overviewRoots={},overviewKeys={},overviewDay="";
 var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null,busStatusNode=null,expiryTimer=null;
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
@@ -52,17 +53,18 @@ function makePages(v){
 }
 function eligible(p){return section==="posters";}
 function tabs(){
-  var active=mode==="bus"||mode==="weather"||mode==="driving"?mode:section;
-  ["bus","tasks","posters","menus","weather","driving"].forEach(function(t){el(t+"Mode").className=t===active?"selected":"";});
+  var active=mode==="family"?section:mode;
+  ["overview","bus","tasks","posters","menus","weather","driving"].forEach(function(t){el(t+"Mode").className=t===active?"selected":"";});
+  if(!settingsOpen)el("displayNav").className=mode==="overview"?"overview-nav":"";
   updateManagementLinks();
   show("familyControls",mode==="family"&&section==="posters");
 }
 function updateManagementLinks(){
-  var target=automatic?"auto":mode==="bus"||mode==="weather"||mode==="driving"?mode:section;
+  var target=automatic?"auto":mode==="family"?section:mode;
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
-function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&mode==="weather"&&weatherPages.length>1);if(open)updateManagementLinks();}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);if(!open&&mode==="overview")el("displayNav").className="overview-nav";show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();}
 function taskDateLabel(day,today){
   var d=new Date(day+"T00:00:00Z"),base=new Date(today+"T00:00:00Z");
   var label=(day.slice(0,4)===today.slice(0,4)?"":day.slice(0,4)+"/")+day.slice(5).replace("-","/");
@@ -110,8 +112,8 @@ function render(){
   txt("pause",running?"暂停轮播":"开始轮播");
 }
 function completeTask(t,on,button){
-  if(!token||!data||data.date!==on||(t.occurrence&&t.occurrence>on)||data.can_complete!==true||section!=="tasks"||mode!=="family"||settingsOpen)return;
-  if(busy){txt("status","正在同步，请稍后再试。");return;}
+  if(!token||!data||data.date!==on||(t.occurrence&&t.occurrence>on)||data.can_complete!==true||!(mode==="overview"||(section==="tasks"&&mode==="family"))||settingsOpen)return;
+  if(busy||(mode==="overview"&&overviewPending.home)){txt("status","正在同步，请稍后再试。");return;}
   if(!window.confirm("确认完成「"+t.title+"」？完成后保留历史记录。"))return;
   var g=epoch,x=new XMLHttpRequest(),ended=false,timer;
   busy=true;button.disabled=true;clearTimeout(refreshTimer);refreshTimer=null;
@@ -122,10 +124,10 @@ function completeTask(t,on,button){
       data.tasks=data.tasks.filter(function(item){return item.id!==t.id;});
       if(Array.isArray(data.upcoming_tasks))data.upcoming_tasks=data.upcoming_tasks.filter(function(item){return item.id!==t.id;});
       data.posters=data.posters.filter(function(item){return item.task_id!==t.id;});
-      accept(data);refresh();
+      if(mode==="overview"){renderOverviewHome(data);clearTimeout(overviewTimers.home);requestOverview("home");}else{accept(data);refresh();}
     }else{
       txt("status","完成未确认成功，请刷新核对后再试。");
-      refreshTimer=setTimeout(refresh,30000);
+      if(mode==="overview"){clearTimeout(overviewTimers.home);overviewTimers.home=setTimeout(function(){requestOverview("home");},30000);}else refreshTimer=setTimeout(refresh,30000);
     }
   }
   try{x.open("POST","/api/home/task/complete",true);
@@ -165,12 +167,12 @@ function restoreResume(){
 function stopRotation(){clearTimeout(rotationTimer);rotationTimer=null;}
 function scheduleRotation(){
   stopRotation();
-  if(mode==="weather"){
+  if(mode==="weather"||mode==="overview"){
     if(settingsOpen||document.hidden||!token||automatic||weatherPages.length<2)return;
     rotationTimer=setTimeout(function(){
       rotationTimer=null;
-      if(mode!=="weather"||settingsOpen||document.hidden||!token||automatic)return;
-      weatherCursor=(weatherCursor+1)%weatherPages.length;renderWeather();scheduleRotation();
+      if((mode!=="weather"&&mode!=="overview")||settingsOpen||document.hidden||!token||automatic)return;
+      weatherCursor=(weatherCursor+1)%weatherPages.length;if(mode==="overview")renderOverviewWeather();else renderWeather();scheduleRotation();
     },WEATHER_SECONDS*1000);
     return;
   }
@@ -263,7 +265,7 @@ function slotStatus(s,valid){
 function stopAge(){clearTimeout(expiryTimer);expiryTimer=null;ageNode=null;etaRows=[];etaSnapshot=null;busStatusNode=null;}
 function paintAge(){
   clearTimeout(expiryTimer);expiryTimer=null;if(document.hidden)return;
-  var now=serverNow();txt("date",isFinite(now)?clockTime(now,now):"");
+  var now=serverNow();txt("date",(mode==="overview"?overviewDay+(overviewDay&&isFinite(now)?"　":""):"")+(isFinite(now)?clockTime(now,now):""));
   if(!ageNode||!etaSnapshot)return;
   var stamp=etaSnapshot.fetched_at_ms,valid=updateEta(etaRows,etaSnapshot,now);
   if(busStatusNode)slotSet(busStatusNode,slotStatus(etaSnapshot,valid));
@@ -541,15 +543,10 @@ el("weatherSave").onclick=function(){
   weatherSettingsRequest({enabled:enabled,consent:consent,name:main.name,latitude:main.latitude,longitude:main.longitude,additional:places});
 };
 
-function acceptDriving(v){
-  data=null;pages=[];cursor=0;stopRotation();stopAge();
-  var key=JSON.stringify(v);
-  if(key!==lastRender){
-    lastRender=key;txt("date","");txt("heading","驾驶");txt("index","");
-    var root=el("body");clear(root);
+function renderDrivingGroups(root,v,limit){
     if(!v.enabled||!v.groups.length)append(root,"p","驾驶未启用或未配置，请前往设置。","note");
     var messages={disabled:"未启用",paused:"不在采集时段",waiting:"等待采集",not_configured:"请在NAS配置高德密钥",credential_error:"高德密钥配置有误",storage_error:"配置或额度存储异常",blocked:"已停止请求，请核查高德账号",stale:"旧数据",unavailable:"暂不可用",ok:""};
-    (v.groups||[]).forEach(function(g){
+    (v.groups||[]).slice(0,limit).forEach(function(g){
       var group=append(root,"section","","driving-group");append(group,"h2",g.name);
       var pair=append(group,"div","","driving-pair"),map=append(pair,"div","","driving-map"),list=append(pair,"div","","driving-routes");
       if(typeof g.image==="string"&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(g.image)){
@@ -567,6 +564,14 @@ function acceptDriving(v){
       if(note)append(group,"p",note,"driving-foot");
     });
     append(root,"p","路线及地图：高德地图 · 预计耗时为采集时的估算","driving-foot");
+}
+function acceptDriving(v){
+  data=null;pages=[];cursor=0;stopRotation();stopAge();
+  var key=JSON.stringify(v);
+  if(key!==lastRender){
+    lastRender=key;txt("date","");txt("heading","驾驶");txt("index","");
+    var root=el("body");clear(root);
+    renderDrivingGroups(root,v,v.groups.length);
   }
   show("login",false);show("display",true);txt("status","");
 }
@@ -686,6 +691,152 @@ el("drivingSave").onclick=function(){
     else txt("drivingSettingStatus","保存失败，请检查坐标、时段和权限。");
   });
 };
+
+/* Composite display: read the existing LAN caches independently. No provider
+   request, additional server worker or data storage is introduced here. */
+function overviewLink(root,label,action){
+  var n=append(root,"button",label,"overview-link");n.type="button";n.onclick=action;return n;
+}
+function stopOverview(){
+  Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
+  overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
+}
+function overviewLayout(){
+  var root=el("body");clear(root);root.className="overview-page";
+  var pair=append(root,"div","","overview-pair");
+  overviewRoots.bus=append(pair,"div","","overview-half");
+  overviewRoots.weather=append(pair,"div","","overview-half");
+  overviewRoots.driving=append(root,"div","","overview-driving");
+  overviewRoots.home=append(root,"div","","overview-home");
+  ["bus","weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
+  txt("heading","");txt("index","");
+}
+function renderOverviewBus(v){
+  var root=overviewRoots.bus,s=v.snapshot,t=v.trip,items=slotItems(s);
+  var labels={live:"实时预计到站",stale:"旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
+  var key=JSON.stringify([t,items.length,["live","stale","no_live_data"].indexOf(s.status)>=0]);
+  if(key!==overviewKeys.bus){
+    overviewKeys.bus=key;stopAge();clear(root);
+    overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});
+    if(t)append(root,"p",t.boarding.name+" → "+t.destination.name,"note");
+    busStatusNode=append(root,"p",labels[s.status]||"状态未知","note");
+    for(var i=0;i<items.length;i++)etaRows.push(buildSlot(root,i));
+    if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
+  }
+  items.forEach(function(item,i){etaRows[i].item=item;});
+  if(!items.length&&busStatusNode)slotSet(busStatusNode,labels[s.status]||"状态未知");
+  etaSnapshot=s;syncClock(s);paintAge();
+}
+function renderOverviewWeather(){
+  var root=overviewRoots.weather,v=weatherPages[weatherCursor];if(!root||!v)return;
+  var key=JSON.stringify([v,weatherCursor,weatherPages.length,weatherPages.map(function(p){return p.sections&&p.sections.alerts;})]);
+  if(key===overviewKeys.weather)return;
+  overviewKeys.weather=key;clear(root);
+  overviewLink(root,(v.name||"天气")+(weatherPages.length>1?" "+(weatherCursor+1)+"/"+weatherPages.length:""),function(){switchMode("weather");});
+  var s=v.sections||{},c=s.current;
+  if(v.status==="disabled")append(root,"p","天气未启用","note");
+  else if(v.status==="storage_error")append(root,"p","天气配置或限额异常","note");
+  else if(c&&c.status==="available"){
+    append(root,"p",weatherNum(c.data.temp,"°")+"　"+c.data.text,"weather-main");
+    append(root,"p","体感 "+weatherNum(c.data.feels,"°")+" · 湿度 "+weatherNum(c.data.humidity,"%"),"weather-summary");
+    append(root,"p","风速 "+weatherNum(c.data.wind," "+(c.data.wind_unit||"")),"weather-summary");
+    append(root,"p","观测 "+weatherTime(c.data.time),"weather-foot");
+    if(c.source==="QWeather"){var a=append(root,"a","天气服务由和风天气驱动","weather-source");a.href="https://www.qweather.com";a.rel="noreferrer";}
+    if(c.source==="Open-Meteo"){var b=append(root,"a","Open-Meteo (CC BY 4.0)","weather-source");b.href="https://open-meteo.com/";b.rel="noreferrer";}
+  }else append(root,"p","当前天气暂不可用","note");
+  if(s.air&&s.air.status==="available")append(root,"p",s.air.data.map(function(a){return a.name+" "+a.aqi+" · "+a.category;}).join("；"),"weather-summary");
+  weatherPages.forEach(function(p){var a=p.sections&&p.sections.alerts;
+    if(a&&a.status==="available"&&a.data.length)a.data.forEach(function(x){append(root,"p",(p.name||"")+"："+(x.type==="cancel"?"解除信息 · ":"")+x.headline,"weather-alert");});
+  });
+}
+function acceptOverviewWeather(v){
+  var next=[{name:v.name,status:v.status,sections:v.sections}];
+  if(v.status!=="disabled"&&v.status!=="storage_error")next=next.concat(v.additional||[]);
+  var order=JSON.stringify(next.map(function(p){return p.name||"";}));
+  if(order!==weatherOrder){weatherCursor=0;weatherOrder=order;stopRotation();}
+  weatherPages=next;if(weatherCursor>=next.length)weatherCursor=0;
+  renderOverviewWeather();
+  show("weatherDisplayControls",settingsOpen&&next.length>1);
+  if(next.length<2||settingsOpen||document.hidden)stopRotation();else if(rotationTimer===null)scheduleRotation();
+}
+function renderOverviewDriving(v){
+  var key=JSON.stringify(v);if(key===overviewKeys.driving)return;
+  overviewKeys.driving=key;var root=overviewRoots.driving;clear(root);
+  renderDrivingGroups(root,v,2);
+  overviewLink(root,v.groups.length>2?"另 "+(v.groups.length-2)+" 个目的地 · 全部路线":"全部路线",function(){switchMode("driving");});
+}
+function renderOverviewHome(v){
+  overviewDay=v.date;data=v;paintAge();
+  var tasks=Array.isArray(v.upcoming_tasks)?v.upcoming_tasks:v.tasks;
+  var menus=v.week_menu.filter(function(m){return m.day===v.date;});
+  var key=JSON.stringify([v.date,tasks,menus,v.can_complete]);if(key===overviewKeys.home)return;
+  overviewKeys.home=key;var root=overviewRoots.home;clear(root);
+  var group=append(root,"section","","menu-day");
+  overviewLink(group,v.date.slice(5).replace("-","/")+" 今日菜单",function(){switchSection("menus");});
+  var names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
+  menus.sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
+    var row=append(group,"div","","menu-meal");append(row,"span",names[m.meal],"menu-meal-label");append(row,"span",m.dishes.join("、"),"menu-dishes");
+  });
+  if(!menus.length)append(group,"p","今日暂无菜单","note");
+  overviewLink(root,tasks.length>3?"全部待办（"+tasks.length+"）":"待办",function(){switchSection("tasks");});
+  var last="",dayGroup;
+  tasks.slice(0,3).forEach(function(t){
+    var day=t.occurrence||v.date;
+    if(day!==last){
+      last=day;dayGroup=append(root,"section","","task-day");var l=taskDateLabel(day,v.date),h=append(dayGroup,"h3",l.label,"task-date");
+      if(day<v.date)append(h,"span","逾期","task-date-tag");else if(l.tag)append(h,"span",l.tag,"task-date-tag");
+    }
+    var row=append(dayGroup,"div","","task-row");append(row,"span",t.title,"task-text");
+    if(v.can_complete===true&&day<=v.date){
+      var action=append(row,"span","","task-action"),button=append(action,"button","完成","task-complete");
+      button.type="button";button.onclick=function(){completeTask(t,v.date,button);};
+    }
+  });
+  if(!tasks.length)append(root,"p","暂无待办","note");
+}
+function overviewFailure(k,status){
+  if(k==="bus"){stopAge();serverBase=NaN;paintAge();}
+  if(k==="weather"){weatherPages=[];weatherOrder="";weatherCursor=0;stopRotation();show("weatherDisplayControls",false);}
+  if(k==="home"){data=null;overviewDay="";paintAge();}
+  delete overviewKeys[k];var root=overviewRoots[k];clear(root);
+  var names={bus:"公交",weather:"天气",driving:"驾驶",home:"菜单与待办"};
+  overviewLink(root,names[k],function(){if(k==="home")switchSection("tasks");else switchMode(k);});
+  append(root,"p",status===404?"模块未启用":"暂不可用，旧内容已隐藏","note");
+}
+function requestOverview(k){
+  if(mode!=="overview"||!token||document.hidden||overviewPending[k])return;
+  var interval=k==="bus"?15000:30000;
+  if(k==="home"&&busy){overviewTimers[k]=setTimeout(function(){requestOverview(k);},interval);return;}
+  var g=epoch,x=new XMLHttpRequest(),ended=false,timeout;
+  overviewPending[k]=true;
+  function finish(ok,v,status){
+    if(ended)return;ended=true;clearTimeout(timeout);if(g!==epoch||mode!=="overview")return;
+    overviewPending[k]=false;
+    if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}
+    if(ok){
+      if(k==="bus")renderOverviewBus(v);else if(k==="weather")acceptOverviewWeather(v);else if(k==="driving")renderOverviewDriving(v);else renderOverviewHome(v);
+      show("login",false);show("display",true);txt("status","");
+    }else{
+      overviewFailure(k,status);
+      if(status===404||status===503){show("login",false);show("display",true);}
+      else txt("status","部分信息连接异常");
+    }
+    overviewTimers[k]=setTimeout(function(){requestOverview(k);},interval);
+  }
+  try{x.open("GET","/api/"+k+"/view",true);if(token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+    x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
+      var valid=v&&(k==="bus"?v.snapshot&&Array.isArray(v.snapshot.vehicles):k==="weather"?typeof v.status==="string"&&v.sections&&typeof v.sections==="object":k==="driving"?typeof v.enabled==="boolean"&&Array.isArray(v.groups):Array.isArray(v.tasks)&&Array.isArray(v.posters)&&Array.isArray(v.week_menu));
+      finish(x.status===200&&valid,v,x.status);
+    };
+    timeout=setTimeout(function(){finish(false,null,0);try{x.abort();}catch(e){}},12000);x.send(null);
+  }catch(e){finish(false,null,0);}
+}
+function startOverview(){
+  if(overviewRoots.bus)return;
+  serverBase=NaN;overviewLayout();
+  ["bus","weather","driving","home"].forEach(function(k){requestOverview(k);});
+}
+
 function modeLabel(){
   txt("modeStatus",automatic?"自动分时 · 按 NAS 采集时段":"手动显示 · 不自动切换模块");updateManagementLinks();
 }
@@ -711,12 +862,13 @@ function switchSection(next){
   if(data)accept(data);else if(!busy)refresh();
 }
 function hide(reason){
-  stopAge();
+  stopOverview();stopAge();
   data=null;pages=[];cursor=0;lastRender="";stopRotation();weatherPages=[];weatherCursor=0;weatherOrder="";el("body").className="";
   txt("date","");txt("heading","");clear(el("body"));txt("index","");txt("status",reason);
 }
 function refresh(){
   if(!token||busy||document.hidden)return;
+  if(mode==="overview"&&!automatic){startOverview();return;}
   busy=true;var g=epoch,x=new XMLHttpRequest(),ended=false,timeout;
   function finish(ok,v,status){
     if(ended)return;ended=true;clearTimeout(timeout);if(g!==epoch)return;busy=false;
@@ -749,12 +901,14 @@ function reset(keepResume){
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   panel(false);show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#bus"||hash==="#weather"||hash==="#driving")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#overview"||(!hash&&typeof location!=="undefined"&&location.pathname==="/"))){mode="overview";resumePage="";forgetResume();}else if(!automatic&&(hash==="#bus"||hash==="#weather"||hash==="#driving")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("autoMode").onclick=function(){
   if(!token)return;
-  panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";tabs();show("options",false);
+  panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";if(mode==="overview"){mode="family";hide("");}tabs();show("options",false);
   clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
 };
+el("overviewMode").onclick=el("overviewView").onclick=function(){switchMode("overview");};
+el("posterView").onclick=function(){switchSection("posters");};
 el("tasksMode").onclick=function(){switchSection("tasks");};
 el("postersMode").onclick=function(){switchSection("posters");};
 el("menusMode").onclick=function(){switchSection("menus");};
@@ -767,7 +921,7 @@ el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(
 el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
 function closeSettings(){clearDrivingForm();weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
 el("returnDisplay").onclick=closeSettings;
-el("weatherNext").onclick=function(){if(mode!=="weather"||weatherPages.length<2||!settingsOpen)return;weatherCursor=(weatherCursor+1)%weatherPages.length;closeSettings();renderWeather();};
+el("weatherNext").onclick=function(){if((mode!=="weather"&&mode!=="overview")||weatherPages.length<2||!settingsOpen)return;weatherCursor=(weatherCursor+1)%weatherPages.length;closeSettings();if(mode==="overview")renderOverviewWeather();else renderWeather();};
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;seconds=n;closeSettings();};
 el("cancel").onclick=closeSettings;
 el("logout").onclick=reset;
@@ -783,7 +937,7 @@ if(window.addEventListener){
 }
 if(document.addEventListener)document.addEventListener("visibilitychange",function(){
   if(document.hidden){
-    rememberResume();stopAge();stopRotation();clearTimeout(refreshTimer);refreshTimer=null;epoch++;busy=false;
+    rememberResume();stopOverview();stopAge();stopRotation();clearTimeout(refreshTimer);refreshTimer=null;epoch++;busy=false;
   }
   else if(token){
     if(mode==="family"&&pages[cursor])resumePage=pages[cursor].id;
