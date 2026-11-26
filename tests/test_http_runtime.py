@@ -218,6 +218,29 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(runtime.schedule_view()["windows"],on["windows"])
         self.assertEqual(len(self.calls),1)
 
+    def test_schedule_does_not_clear_provider_block(self):
+        from dashboard.bus import AccessBlocked
+        self.runtime.web_settings = True
+        on = {"enabled":True,"windows":[{"days":[0],"start":480,"end":540}]}
+        off = {"enabled":False,"windows":[]}
+        def blocked(*args):
+            raise AccessBlocked("Synthetic provider restriction")
+        self.bus.gate.request=blocked
+        self.assertEqual(self.req("POST","/api/bus/search",self.admin,{"keyword":"Example"})[0],503)
+        self.assertTrue(self.bus.gate.blocked)
+        self.runtime.configure_schedule(off)
+        self.runtime.configure_schedule(on)
+        self.assertTrue(self.bus.gate.blocked)
+        self.assertEqual(self.runtime.read().snapshot.status,"blocked")
+        with self.bus.gate._db() as db:
+            db.execute("UPDATE schedule SET payload='null' WHERE id=1")
+        restored=BusService(self.temp.name,enabled=True,clock=lambda:self.now,request=self.provider)
+        runtime=Runtime(restored,clock=lambda:self.now,web_settings=True)
+        self.assertFalse(restored.gate.enabled)
+        self.assertTrue(restored.config_error)
+        self.assertTrue(restored.gate.blocked)
+        self.assertEqual(runtime.read().snapshot.status,"blocked")
+
     def test_budget_reasons(self):
         self.bus.gate.enabled = False
         self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "A"}), (503, {"error": "bus_disabled"}, "no-store"))
