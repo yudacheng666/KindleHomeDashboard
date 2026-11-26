@@ -220,11 +220,33 @@ def main():
                 wait(lambda:text_in("vehicles","4 分钟"))
                 wait(lambda:text_in("updated","秒前刷新"))
                 assert len(calls)==3
+                # Real geometry: both slots share the same columns and the first is larger.
+                layout = """return (function(){
+                  var slots=document.querySelectorAll('.bus-slot');
+                  if(slots.length!==2)return false;
+                  var a=slots[0].querySelector('.eta'),b=slots[1].querySelector('.eta');
+                  var x=slots[0].querySelector('.bus-time'),y=slots[1].querySelector('.bus-time');
+                  return Math.abs(a.getBoundingClientRect().left-b.getBoundingClientRect().left)<2
+                    && Math.abs(x.getBoundingClientRect().left-y.getBoundingClientRect().left)<2
+                    && x.getBoundingClientRect().left>a.getBoundingClientRect().left+50
+                    && parseFloat(getComputedStyle(a).fontSize)>parseFloat(getComputedStyle(b).fontSize)
+                    && document.documentElement.scrollWidth<=window.innerWidth;
+                })()"""
+                assert js(layout)
                 go("/display")
                 wait(lambda:text_in("heading","待办清单"))
                 click("busMode")
                 wait(lambda:text_in("body","4 分钟"))
                 wait(lambda:text_in("body","数据更新于"))
+                assert len(calls)==3
+                assert js(layout)
+                # Use the existing cache, not a new upstream request.
+                from dataclasses import replace
+                bus.poller.last=replace(bus.poller.last, vehicles=bus.poller.last.vehicles[:1],
+                                        scheduled_departures=1, departure_plans=({"time":"23:59","imminent":False},))
+                go("/")
+                wait(lambda:text_in("vehicles","首站计划发车"))
+                assert js(layout)
                 assert len(calls)==3
                 print("Real Chromium bus selection PASS: one route, explicit direction, verified stations, relative age, local reads.")
                 print("Real Chromium automatic entry PASS: direct startup, manual override, resume automatic")

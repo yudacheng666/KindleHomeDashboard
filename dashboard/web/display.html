@@ -9,6 +9,23 @@ button{margin:4px 4px 4px 0}input[type=password]{display:block;width:100%;margin
 .hidden{display:none}.frame{border-top:2px solid #111;border-bottom:2px solid #111;min-height:220px;padding:16px 0}
 .poster{text-align:center;font-size:38px;line-height:1.5;font-weight:bold}.poster.medium{font-size:30px}.poster.compact{font-size:24px}.note{font-size:16px;color:#333}.eta{font-size:44px;line-height:1.2;font-weight:bold}
 label{display:block;margin:8px 0}a{color:#111}button.selected{background:#111;color:#fff}.status{font-size:15px;color:#444}
+
+/* Identical two-column geometry for both slots; only hierarchy changes. */
+.bus-slot{padding:12px 0;border-bottom:1px solid #777}
+.bus-slot-label{font-size:16px;color:#444;margin-bottom:5px}
+.bus-pair{display:table;table-layout:fixed;width:100%}
+.bus-left,.bus-right{display:table-cell;width:50%;vertical-align:middle;word-wrap:break-word;white-space:normal}
+.bus-left{padding-right:5px;text-align:left}
+.bus-right{padding-left:5px;text-align:right}
+.bus-first .eta{font-size:48px;font-weight:bold;line-height:1.15}
+.bus-first .eta.bus-state{font-size:29px}
+.bus-next .eta{font-size:25px;font-weight:bold;line-height:1.2}
+.bus-next .eta.bus-state{font-size:21px}
+.bus-time{font-size:22px;font-weight:bold;line-height:1.35;white-space:pre-line}
+.bus-next .bus-time{font-size:17px}
+.bus-details{font-size:17px;color:#444;margin-top:8px}
+.bus-next .bus-details,.bus-next .bus-slot-label{font-size:14px}
+@media(max-width:360px){.bus-first .eta{font-size:36px}.bus-first .eta.bus-state{font-size:24px}.bus-next .eta{font-size:21px}.bus-next .eta.bus-state{font-size:18px}.bus-time{font-size:18px}.bus-next .bus-time{font-size:15px}.bus-details{font-size:15px}}
 </style></head>
 <body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button><p><a href="/home#tasks">内容管理</a> · <a href="/">公交</a></p></div>
 <p id="status" class="status" role="status"></p>
