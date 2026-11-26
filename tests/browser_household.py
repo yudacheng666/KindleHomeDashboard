@@ -359,7 +359,7 @@ def main():
                 assert js("return document.querySelectorAll('#drivingGroups > section').length===3")
                 assert js("return document.getElementById('drivingSave').parentNode.nextElementSibling.id==='drivingSettingStatus'")
                 click("returnDisplay")
-                go("/display#overview")
+                click("overviewMode")
                 wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===2 && document.querySelector('#body .overview-pair')!==null"))
                 assert text_in("body","另 1 个目的地")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
