@@ -88,21 +88,40 @@ def normalize_keyword(keyword):
     return keyword
 
 
-def search_keyword(keyword, broad=False):
+def search_keyword(keyword):
     keyword = normalize_keyword(keyword)
-    if broad:
-        # One explicit broader request, never automatic retry or pagination.
-        digits = re.search(r"[0-9]+", keyword)
-        if digits:
-            return digits.group()
-    # A common shorthand omits the 路 character before a letter suffix.
-    return re.sub(r"([0-9]+)([A-Za-z]+)(线?)$", r"\1路\2\3", keyword)
+    # Full names with an explicit route marker keep their precise query.
+    # Other numbered abbreviations use one broader numeric request.
+    digits = re.findall(r"[0-9]+", keyword)
+    if len(digits) == 1 and "路" not in keyword and "线" not in keyword:
+        return digits[0]
+    return keyword
 
 
-def search(keyword: str, city_code="310100", *, request=post, broad=False) -> tuple[Line, ...]:
-    keyword = search_keyword(keyword, broad)
+def rank_lines(keyword, lines):
+    def canonical(text):
+        return re.sub(r"[\s路线]+", "", unicodedata.normalize("NFKC", text)).casefold()
+
+    term = canonical(normalize_keyword(keyword))
+    digits = re.findall(r"[0-9]+", term)
+    suffix = re.search(r"[0-9]+([a-z]+)$", term)
+
+    def score(line):
+        name = canonical(line.name)
+        same_number = bool(digits) and re.findall(r"[0-9]+", name) == digits
+        chars = iter(name)
+        subsequence = all(char in chars for char in term)
+        suffix_match = bool(suffix) and name.endswith(suffix.group(1))
+        return (name == term, same_number, subsequence, suffix_match)
+
+    # Only rank real provider records; never invent or silently discard routes.
+    return tuple(sorted(lines, key=score, reverse=True))
+
+
+def search(keyword: str, city_code="310100", *, request=post) -> tuple[Line, ...]:
+    query = search_keyword(keyword)
     payload = request("/traffic/v2/querytrafficline",
-                      {"keywords": keyword, "type": 0, "pageNo": 1, "pageSize": 20},
+                      {"keywords": query, "type": 0, "pageNo": 1, "pageSize": 20},
                       city_code)
     items = payload["data"].get("trafficStop")
     if not isinstance(items, list):
@@ -126,7 +145,7 @@ def search(keyword: str, city_code="310100", *, request=post, broad=False) -> tu
             found.setdefault((line.line_id, line.direction), line)
     if items and not found:
         raise BusError("No recognizable route results")
-    return tuple(found.values())
+    return rank_lines(keyword, found.values())
 
 
 def detail(line: Line, direction=None, *, request=post) -> Route:
