@@ -3,10 +3,10 @@
 "use strict";
 var access=typeof window!=="undefined"&&window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", admin=false, busy=false, generation=0, configuring=false;
-var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false, searchedKeyword="", groups=[], choices=[], ageTimer=null, collectedAt=null;
+var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false, searchedKeyword="", groups=[], choices=[], ageTimer=null, collectedAt=null, etaRows=[], etaSnapshot=null;
 function el(id){return document.getElementById(id);}
 function txt(id,value){var n=el(id);if(n.textContent!==value)n.textContent=value;}
-function show(id,visible){el(id).className=visible?"":"hidden";}
+function show(id,visible){var n=el(id),c=visible?"":"hidden";if(n.className!==c)n.className=c;}
 function note(value){txt("message",value);}
 function option(select,value,label){var n=document.createElement("option");n.value=String(value);n.textContent=label;select.appendChild(n);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
@@ -45,12 +45,37 @@ function resetSelection(){
   clear(el("route"));clear(el("board"));clear(el("destination"));
   clear(el("direction"));show("directionStep",false);show("results",false);show("stations",false);txt("selection-summary","");
 }
-function stopAge(){clearTimeout(ageTimer);ageTimer=null;collectedAt=null;txt("updated","");}
-function paintAge(){clearTimeout(ageTimer);ageTimer=null;if(collectedAt===null||document.hidden)return;var n=Math.floor((Date.now()-collectedAt)/1000);txt("updated",n<0?"更新时间未知（请检查设备时间）":n+" 秒前刷新");ageTimer=setTimeout(paintAge,5000);}
-function setAge(s){stopAge();if(["live","stale","no_live_data"].indexOf(s.status)>=0){var t=Date.parse(s.fetched_at);if(isFinite(t)){collectedAt=t;paintAge();}}}
+// ETA is a minute-resolution prediction at receipt, not a countdown or arrival event.
+function clockTime(ms,now){
+  var d=new Date(ms),n=new Date(now);
+  function pad(v){return ("0"+v).slice(-2);}
+  return (d.toDateString()!==n.toDateString()?pad(d.getMonth()+1)+"-"+pad(d.getDate())+" ":"")+pad(d.getHours())+":"+pad(d.getMinutes());
+}
+function updateEta(rows,s,now){
+  var stamp=Date.parse(s.fetched_at),age=now-stamp,valid=isFinite(stamp)&&age>=0&&age<90000;
+  rows.forEach(function(row){
+    var target=stamp+row.minutes*60000,remaining=Math.ceil((target-now)/60000),label,detail;
+    if(!valid){label="等待数据更新";detail="";}
+    else if(s.status==="stale"){label="旧预测 · 约 "+row.minutes+" 分钟";detail="原预计到站 "+clockTime(target,now);}
+    else{label=remaining<=0?"等待到站确认":remaining===1?"预计即将到站":"约 "+remaining+" 分钟";detail="预计到站 "+clockTime(target,now);}
+    if(row.eta.textContent!==label)row.eta.textContent=label;
+    if(row.time.textContent!==detail)row.time.textContent=detail;
+  });
+  return valid;
+}
+function stopAge(){clearTimeout(ageTimer);ageTimer=null;collectedAt=null;etaSnapshot=null;txt("updated","");txt("clock","");}
+function paintAge(){
+  clearTimeout(ageTimer);ageTimer=null;if(!etaSnapshot||document.hidden)return;
+  var now=Date.now(),n=Math.floor((now-collectedAt)/1000),valid=updateEta(etaRows,etaSnapshot,now);txt("clock",clockTime(now,now));
+  if(etaRows.length)txt("status",valid?(etaSnapshot.status==="stale"?"数据暂未更新 · 以下为旧数据":"实时预计到站"):"数据时间异常或已过期 · 以下为旧位置");
+  txt("updated",!isFinite(collectedAt)||n<0?"更新时间未知（请检查设备时间）":(admin?n+" 秒前刷新":"数据更新于 "+clockTime(collectedAt,now))+(valid?"":" · 数据已失去时效"));
+  var delay=admin?5000:15000;if(valid)delay=Math.min(delay,90000-(now-collectedAt));
+  ageTimer=setTimeout(paintAge,delay);
+}
+function setAge(s){clearTimeout(ageTimer);ageTimer=null;etaSnapshot=null;collectedAt=null;if(["live","stale","no_live_data"].indexOf(s.status)>=0){etaSnapshot=s;collectedAt=Date.parse(s.fetched_at);paintAge();}else txt("updated","");}
 function hideData(message){
   stopAge();
-  lastKey="";clear(el("vehicles"));txt("updated","");txt("schedule","");
+  lastKey="";etaRows=[];clear(el("vehicles"));txt("updated","");txt("schedule","");
   txt("status",message);
 }
 function render(data){
@@ -60,18 +85,22 @@ function render(data){
   txt("trip",trip?trip.boarding.name+" → "+trip.destination.name+" · "+(trip.destination_index-trip.board_index)+"站":"");
   var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查采集时间设置或 Docker 日志",unconfigured:"请先设置线路和站点",unverified:"正在核对保存的线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
   var vehicles=(s.status==="live"||s.status==="stale")?s.vehicles:[];
-  var key=JSON.stringify([trip,s.status,vehicles,s.scheduled_departures,["live","stale","no_live_data"].indexOf(s.status)>=0?s.fetched_at:""]);
-  if(key===lastKey){if(collectedAt===null)setAge(s);return;}lastKey=key;
-  txt("status",labels[s.status]||"状态未知");
-  var root=el("vehicles");clear(root);
+  var key=JSON.stringify([trip,vehicles.map(function(v){return v.position;})]);
+  if(key!==lastKey){lastKey=key;
+  var root=el("vehicles");clear(root);etaRows=[];
   for(var i=0;i<vehicles.length;i++){
     var v=vehicles[i],row=document.createElement("div"),label=document.createElement("div"),eta=document.createElement("div"),info=document.createElement("p");
     row.className="vehicle";label.textContent=v.position===1?"最近一辆":"下一辆";
-    eta.className="eta";eta.textContent=v.eta_min+" 分钟";
-    var parts=[];if(v.distance_m!==null)parts.push(v.distance_m+" 米");
-    if(v.stops_remaining!==null)parts.push("剩余 "+v.stops_remaining+" 站");
-    info.textContent=parts.join(" · ");row.appendChild(label);row.appendChild(eta);row.appendChild(info);root.appendChild(row);
-  }
+    eta.className="eta";var time=document.createElement("p");time.className="small";etaRows.push({minutes:v.eta_min,eta:eta,time:time,info:info});
+    row.appendChild(label);row.appendChild(eta);row.appendChild(time);row.appendChild(info);root.appendChild(row);
+  }}
+  vehicles.forEach(function(v,i){
+    var row=etaRows[i],parts=[];row.minutes=v.eta_min;
+    if(v.distance_m!=null)parts.push(v.distance_m+" 米");
+    if(v.stops_remaining!=null)parts.push("剩余 "+v.stops_remaining+" 站");
+    var label=parts.join(" · ");if(row.info.textContent!==label)row.info.textContent=label;
+  });
+  if(!vehicles.length)txt("status",labels[s.status]||"状态未知");
   txt("schedule",s.scheduled_departures&&s.status!=="stale"?"计划待发车 "+s.scheduled_departures+" 辆（非实时 ETA）":"");
   setAge(s);
 }

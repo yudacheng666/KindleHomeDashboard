@@ -224,7 +224,7 @@ def main():
                 wait(lambda:text_in("heading","今日生活"))
                 click("busMode")
                 wait(lambda:text_in("body","4 分钟"))
-                wait(lambda:text_in("body","秒前刷新"))
+                wait(lambda:text_in("body","数据更新于"))
                 assert len(calls)==3
                 print("Real Chromium bus selection PASS: one route, explicit direction, verified stations, relative age, local reads.")
                 print("Real Chromium automatic entry PASS: direct startup, manual override, resume automatic")
