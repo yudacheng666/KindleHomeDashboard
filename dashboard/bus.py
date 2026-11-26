@@ -55,6 +55,7 @@ class Snapshot:
     fetched_at: datetime
     vehicles: tuple[Vehicle, ...] = ()
     scheduled_departures: int = 0
+    departure_plans: tuple[dict, ...] = ()
 
 
 def _number(value):
@@ -95,8 +96,23 @@ def parse(payload: dict, fetched_at: datetime) -> Snapshot:
         vehicles.append(Vehicle(i, eta, distance, remaining))
     schedule = data.get("dispatchCarSchedule")
     departures = schedule.get("dispatchCars") if isinstance(schedule, dict) else None
+    # Only typed plan records; never retain plates or arbitrary provider text.
+    plans = []
+    for car in departures if isinstance(departures, list) else []:
+        if not isinstance(car, dict):
+            continue
+        raw = car.get("time")
+        time = raw.strip() if isinstance(raw, str) else ""
+        if not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9])?", time):
+            time = None
+        else:
+            time = time[:5]
+        # The numeric countdown's unit is not verified. Only explicit text
+        # can indicate imminent dispatch; a planned time is not a live ETA.
+        imminent = car.get("countdown") == "即将发车"
+        plans.append({"time": time, "imminent": imminent})
     return Snapshot("live" if vehicles else "no_live_data", fetched_at,
-                    tuple(vehicles), len(departures) if isinstance(departures, list) else 0)
+                    tuple(vehicles), len(plans), tuple(plans[:2]))
 
 
 def post(path: str, body: dict, city_code: str, timeout: float = 8.0) -> dict:
@@ -163,7 +179,7 @@ class Poller:
         if self.last is None:
             return Snapshot("unavailable", now)
         if (now - self.last.fetched_at).total_seconds() >= self.ttl:
-            return replace(self.last, status="expired", vehicles=(), scheduled_departures=0)
+            return replace(self.last, status="expired", vehicles=(), scheduled_departures=0, departure_plans=())
         return self.last
 
     def poll(self) -> Snapshot:

@@ -63,6 +63,15 @@ class API:
         return compare_digest(value, self.admin_token) or (
             not admin and compare_digest(value, self.read_token))
 
+    def bus_view(self, bus):
+        payload = asdict(bus)
+        now = self.runtime.bus.clock()
+        snapshot = payload["snapshot"]
+        snapshot["server_now_ms"] = int(now.timestamp() * 1000)
+        snapshot["fetched_at_ms"] = int(bus.snapshot.fetched_at.timestamp() * 1000)
+        snapshot["timezone_offset_min"] = int(now.astimezone(self.runtime.zone).utcoffset().total_seconds() / 60)
+        return payload
+
     def automatic_view(self):
         """Use the existing collection windows, never call the upstream here."""
         if self.household is not None and not self.runtime.active():
@@ -72,7 +81,7 @@ class API:
             return {"mode": "family", "view": self.household.get(READ)}
         # During the configured commute, keep bus failures visible rather than
         # silently presenting a timetable or hiding the failure.
-        return {"mode": "bus", "view": asdict(bus)}
+        return {"mode": "bus", "view": self.bus_view(bus)}
 
     def dispatch(self, path, body):
         # Single selection session: a newer route preview invalidates the old
@@ -106,7 +115,7 @@ class API:
                     raise ValueError("Selection expired")
                 view = bus.save_trip(self.selection[1], body["boarding"], body["destination"])
                 self.selection = None
-                return asdict(self.runtime.read())
+                return self.bus_view(self.runtime.read())
             raise ValueError("Unknown operation")
 
 
@@ -191,7 +200,7 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.server.api.automatic_view()
             else:
                 payload = (self.server.api.household.get(self.path) if home
-                           else asdict(self.server.api.runtime.read()))
+                           else self.server.api.bus_view(self.server.api.runtime.read()))
         except Exception:
             self.send_json(503, {"error": "service_error"})
             return

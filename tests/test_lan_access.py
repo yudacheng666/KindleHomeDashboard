@@ -63,6 +63,7 @@ class DirectTests(unittest.TestCase):
     def test_auto_uses_server_clock_and_never_collects(self):
         now = datetime(2026, 1, 5, 0, 59, tzinfo=timezone.utc)
         bus = Mock()
+        bus.clock = lambda: now
         bus.read.return_value = BusView({"fictional":True}, Snapshot("live",now))
         runtime = Runtime(bus, windows=(Window((0,), 540, 600),),
                           clock=lambda:now)
@@ -74,7 +75,12 @@ class DirectTests(unittest.TestCase):
         self.assertEqual(auto()["mode"],"family")
         bus.read.assert_not_called()
         now += timedelta(minutes=1)
-        self.assertEqual(auto()["mode"],"bus")
+        view = auto()
+        self.assertEqual(view["mode"],"bus")
+        snapshot = view["view"]["snapshot"]
+        self.assertEqual(snapshot["server_now_ms"], int(now.timestamp()*1000))
+        self.assertEqual(snapshot["fetched_at_ms"], int((now-timedelta(minutes=1)).timestamp()*1000))
+        self.assertEqual(snapshot["timezone_offset_min"], 480)
         bus.read.return_value = BusView({"fictional":True},Snapshot("blocked",now))
         self.assertEqual(auto()["view"]["snapshot"]["status"],"blocked")
         bus.read.return_value = BusView(None,Snapshot("unconfigured",now))
