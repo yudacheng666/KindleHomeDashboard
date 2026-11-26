@@ -1,6 +1,6 @@
 """Local HTTP API; explicit trusted LAN mode or authenticated loopback."""
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from hmac import compare_digest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -87,15 +87,81 @@ class API:
         return payload
 
     def automatic_view(self):
-        """Use the existing collection windows, never call the upstream here."""
+        """Legacy single-module view; the default Kindle page uses overview_view."""
         if self.household is not None and not self.runtime.active():
             return {"mode": "family", "view": self.household.get(READ)}
         bus = self.runtime.read()
         if self.household is not None and (bus.trip is None or bus.snapshot.status in ("disabled", "config_error")):
             return {"mode": "family", "view": self.household.get(READ)}
-        # During the configured commute, keep bus failures visible rather than
-        # silently presenting a timetable or hiding the failure.
         return {"mode": "bus", "view": self.bus_view(bus)}
+
+    def overview_view(self, authorization=None):
+        """Read cached module snapshots once; never trigger upstream collection."""
+        now = self.runtime.clock()
+        local = now.astimezone(self.runtime.zone)
+        try:
+            bus = self.bus_view(self.runtime.read())
+        except Exception:
+            bus = {"trip": None, "snapshot": {
+                "status": "service_error", "vehicles": [], "departure_plans": [],
+                "fetched_at_ms": None, "server_now_ms": int(now.timestamp() * 1000),
+                "timezone_offset_min": int(local.utcoffset().total_seconds() / 60)}}
+
+        def current_only(location):
+            if not isinstance(location, dict):
+                return {"status": "unavailable", "sections": {}}
+            sections = location.get("sections", {})
+            # The overview intentionally displays current conditions only.
+            # Active warnings remain visible; forecast sections are not sent.
+            selected = {key: sections[key] for key in ("current", "alerts") if key in sections}
+            return {"status": location.get("status", "waiting"),
+                    "name": location.get("name", ""), "sections": selected}
+
+        try:
+            if self.weather is None:
+                weather = {"status": "disabled", "sections": {}, "additional": []}
+            else:
+                raw_weather = self.weather.read()
+                weather = current_only(raw_weather)
+                weather["additional"] = [current_only(x) for x in raw_weather.get("additional", [])]
+        except Exception:
+            weather = {"status": "unavailable", "sections": {}, "additional": []}
+
+        try:
+            if self.driving is None:
+                driving = {"enabled": False, "groups": [], "group_count": 0}
+            else:
+                driving = self.driving.read()
+                groups = driving.get("groups", [])
+                driving["group_count"] = len(groups)
+                # The compact Kindle overview has exactly two map slots.
+                # All configured destinations remain available on /api/driving/view.
+                driving["groups"] = groups[:2]
+        except Exception:
+            driving = {"enabled": False, "groups": [], "group_count": 0, "error": "unavailable"}
+
+        try:
+            if self.household is None:
+                home = {"date": local.date().isoformat(), "tasks": [], "upcoming_tasks": [],
+                        "posters": [], "week_menu": [], "can_complete": False, "status": "disabled"}
+            else:
+                raw_home = self.household.get(READ)
+                today = date.fromisoformat(raw_home["date"])
+                tomorrow = (today + timedelta(days=1)).isoformat()
+                home = {
+                    "date": raw_home["date"],
+                    "tasks": raw_home.get("tasks", []),
+                    "upcoming_tasks": raw_home.get("upcoming_tasks", raw_home.get("tasks", [])),
+                    "posters": raw_home.get("posters", []),
+                    "week_menu": [item for item in raw_home.get("week_menu", [])
+                                  if item.get("day") in (raw_home["date"], tomorrow)],
+                    "can_complete": self.authorized(authorization, True),
+                    "status": "ready"
+                }
+        except Exception:
+            home = {"date": local.date().isoformat(), "tasks": [], "upcoming_tasks": [],
+                    "posters": [], "week_menu": [], "can_complete": False, "status": "unavailable"}
+        return {"bus": bus, "weather": weather, "driving": driving, "home": home}
 
     def dispatch(self, path, body):
         if path == "/api/driving/search" and self.driving is not None:
@@ -214,11 +280,15 @@ class Handler(BaseHTTPRequestHandler):
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
         weather = self.path in ("/api/weather/view", "/api/weather/settings") and self.server.api.weather is not None
         driving = self.path in ("/api/driving/view", "/api/driving/settings") and self.server.api.driving is not None
-        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/bus/schedule") and not home and not weather and not driving:
+        overview = self.path == "/api/display/overview"
+        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/display/overview", "/api/bus/schedule") and not home and not weather and not driving:
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            if driving:
+            if overview:
+                headers = self.headers.get_all("Authorization") or []
+                payload = self.server.api.overview_view(headers[0] if headers else None)
+            elif driving:
                 payload = (self.server.api.driving.settings_view() if self.path == "/api/driving/settings"
                            else self.server.api.driving.read())
             elif weather:
