@@ -40,13 +40,18 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual([v.direction for v in lines], ["0", "1"])
         self.assertEqual(request.call_args.args[1]["keywords"], "Example")
 
-    def test_search_shorthand_and_explicit_broad(self):
-        self.assertEqual(search_keyword("示例８２Ｃ"), "示例82路C")
+    def test_single_search_normalizes_and_ranks_abbreviations(self):
+        self.assertEqual(search_keyword("示例８２Ｃ"), "82")
         self.assertEqual(search_keyword("示例82路C"), "示例82路C")
-        request = Mock(return_value=response(trafficStop=[]))
-        search("示82C", request=request, broad=True)
+        names = ["其他182路C", "其他82路D", "示例82路C"]
+        rows = [{"lineInfo":dict(brief(0),lineId=str(i),lineName=name)}
+                for i,name in enumerate(names)]
+        request = Mock(return_value=response(trafficStop=rows))
+        lines = search("示82C", request=request)
         self.assertEqual(request.call_count, 1)
         self.assertEqual(request.call_args.args[1]["keywords"], "82")
+        self.assertEqual(lines[0].name, names[2])
+        self.assertEqual(len(lines), 3)
 
     def test_empty_search(self):
         self.assertEqual(search("Example", request=Mock(return_value=response(trafficStop=[]))), ())
