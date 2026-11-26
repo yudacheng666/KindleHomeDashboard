@@ -6,10 +6,10 @@ var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
-var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null,busStatusNode=null;
+var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null,busStatusNode=null,expiryTimer=null;
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
-function show(id,yes){el(id).className=yes?"":"hidden";}
+function show(id,yes){var n=el(id),c=yes?"":"hidden";if(n.className!==c)n.className=c;}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function append(root,tag,text,cls){var n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;root.appendChild(n);return n;}
 // Conservative character/line budget; never truncate, including surrogate pairs.
@@ -132,21 +132,24 @@ function updateEta(rows,s,now){
   });
   return valid;
 }
-function stopAge(){ageNode=null;etaRows=[];etaSnapshot=null;busStatusNode=null;}
+function stopAge(){clearTimeout(expiryTimer);expiryTimer=null;ageNode=null;etaRows=[];etaSnapshot=null;busStatusNode=null;}
 function paintAge(){
+  clearTimeout(expiryTimer);expiryTimer=null;if(document.hidden)return;
   var now=Date.now();txt("date",clockTime(now,now));
   if(!ageNode||!etaSnapshot)return;
   var stamp=Date.parse(etaSnapshot.fetched_at),valid=updateEta(etaRows,etaSnapshot,now);
   if(etaRows.length&&busStatusNode){var status=valid?(etaSnapshot.status==="stale"?"数据暂未更新 · 以下为旧数据":"实时预计到站"):"数据时间异常或已过期 · 以下为旧位置";if(busStatusNode.textContent!==status)busStatusNode.textContent=status;}
   var label=!isFinite(stamp)||stamp>now?"更新时间未知（请检查设备时间）":"数据更新于 "+clockTime(stamp,now)+(valid?"":" · 数据已失去时效");
   if(ageNode.textContent!==label)ageNode.textContent=label;
+  // The local deadline does not wait for a slow or outstanding LAN read.
+  if(valid)expiryTimer=setTimeout(paintAge,90000-(now-stamp));
 }
 function acceptBus(v){
   data=null;pages=[];cursor=0;resumePage="";stopRotation();
   var s=v.snapshot,t=v.trip;
   var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查 Docker 日志",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
   var vehicles=(s.status==="live"||s.status==="stale")?s.vehicles:[];
-  var key=JSON.stringify([t,s.status,vehicles,s.scheduled_departures]);
+  var key=JSON.stringify([t,vehicles.map(function(v){return v.position;}),s.status!=="stale"?s.scheduled_departures:0,["live","stale","no_live_data"].indexOf(s.status)>=0]);
   if(key!==lastRender){
     stopAge();lastRender=key;txt("date","");txt("heading",t?t.line.name:"实时公交");txt("index","");
     var root=el("body");clear(root);
@@ -154,14 +157,19 @@ function acceptBus(v){
     busStatusNode=append(root,"p",labels[s.status]||"状态未知","note");
     vehicles.forEach(function(v){
       append(root,"p",v.position===1?"最近一辆":"下一辆","note");
-      var eta=append(root,"p","","eta"),time=append(root,"p","","note");etaRows.push({minutes:v.eta_min,eta:eta,time:time});
-      var a=[];if(v.distance_m!=null)a.push(v.distance_m+" 米");
-      if(v.stops_remaining!=null)a.push("剩余 "+v.stops_remaining+" 站");
-      if(a.length)append(root,"p",a.join(" · "),"note");
+      var eta=append(root,"p","","eta"),time=append(root,"p","","note"),info=append(root,"p","","note");etaRows.push({minutes:v.eta_min,eta:eta,time:time,info:info});
     });
     if(s.scheduled_departures&&s.status!=="stale")append(root,"p","计划待发车 "+s.scheduled_departures+" 辆（非实时 ETA）","note");
     if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
   }
+  vehicles.forEach(function(v,i){
+    var row=etaRows[i],a=[];row.minutes=v.eta_min;
+    if(v.distance_m!=null)a.push(v.distance_m+" 米");
+    if(v.stops_remaining!=null)a.push("剩余 "+v.stops_remaining+" 站");
+    var label=a.join(" · ");if(row.info.textContent!==label)row.info.textContent=label;
+    var cls=a.length?"note":"hidden";if(row.info.className!==cls)row.info.className=cls;
+  });
+  if(!vehicles.length&&busStatusNode){var label=labels[s.status]||"状态未知";if(busStatusNode.textContent!==label)busStatusNode.textContent=label;}
   etaSnapshot=s;paintAge();
   show("login",false);show("display",true);txt("status","");
 }
