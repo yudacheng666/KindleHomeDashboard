@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
-var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false;
+var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false,historyOpen=false;
 function initialTab(){var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#display"?"displaySettings":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
@@ -29,7 +29,7 @@ function req(path,body,done){
   }catch(e){finish(false,{});}
 }
 function closeEditor(){editing=false;clear(el("editor"));show("editor",false);}
-function reset(){epoch++;busy=false;token="";admin=false;data=null;menus=[];menuDate="";tab=initialTab();
+function reset(){epoch++;busy=false;token="";admin=false;data=null;menus=[];menuDate="";tab=initialTab();historyOpen=false;
   closeEditor();clear(el("content"));el("date").textContent="";el("token").value="";show("home",false);show("login",true);note("");}
 function load(){
   req(admin?"manage":"view",null,function(ok,v){
@@ -91,9 +91,17 @@ function tasks(p,arr,manage){
   if(!arr.length)node(p,"p","暂无待办");
   arr.forEach(function(t){var n=row(p);node(n,"p",t.title);if(manage){
     node(n,"small",t.start+" · "+({once:"单次",daily:"每日",weekly:"每周"}[t.repeat])+(t.occurrence?(t.completed?" · 已完成":" · 待完成"):" · 非发生日"));
-    if(t.occurrence)btn(n,t.completed?"撤销完成":"完成",function(){mutate("task/complete",{key:t.id,on:data.date,completed:!t.completed});});
+    if(t.occurrence&&!t.completed)btn(n,"完成",function(){if(window.confirm("确认完成「"+t.title+"」？"))mutate("task/complete",{key:t.id,on:data.date,completed:true});});
     btn(n,"编辑",function(){taskForm(t);});btn(n,"删除",function(){remove("task/delete",{key:t.id},"待办及其完成记录");});
   }});
+}
+function history(p,arr){
+  if(!arr.length)node(p,"p","暂无历史待办");
+  arr.forEach(function(t){var n=row(p);node(n,"p",t.title);
+    node(n,"small",t.completed_at?"完成于 "+t.completed_at.replace("T"," "):"发生日期 "+t.occurrence+" · 完成时间未知");
+    if(t.restorable)btn(n,"恢复",function(){if(window.confirm("确认恢复此待办？"))mutate("task/complete",{key:t.id,on:data.date,completed:false});});
+    btn(n,"彻底删除",function(){remove("history/delete",{key:t.id,occurrence:t.occurrence},t.repeat==="once"?"此待办及完成记录（关联海报须先解除）":"此期历史记录（保留周期任务及完成标记）");});
+  });
 }
 function posters(p,arr,manage){
   if(!arr.length)node(p,"p","暂无提醒海报");
@@ -120,7 +128,15 @@ function render(){
   var p=el("content");clear(p);if(!data)return;
   ["tasks","posters","menus","displaySettings"].forEach(function(t){el(t).className=t===tab?"primary":"";});
   if(tab==="displaySettings"){node(p,"h2","显示设置");var s=data.display_settings||{};node(p,"p","海报轮播："+(s.autoplay?"开启":"关闭")+" · 每页 "+(s.seconds||180)/60+" 分钟");if(admin)btn(p,"保存轮播设置",displayForm);}
-  else if(tab==="tasks"){node(p,"h2","待办清单");if(admin)btn(p,"新增待办",function(){taskForm(null);});tasks(p,data.tasks,admin);}
+  else if(tab==="tasks"){node(p,"h2","待办清单");
+    if(admin){
+      btn(p,"未完成",function(){if(canLeave()){closeEditor();historyOpen=false;render();}}).className=historyOpen?"":"primary";
+      btn(p,"历史待办",function(){if(canLeave()){closeEditor();historyOpen=true;render();}}).className=historyOpen?"primary":"";
+      if(historyOpen){history(p,data.history||[]);return;}
+      btn(p,"新增待办",function(){taskForm(null);});
+    }
+    tasks(p,admin?data.tasks.filter(function(t){return t.repeat!=="once"||!t.completed;}):data.tasks,admin);
+  }
   else if(tab==="posters"){node(p,"h2","海报");if(admin){btn(p,"新增海报",function(){posterForm(null);});btn(p,"保存轮播设置",displayForm);}posters(p,data.posters,admin);}
   else if(tab==="menus"){node(p,"h2","本周菜单");if(admin){
       var d=field(p,"查询所在周",menuDate,"date");btn(p,"查询",function(){menuDate=d.value;render();});btn(p,"新增菜单",function(){menuDate=d.value;menuForm(null);});

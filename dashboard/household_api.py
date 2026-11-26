@@ -10,6 +10,7 @@ OPERATIONS = {
     "task/add": ("add_task", ("title","start","repeat")),
     "task/edit": ("edit_task", ("key","title","start","repeat")),
     "task/delete": ("delete_task", ("key",)),
+    "history/delete": ("delete_history", ("key","occurrence")),
     "task/complete": ("complete", ("key","on","completed")),
     "poster/add": ("add_poster", ("title","body","start","end","note","task_id")),
     "poster/edit": ("edit_poster", ("key","title","body","start","end","note","task_id")),
@@ -61,5 +62,8 @@ class HouseholdAPI:
         if name == "task/complete" and day(args["on"]) != self.today():
             # A stale screen must not complete tomorrow's recurrence.
             raise ValueError("Day changed; refresh before completing")
+        if name == "task/complete":
+            # Actual completion time comes from the NAS, not the client.
+            args["completed_at"] = self.runtime.clock().astimezone(self.runtime.zone).isoformat(timespec="seconds")
         result = getattr(self.home, method)(**args)
         return {"result": result}

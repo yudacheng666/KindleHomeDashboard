@@ -9,7 +9,7 @@ class Node {
 const nodes={},doc={getElementById(id){return nodes[id]||(nodes[id]=new Node(id));},createElement(tag){return new Node(tag);}};
 const el=id=>doc.getElementById(id);
 const date="2026-01-05",task={id:"synthetic-task",title:"Example task",start:date,repeat:"daily",occurrence:date,completed:false};
-const manage={date,tasks:[task],posters:[],shopping:[]};
+const manage={date,tasks:[task],posters:[],shopping:[],history:[{...task,completed_at:null,restorable:true}]};
 const view={date,tasks:[task],posters:[],shopping:[],today_menu:[],week_menu:[]};
 const calls=[];let fail=false,confirmed=true;
 const sampleMenu={day:date,meal:"lunch",dishes:["Example dish"],ingredients:["Example ingredient"]};
@@ -30,7 +30,11 @@ el("token").value="example-test-only";el("mode").value="admin";el("connect").onc
 assert.equal(el("token").value,"");
 el("tasks").onclick();click(el("content"),"完成");
 assert.ok(calls.some(c=>c[0].endsWith("/task/complete")&&c[1].on===date&&c[1].completed===true));
-click(el("content"),"新增待办");
+click(el("content"),"历史待办");
+assert.ok(all(el("content"),n=>n.textContent.includes("完成时间未知")).length);
+confirmed=false;const historyCount=calls.length;click(el("content"),"彻底删除");assert.equal(calls.length,historyCount);
+confirmed=true;click(el("content"),"彻底删除");assert.ok(calls.some(c=>c[0].endsWith("/history/delete")&&c[1].confirm===true));
+click(el("content"),"未完成");click(el("content"),"新增待办");
 const inputs=all(el("editor"),n=>n.tag==="input");inputs[0].value="Fictional new task";
 click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/task/add")&&c[1].title==="Fictional new task"));
 click(el("content"),"编辑");click(el("editor"),"取消");assert.equal(el("editor").className,"hidden");

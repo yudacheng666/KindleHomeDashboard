@@ -33,6 +33,34 @@ class HouseholdTests(unittest.TestCase):
         self.home.complete(key,"2026-01-07",False)
         self.assertEqual(len(self.home.view("2026-01-07")["tasks"]),1)
 
+    def test_history_delete_and_restore(self):
+        key=self.home.add_task("Example daily",self.today,"daily")
+        stamp="2026-01-05T09:30:00+00:00"
+        self.home.complete(key,self.today,completed_at=stamp)
+        self.home.complete(key,self.today,completed_at="2026-01-05T10:30:00+00:00")
+        record=self.home.manage(self.today)["history"][0]
+        self.assertEqual(record["completed_at"],stamp)
+        self.assertTrue(record["restorable"])
+        self.home.delete_history(key,self.today)
+        self.assertEqual(self.home.manage(self.today)["history"],[])
+        self.assertEqual(self.home.view(self.today)["tasks"],[])
+        self.assertEqual(len(self.home.view("2026-01-06")["tasks"]),1)
+        once=self.home.add_task("Example once",self.today)
+        self.home.complete(once,"2026-01-06",completed_at=stamp)
+        self.assertTrue(self.home.manage("2026-01-07")["history"][0]["restorable"])
+        self.home.complete(once,"2026-01-07",False)
+        self.assertEqual(self.home.manage("2026-01-07")["history"],[])
+        self.home.complete(once,"2026-01-07")
+        self.home.delete_history(once,self.today)
+        self.assertNotIn(once,[t["id"] for t in self.home.manage(self.today)["tasks"]])
+
+    def test_legacy_completion_has_unknown_timestamp(self):
+        key=self.home.add_task("Example legacy",self.today)
+        with self.home.db() as db:
+            db.execute("INSERT INTO completions VALUES (?,?)",(key,self.today))
+        self.assertIsNone(self.home.manage(self.today)["history"][0]["completed_at"])
+        self.assertEqual(self.home.view(self.today)["tasks"],[])
+
     def test_daily_completion_is_per_day(self):
         key=self.home.add_task("Example daily",self.today,"daily")
         self.home.complete(key,self.today)

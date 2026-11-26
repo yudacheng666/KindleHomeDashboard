@@ -170,3 +170,28 @@ windowEvents.pagehide();windowEvents.pageshow({persisted:true});heading("Second 
 click("logout");assert.equal(storage.size,0);assert.equal(timers.size,0);
 directDisplay();heading("待办清单");click("logout");
 console.log("Household display simulation passed: automatic switching, override, saved settings, long poster preservation, unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
+
+// Authorized completion: cancellation, failed write, successful write, no automatic deletion.
+{
+  let confirmed=false, posts=0, postFail=true, current={...sample,can_complete:true};
+  class TaskXHR {
+    open(method,path){this.method=method;this.path=path;}
+    setRequestHeader(){}
+    send(body){
+      this.status=200;
+      if(this.method==="POST"){
+        posts++;assert.deepEqual(JSON.parse(body),{key:task.id,on:date,completed:true});
+        this.status=postFail?503:200;
+        if(!postFail)current={...current,tasks:[]};
+        this.responseText=JSON.stringify(postFail?{error:"service_error"}:{result:null});
+      }else this.responseText=JSON.stringify(current);
+      this.readyState=4;this.onreadystatechange();
+    }
+    abort(){}
+  }
+  vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{KHD_ACCESS:{direct:true,openAdmin:true},confirm:()=>confirmed,addEventListener(){}},XMLHttpRequest:TaskXHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
+  const completeButton=()=>descendants(el("body")).find(n=>n.tag==="button"&&n.textContent==="完成");
+  assert.ok(completeButton());completeButton().onclick();assert.equal(posts,0);
+  confirmed=true;completeButton().onclick();assert.equal(posts,1);assert.ok(completeButton());assert.ok(el("status").textContent.includes("未确认"));
+  postFail=false;completeButton().onclick();assert.equal(posts,2);assert.equal(el("body").children[0].textContent,"暂无待办");
+}

@@ -110,6 +110,22 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.assertEqual(self.req("GET","home/view",self.read_token)[0],404)
         self.assertEqual(self.req("POST","home/task/add",self.admin_token,{})[0],404)
 
+    def test_completion_permission_and_history(self):
+        key=self.task()
+        self.assertFalse(self.view()["can_complete"])
+        self.assertTrue(self.req("GET","home/view",self.admin_token)[1]["can_complete"])
+        body={"key":key,"on":self.today,"completed":True}
+        self.assertEqual(self.req("POST","home/task/complete",self.read_token,body)[0],401)
+        self.post("task/complete",body)
+        self.assertEqual(self.view()["tasks"],[])
+        record=self.manage()["history"][0]
+        self.assertIsNotNone(record["completed_at"])
+        self.assertNotIn("history",self.view())
+        self.post("history/delete",{"key":key,"occurrence":self.today},400)
+        self.post("history/delete",{"key":key,"occurrence":self.today,"confirm":True})
+        self.assertEqual(self.manage()["history"],[])
+        self.assertEqual(self.view()["tasks"],[])
+
     def test_task_edit_and_history(self):
         key = self.task()
         self.post("task/edit",{"key":key,"title":"Revised","start":self.today,"repeat":"weekly"})

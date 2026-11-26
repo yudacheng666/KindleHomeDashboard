@@ -59,6 +59,11 @@ class Household:
                 CREATE TABLE IF NOT EXISTS completions (
                     task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                     occurrence TEXT NOT NULL, PRIMARY KEY(task_id, occurrence));
+                CREATE TABLE IF NOT EXISTS completion_history (
+                    task_id TEXT NOT NULL, occurrence TEXT NOT NULL,
+                    completed_at TEXT, title TEXT, hidden INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(task_id, occurrence),
+                    FOREIGN KEY(task_id, occurrence) REFERENCES completions(task_id, occurrence) ON DELETE CASCADE);
                 CREATE TABLE IF NOT EXISTS posters (
                     id TEXT PRIMARY KEY, title TEXT NOT NULL, body TEXT NOT NULL,
                     note TEXT NOT NULL, start TEXT NOT NULL, end TEXT,
@@ -149,7 +154,7 @@ class Household:
                 result.append({"id":task["id"],"title":task["title"],"occurrence":occurrence})
         return result
 
-    def complete(self, key, on, completed=True):
+    def complete(self, key, on, completed=True, completed_at=None):
         on = day(on)
         if type(completed) is not bool:
             raise ValueError("Invalid completion")
@@ -160,9 +165,31 @@ class Household:
             if not occurrence:
                 raise ValueError("Task is not due on this date")
             if completed:
-                db.execute("INSERT OR IGNORE INTO completions VALUES (?,?)",(key,occurrence))
+                inserted = db.execute("INSERT OR IGNORE INTO completions VALUES (?,?)",(key,occurrence))
+                if inserted.rowcount:
+                    db.execute("INSERT INTO completion_history VALUES (?,?,?,?,0)",
+                               (key, occurrence, completed_at, task["title"]))
             else:
                 db.execute("DELETE FROM completions WHERE task_id=? AND occurrence=?",(key,occurrence))
+
+    def delete_history(self, key, occurrence):
+        occurrence = day(occurrence)
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            task = db.execute("SELECT * FROM tasks WHERE id=?", (key,)).fetchone()
+            completion = db.execute("SELECT 1 FROM completions WHERE task_id=? AND occurrence=?",
+                                    (key, occurrence)).fetchone()
+            if not task or not completion:
+                raise ValueError("Unknown completion")
+            if task["repeat"] == "once":
+                if db.execute("SELECT 1 FROM posters WHERE task_id=?", (key,)).fetchone():
+                    raise ValueError("Remove linked posters first")
+                db.execute("DELETE FROM tasks WHERE id=?", (key,))
+            else:
+                # Keep only the occurrence suppression marker; otherwise deletion
+                # would resurrect a completed recurring task on the same date.
+                db.execute("INSERT OR REPLACE INTO completion_history VALUES (?,?,NULL,NULL,1)",
+                           (key, occurrence))
 
     def add_poster(self, title, body, start, *, end=None, note="", task_id=None):
         title, start = text(title), day(start)
@@ -324,7 +351,19 @@ class Household:
                     "SELECT 1 FROM completions WHERE task_id=? AND occurrence=?",
                     (task["id"], occurrence)).fetchone())
                 tasks.append(task)
+            history = [dict(r) for r in db.execute("""
+                SELECT t.id, COALESCE(h.title,t.title) AS title, t.repeat,
+                       c.occurrence, h.completed_at
+                FROM completions c JOIN tasks t ON t.id=c.task_id
+                LEFT JOIN completion_history h ON h.task_id=c.task_id AND h.occurrence=c.occurrence
+                WHERE COALESCE(h.hidden,0)=0
+                ORDER BY COALESCE(h.completed_at,c.occurrence) DESC, c.occurrence DESC, t.id
+                """)]
+            for record in history:
+                task = next(t for t in tasks if t["id"] == record["id"])
+                record["restorable"] = task["occurrence"] == record["occurrence"]
             return {"date": on, "display_settings": self._display_settings(db), "tasks": tasks,
+                    "history": history,
                     "posters": [dict(r) for r in db.execute("SELECT * FROM posters ORDER BY start,id")],
                     "shopping": [dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]}
 
