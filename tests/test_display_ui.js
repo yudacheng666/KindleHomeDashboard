@@ -33,15 +33,16 @@ function advance(ms){
   clock=end;
 }
 class XHR {
-  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto"].includes(path));this.path=path;}
+  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto","/api/weather/view"].includes(path));this.path=path;}
   setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
+  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/weather/view"?{status:"ready",name:"Example",sections:{current:{status:"available",source:"QWeather",fetched_at:"2026-01-05T00:00:00Z",attributions:[],data:{temp:20,text:"晴",time:"2026-01-05T00:00:00Z"}}}}:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
 function click(id){el(id).onclick();}
 function heading(expected){assert.equal(el("heading").textContent,expected);}
 el("token").value="example-display-token";click("connect");heading("待办清单");
+click("weatherMode");heading("Example · 天气");assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent==="暂不可用"));click("tasksMode");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");assert.equal(el("displayManage").href,"/home#display/return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);
