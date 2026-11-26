@@ -42,7 +42,15 @@ assert.equal(el("vehicles").children.length,2);
 assert.equal(el("vehicles").children[0].children[1].textContent,"4 分钟");
 el("settings").onclick();el("keyword").value="Example";
 for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
-searchError="";el("search").onclick();el("detail").onclick();
+searchError="";el("search").onclick();
+el("direction").value="1";el("direction").onchange();el("search").onclick();
+assert.equal(el("direction").value,"1");
+el("broadSearch").onclick();
+assert.equal(calls[calls.length-1][2].broad,true);
+assert.equal(el("direction").value,"1");
+el("detail").onclick();
+assert.equal(calls[calls.length-1][2].direction,"1");
+
 assert.equal(el("board").children.length,2);
 el("board").value="1";el("board").onchange();
 assert.equal(el("destination").children.length,1);
