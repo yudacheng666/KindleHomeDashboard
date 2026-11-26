@@ -19,7 +19,7 @@ from dashboard.http_api import API, LocalServer
 from dashboard.runtime import Runtime
 from dashboard.service import BusService
 from dashboard.weather_service import WeatherService
-from test_weather_service import ENV, q_current
+from test_weather_service import ENV, q_current, meteo
 
 
 def main():
@@ -59,7 +59,7 @@ def main():
             if "/geo/v2/city/lookup" in url:
                 return {"code":"200","location":[{"name":"Fictional district","adm1":"Fictional province","lat":"1.23","lon":"2.34"},{"name":"Fictional district","adm1":"Other province","lat":"3.45","lon":"4.56"}]}
             return q_current(now)
-        weather=WeatherService(directory,ENV,clock=lambda:now,q_transport=fake_weather)
+        weather=WeatherService(directory,ENV,clock=lambda:now,q_transport=fake_weather,backup_transport=lambda u,h:meteo())
         with LocalServer(API(runtime, reader, admin, household=home, weather=weather), 0) as server:
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -286,6 +286,26 @@ def main():
                 click("settings");click("weatherLoad")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))
                 assert js("return document.getElementById('weatherEnabled').checked")
+                click("weatherAdd");click("weatherManual")
+                js("document.getElementById('weatherName').value='Fictional custom';document.getElementById('weatherLat').value='3.45';document.getElementById('weatherLon').value='4.56'")
+                click("weatherSave")
+                wait(lambda:text_in("weatherSettingStatus","已保存"))
+                assert weather.settings_view()["additional"]==[{"name":"Fictional custom","latitude":3.45,"longitude":4.56}]
+                for _ in range(9): weather.step()
+                click("returnDisplay");click("tasksMode");click("weatherMode")
+                wait(lambda:text_in("body","Fictional custom"))
+                assert weather.read()["additional"][0]["sections"]["current"]["status"]=="available"
+                click("settings");click("weatherLoad")
+                wait(lambda:text_in("weatherSettingStatus","已读取"))
+                js("document.querySelectorAll('#weatherLocations button')[1].click()")
+                click("weatherMakePrimary");click("weatherSave")
+                wait(lambda:text_in("weatherSettingStatus","已保存"))
+                assert weather.settings_view()["name"]=="Fictional custom"
+                assert weather.settings_view()["additional"][0]["name"]=="Fictional district"
+                js("document.querySelectorAll('#weatherLocations button')[1].click()")
+                click("weatherRemove");click("weatherSave")
+                wait(lambda:text_in("weatherSettingStatus","已保存"))
+                assert weather.settings_view()["additional"]==[]
                 click("returnDisplay")
                 click("postersMode")
                 wait(lambda:text_in("heading","Fictional reminder"))

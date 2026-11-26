@@ -8,7 +8,8 @@ import json
 import unittest
 from secrets import token_urlsafe
 from dashboard.weather_service import WeatherService
-from dashboard.weather import WeatherError, WeatherBlocked
+from dashboard.weather import WeatherError, WeatherBlocked, LIMIT, INTERVALS
+from dashboard.weather_service import SECONDARY_INTERVALS
 from dashboard.http_api import API, LocalServer
 from dashboard.runtime import Runtime
 from dashboard.service import BusService
@@ -160,6 +161,32 @@ class WeatherServiceTests(unittest.TestCase):
         self.service.configure({**CONFIG,"additional":[third]})
         self.assertEqual(self.service.read()["additional"][0]["status"],"waiting")
         self.assertEqual(self.service.ledger.usage()["used"],12)
+
+    def test_shared_quota_and_location_isolation(self):
+        extra={"name":"Fictional second","latitude":3.45,"longitude":4.56}
+        self.service.configure({**CONFIG,"additional":[extra]})
+        calls=[]
+        def specific(url,headers):
+            calls.append(url)
+            raw=self.q(url,headers)
+            if "/weather/v1/current/3.45/4.56" in url:
+                raw["temperature"]["value"]=25
+            return raw
+        self.service.primary.transport=specific
+        for _ in range(9): self.service.step()
+        v=self.service.read()
+        self.assertEqual(v["sections"]["current"]["data"]["temp"],20)
+        self.assertEqual(v["additional"][0]["sections"]["current"]["data"]["temp"],25)
+        with self.service.ledger._connect() as db:
+            db.execute("UPDATE request_days SET used=?",(LIMIT-1,))
+        self.mono+=600
+        self.service.step()
+        self.assertEqual(self.service.ledger.usage()["rolling_used"],LIMIT)
+        count=len(calls)
+        self.mono+=1800
+        for _ in range(20): self.service.step()
+        self.assertEqual(len(calls),count)
+        self.assertLess((sum(86400//x for x in INTERVALS.values())+2*sum(86400//x for x in SECONDARY_INTERVALS.values()))*32,LIMIT)
 
     def test_legacy_location_upgrade(self):
         self.service.configure(CONFIG)
