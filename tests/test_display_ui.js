@@ -64,6 +64,18 @@ busData={...bus,snapshot:{...bus.snapshot,fetched_at:new Date(FakeDate.now()-500
 assert.ok(el("body").children.some(n=>n.textContent==="约 4 分钟"));
 assert.ok(el("body").children.some(n=>n.textContent==="约 9 分钟"));
 const oldBus=busRequests;const ageBefore=el("body").children.at(-1).textContent;assert.ok(ageBefore.startsWith("数据更新于"));advance(5000);assert.equal(busRequests,oldBus);assert.equal(el("body").children.at(-1).textContent,ageBefore);advance(10000);assert.equal(busRequests,oldBus+1);advance(45000);assert.ok(el("body").children.some(n=>n.textContent==="约 3 分钟"));assert.equal(el("body").children.at(-1).textContent,ageBefore);
+// The same cached prediction does not recreate the vehicle DOM.
+const firstEta=el("body").children.find(n=>n.className==="eta");
+busData={...bus,snapshot:{...bus.snapshot,fetched_at:new Date(FakeDate.now()).toISOString()}};advance(15000);
+assert.equal(el("body").children.find(n=>n.className==="eta"),firstEta);
+assert.equal(firstEta.textContent,"约 4 分钟"); // new sample can increase ETA
+assert.ok(el("body").children.some(n=>n.textContent.startsWith("预计到站 ")));
+busData={...busData,snapshot:{...busData.snapshot,status:"stale"}};advance(15000);
+assert.ok(el("body").children.some(n=>n.textContent==="旧预测 · 约 4 分钟"));
+busData={...bus,snapshot:{...bus.snapshot,fetched_at:new Date(FakeDate.now()).toISOString(),vehicles:[{...bus.snapshot.vehicles[0],eta_min:1},bus.snapshot.vehicles[1]]}};advance(15000);
+assert.ok(el("body").children.some(n=>n.textContent==="预计即将到站"));
+advance(45000);assert.ok(el("body").children.some(n=>n.textContent==="等待到站确认"));assert.equal(el("body").children.filter(n=>n.className==="eta").length,2);
+advance(30000);assert.ok(el("body").children.some(n=>n.textContent==="等待数据更新"));
 busData={...bus,snapshot:{...bus.snapshot,status:"expired",vehicles:[]}};advance(15000);
 assert.ok(!el("body").children.some(n=>n.className==="eta"));assert.ok(!el("body").children.some(n=>n.textContent.includes("数据更新于")));
 click("familyMode");heading("今日生活");assert.equal(el("familyControls").className,"");
