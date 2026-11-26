@@ -18,6 +18,8 @@ from dashboard.household import Household
 from dashboard.http_api import API, LocalServer
 from dashboard.runtime import Runtime
 from dashboard.service import BusService
+from dashboard.weather_service import WeatherService
+from test_weather_service import ENV, q_current
 
 
 def main():
@@ -51,7 +53,12 @@ def main():
         bus = BusService(directory, enabled=False)
         runtime = Runtime(bus, clock=lambda:now)
         reader, admin = token_urlsafe(32), token_urlsafe(32)
-        with LocalServer(API(runtime, reader, admin, household=home), 0) as server:
+        weather_calls=[]
+        def fake_weather(url, headers):
+            weather_calls.append(url)
+            return q_current(now)
+        weather=WeatherService(directory,ENV,clock=lambda:now,q_transport=fake_weather)
+        with LocalServer(API(runtime, reader, admin, household=home, weather=weather), 0) as server:
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             proc = subprocess.Popen(
@@ -231,6 +238,8 @@ def main():
                 click("settings")
                 assert js("return getComputedStyle(document.getElementById(\'displayContent\')).display===\'none\' && getComputedStyle(document.getElementById(\'settingsPanel\')).display!==\'none\'")
                 assert js("return document.getElementById(\'manageLink\').getAttribute(\'href\')===\'/bus#return-tasks\'")
+                click("weatherLoad")
+                wait(lambda:text_in("weatherSettingStatus","需要管理权限"))
                 click("returnDisplay")
                 assert text_in("heading","待办清单")
                 click("postersMode");assert text_in("heading","Fictional reminder")
@@ -253,6 +262,22 @@ def main():
                 server.api.admin_token = None
                 go("/display")
                 wait(lambda:text_in("heading","待办清单"))
+                click("weatherMode")
+                wait(lambda:text_in("body","天气未启用"))
+                click("settings");click("weatherLoad")
+                wait(lambda:text_in("weatherSettingStatus","已读取"))
+                js("document.getElementById('weatherName').value='Fictional district';document.getElementById('weatherLat').value='1.23';document.getElementById('weatherLon').value='2.34';document.getElementById('weatherEnabled').checked=true;document.getElementById('weatherConsent').checked=true")
+                click("weatherSave")
+                wait(lambda:text_in("weatherSettingStatus","已保存"))
+                assert weather.settings_view()["enabled"] and not weather_calls
+                weather.step()
+                click("returnDisplay");click("tasksMode");click("weatherMode")
+                wait(lambda:text_in("body","20°C"))
+                assert text_in("body","和风天气") and len(weather_calls)==1
+                click("settings");click("weatherLoad")
+                wait(lambda:text_in("weatherSettingStatus","已读取"))
+                assert js("return document.getElementById('weatherEnabled').checked")
+                click("returnDisplay")
                 click("postersMode")
                 wait(lambda:text_in("heading","Fictional reminder"))
                 click("settings")

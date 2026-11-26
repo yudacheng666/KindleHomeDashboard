@@ -200,6 +200,7 @@ class WeatherService:
         self.settings = dict(DEFAULT)
         self.error = ""
         self.primary = None
+        self.primary_blocked = False
         self.ledger = None
         self.generation = 0
         self.records = {}
@@ -219,6 +220,7 @@ class WeatherService:
                 if not (root/"weather-budget.sqlite3").exists():
                     raise ValueError("missing_weather_budget")
             self.ledger = RequestLedger(str(root), clock)
+            self.primary_blocked = self.primary_blocked
         except Exception:
             self.error = "storage_error"
             return
@@ -302,10 +304,14 @@ class WeatherService:
                     if generation==self.generation:
                         self.records[kind]=record
                         self.failures.pop(kind,None)
-            except Exception:
+            except Exception as exc:
                 with self.lock:
+                    if isinstance(exc, WeatherBlocked):
+                        self.primary_blocked=True
                     if generation==self.generation:
-                        self.failures[kind]="unavailable"
+                        count=self.failures.get(kind,0)+1
+                        self.failures[kind]=count
+                        self.due[kind]=self.monotonic()+min(3600,INTERVALS[kind]*(2**min(count,4)))
                         if kind in CORE and self.monotonic()>=self.backup_due:
                             self.backup_due=self.monotonic()+BACKUP_INTERVAL
                             backup_due=True
