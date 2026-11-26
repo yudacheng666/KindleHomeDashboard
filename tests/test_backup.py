@@ -60,7 +60,8 @@ class BackupTests(unittest.TestCase):
         from datetime import datetime,timezone
         now=datetime(2026,1,5,tzinfo=timezone.utc)
         service=WeatherService(str(self.source),{},clock=lambda:now)
-        service.configure({"enabled":True,"consent":True,"name":"Example district","latitude":1.23,"longitude":2.34})
+        service.configure({"enabled":True,"consent":True,"name":"Example district","latitude":1.23,"longitude":2.34,
+                           "additional":[{"name":"Example second","latitude":3.45,"longitude":4.56}]})
         service.ledger.reserve()
         self.save()
         restore(str(self.snapshot),str(self.restored))
@@ -68,6 +69,7 @@ class BackupTests(unittest.TestCase):
         self.assertFalse(restored.settings_view()["enabled"])
         self.assertFalse(restored.settings_view()["consent"])
         self.assertEqual(restored.settings_view()["name"],"Example district")
+        self.assertEqual(restored.settings_view()["additional"],[{"name":"Example second","latitude":3.45,"longitude":4.56}])
         self.assertEqual(restored.settings_view()["budget"]["used"],1)
         with self.assertRaises(WeatherBlocked):
             restored.ledger.reserve()

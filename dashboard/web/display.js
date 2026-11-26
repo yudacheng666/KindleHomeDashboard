@@ -274,6 +274,40 @@ function weatherPart(root,sections,key,title,attrs,draw){
   draw(block,s.data);
   weatherSource(block,s,attrs);
 }
+function weatherRain(block,r){
+  append(block,"p",r.summary+" · 每5分钟预报");
+  if(Array.isArray(r.points)&&r.points.length>1){
+    var bars=append(block,"div","","rain-bars");
+    var maximum=Math.max.apply(null,r.points.map(function(p){return p.mm;}));
+    r.points.forEach(function(p){
+      var cell=append(bars,"span",""),bar=append(cell,"b","");
+      if(bar.style)bar.style.height=String(maximum>0?Math.max(1,Math.round(30*p.mm/maximum)):1)+"px";
+    });
+    append(block,"p",r.points[0].time.slice(11,16)+" — "+r.points[r.points.length-1].time.slice(11,16)+" · 峰值 "+maximum+" mm/5分钟","weather-source");
+  }
+  append(block,"p","预报生成时间 "+weatherTime(r.time),"weather-source");
+}
+function weatherSecondary(root,v,attrs){
+  var area=append(root,"section","","weather-location"),s=v.sections||{};
+  append(area,"h2",v.name);
+  if(s.current&&s.current.status==="available"){
+    var c=s.current.data;append(area,"p",weatherNum(c.temp,"°C")+"　"+c.text,"weather-compact");
+    append(area,"p","体感 "+weatherNum(c.feels,"°C")+" · 湿度 "+weatherNum(c.humidity,"%"),"note");
+    weatherSource(area,s.current,attrs);
+  }else append(area,"p","等待当前天气","note");
+  weatherPart(area,s,"rain","未来2小时降水",attrs,weatherRain);
+  var a=s.alerts;
+  if(a&&a.status==="available"){
+    if(a.data.length)a.data.forEach(function(x){
+      var warning=append(area,"div","","weather-alert");
+      append(warning,"p",x.headline);append(warning,"p",x.sender+" · "+weatherTime(x.issued),"note");
+      if(x.description)append(warning,"p",x.description,"note");
+      if(x.instruction)append(warning,"p",x.instruction,"note");
+    });
+    else append(area,"p","本次未查到预警，以气象部门发布为准。","weather-source");
+    weatherSource(area,a,attrs);
+  }else append(area,"p","预警暂不可用","note");
+}
 function acceptWeather(v){
   data=null;pages=[];cursor=0;stopRotation();stopAge();
   var key=JSON.stringify(v);
@@ -300,10 +334,9 @@ function acceptWeather(v){
           if(a.instruction)append(row,"p",a.instruction,"note");
         });
       });
-      weatherPart(root,s,"rain","未来2小时降水",attrs,function(block,r){
-        append(block,"p",r.summary+" · 每5分钟预报");
-        append(block,"p","预报生成时间 "+weatherTime(r.time),"weather-source");
-      });
+      weatherPart(root,s,"rain","未来2小时降水",attrs,weatherRain);
+      (v.additional||[]).forEach(function(place){weatherSecondary(root,place,attrs);});
+      if(v.additional&&v.additional.length)append(root,"h2",v.name+" · 主地点预报");
       weatherPart(root,s,"hourly","未来12小时",attrs,function(block,rows){
         var strip=append(block,"div","","weather-strip");
         rows.slice(0,12).forEach(function(h,i){
@@ -326,10 +359,11 @@ function acceptWeather(v){
         rows.forEach(function(a){append(block,"p",a.name+" "+a.aqi+" · "+a.category,"note");});
       });
       attrs.forEach(function(a){append(root,"p",a,"weather-source");});
-      if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="QWeather";})){
+      var allSections=[s].concat((v.additional||[]).map(function(p){return p.sections||{};}));
+      if(allSections.some(function(sections){return Object.keys(sections).some(function(k){return sections[k].status==="available"&&sections[k].source==="QWeather";});})){
         var attribution=append(root,"a","天气服务由和风天气驱动","weather-source");attribution.href="https://www.qweather.com";attribution.rel="noreferrer";
       }
-      if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="Open-Meteo";})){
+      if(allSections.some(function(sections){return Object.keys(sections).some(function(k){return sections[k].status==="available"&&sections[k].source==="Open-Meteo";});})){
         var meteoLink=append(root,"a"," · Open-Meteo (CC BY 4.0)","weather-source");meteoLink.href="https://open-meteo.com/";meteoLink.rel="noreferrer";
       }
     }
@@ -339,10 +373,41 @@ function acceptWeather(v){
 var weatherSettingsEpoch=0,weatherSettingsBusy=false,weatherSearchEpoch=0,weatherSearchBusy=false;
 function clearWeatherSearch(){weatherSearchEpoch++;weatherSearchBusy=false;el("weatherSearch").disabled=false;clear(el("weatherResults"));txt("weatherSearchStatus","");}
 function weatherSelected(){txt("weatherSelected",el("weatherName").value?"当前选择："+el("weatherName").value:"尚未选择地点");}
+var weatherDraft=[],weatherActive=0;
+function weatherCapture(){
+  if(!weatherDraft.length)return;
+  weatherDraft[weatherActive]={name:el("weatherName").value,latitude:el("weatherLat").value,longitude:el("weatherLon").value};
+}
+function weatherLocationButtons(){
+  var root=el("weatherLocations");clear(root);
+  weatherDraft.forEach(function(p,i){
+    var b=append(root,"button",(i===0?"主地点：":"地点 "+(i+1)+"：")+(p.name||"未命名"),i===weatherActive?"selected":"");
+    b.type="button";b.onclick=function(){if(weatherSettingsBusy)return;weatherCapture();weatherActive=i;weatherEdit();};
+  });
+  el("weatherAdd").disabled=weatherDraft.length>=3;
+  el("weatherMakePrimary").disabled=weatherActive===0;
+  el("weatherRemove").disabled=weatherDraft.length<=1;
+}
+function weatherEdit(){
+  var p=weatherDraft[weatherActive];el("weatherName").value=p.name;el("weatherLat").value=p.latitude;el("weatherLon").value=p.longitude;
+  clearWeatherSearch();el("weatherKeyword").value="";weatherSelected();show("weatherCoordinates",false);weatherLocationButtons();
+}
+el("weatherAdd").onclick=function(){
+  if(weatherSettingsBusy||weatherDraft.length>=3)return;
+  weatherCapture();weatherDraft.push({name:"",latitude:"",longitude:""});weatherActive=weatherDraft.length-1;weatherEdit();
+};
+el("weatherMakePrimary").onclick=function(){
+  if(weatherSettingsBusy||weatherActive===0)return;
+  weatherCapture();weatherDraft.unshift(weatherDraft.splice(weatherActive,1)[0]);weatherActive=0;weatherEdit();
+};
+el("weatherRemove").onclick=function(){
+  if(weatherSettingsBusy||weatherDraft.length<=1)return;
+  weatherDraft.splice(weatherActive,1);weatherActive=0;weatherEdit();txt("weatherSettingStatus","已移除草稿地点，保存后生效。");
+};
 function weatherForm(v){
   el("weatherEnabled").checked=v.enabled===true;el("weatherConsent").checked=v.consent===true;
-  el("weatherName").value=v.name||"";el("weatherLat").value=v.name?String(v.latitude):"";el("weatherLon").value=v.name?String(v.longitude):"";
-  clearWeatherSearch();el("weatherKeyword").value="";weatherSelected();show("weatherCoordinates",false);
+  weatherDraft=[v].concat(v.additional||[]).map(function(p){return {name:p.name||"",latitude:p.name?String(p.latitude):"",longitude:p.name?String(p.longitude):""};});
+  weatherActive=0;weatherEdit();
   var b=v.budget;txt("weatherBudget",(v.primary_configured?"和风凭据已配置":"和风凭据未配置，仅可使用备用源")+
     (b?" · 本月已计 "+b.used+" / "+b.limit+"，滚动32天 "+b.rolling_used+(b.blocked?" · 和风已阻断，需核查账户":"")+(b.backup_blocked?" · 备用源已阻断":""):" · 额度不可用"));
   show("weatherForm",true);
@@ -370,7 +435,7 @@ function weatherSettingsRequest(body){
 }
 el("weatherLoad").onclick=function(){weatherSettingsRequest(null);};
 el("weatherManual").onclick=function(){show("weatherCoordinates",el("weatherCoordinates").className==="hidden");};
-el("weatherName").oninput=weatherSelected;
+el("weatherName").oninput=function(){weatherCapture();weatherSelected();weatherLocationButtons();};
 el("weatherKeyword").oninput=clearWeatherSearch;
 el("weatherConsent").onchange=function(){if(!el("weatherConsent").checked)clearWeatherSearch();};
 el("weatherSearch").onclick=function(){
@@ -398,7 +463,7 @@ el("weatherSearch").onclick=function(){
         if(g!==weatherSearchEpoch||!settingsOpen)return;
         el("weatherName").value=item.name;el("weatherLat").value=String(item.latitude);el("weatherLon").value=String(item.longitude);
         clearWeatherSearch();txt("weatherSelected","当前选择："+item.name+(item.region?" · "+item.region:""));
-        show("weatherCoordinates",false);txt("weatherSearchStatus","已选择，请保存天气设置。");
+        weatherCapture();weatherLocationButtons();show("weatherCoordinates",false);txt("weatherSearchStatus","已选择，可修改显示名称，请保存天气设置。");
       };
     });
   }
@@ -413,12 +478,21 @@ el("weatherSearch").onclick=function(){
 };
 el("weatherKeyword").onkeydown=function(e){e=e||window.event;if(e&&e.keyCode===13)el("weatherSearch").onclick();};
 el("weatherSave").onclick=function(){
-  var a=el("weatherLat").value,b=el("weatherLon").value,enabled=el("weatherEnabled").checked,consent=el("weatherConsent").checked,name=el("weatherName").value;
-  if(!enabled&&!name&&!a&&!b){a="0";b="0";}
-  if(!/^-?\d{1,3}(\.\d{1,2})?$/.test(a)||! /^-?\d{1,3}(\.\d{1,2})?$/.test(b)||
-    Math.abs(Number(a))>90||Math.abs(Number(b))>180||(enabled&&(!consent||!name.trim()))){
-    txt("weatherSettingStatus","请输入有效经纬度、名称并确认位置传输。");return;}
-  weatherSettingsRequest({enabled:enabled,consent:consent,name:name,latitude:Number(a),longitude:Number(b)});
+  if(weatherSettingsBusy||!weatherDraft.length)return;
+  weatherCapture();
+  var enabled=el("weatherEnabled").checked,consent=el("weatherConsent").checked,places=[];
+  for(var i=0;i<weatherDraft.length;i++){
+    var p=weatherDraft[i],a=p.latitude,b=p.longitude,name=p.name.trim();
+    if(i===0&&weatherDraft.length===1&&!enabled&&!name&&!a&&!b){a="0";b="0";}
+    if(!/^-?\d{1,3}(\.\d{1,2})?$/.test(a)||! /^-?\d{1,3}(\.\d{1,2})?$/.test(b)||
+       Math.abs(Number(a))>90||Math.abs(Number(b))>180||((enabled||weatherDraft.length>1)&&!name)){
+      txt("weatherSettingStatus","第"+(i+1)+"个地点：请输入有效名称及经纬度。");weatherActive=i;weatherEdit();show("weatherCoordinates",true);return;
+    }
+    places.push({name:name,latitude:Number(a),longitude:Number(b)});
+  }
+  if(enabled&&!consent){txt("weatherSettingStatus","请确认位置传输授权。");return;}
+  var main=places.shift();
+  weatherSettingsRequest({enabled:enabled,consent:consent,name:main.name,latitude:main.latitude,longitude:main.longitude,additional:places});
 };
 
 function modeLabel(){
