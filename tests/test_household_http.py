@@ -171,6 +171,17 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.post("category/delete",{"key":c,"confirm":True})
         self.assertEqual(self.view()["week_menu"][0]["dishes"],["Example dish"])
 
+    def test_upcoming_tasks_are_visible_but_not_completable_early(self):
+        future=self.post("task/add",{"title":"Example future","start":"2026-01-12","repeat":"once"})
+        daily=self.task()
+        rows=self.view()["upcoming_tasks"]
+        self.assertEqual([(t["id"],t["occurrence"]) for t in rows],[(daily,self.today),(future,"2026-01-12")])
+        self.post("task/complete",{"key":future,"on":"2026-01-12","completed":True},400)
+        self.post("task/complete",{"key":future,"on":self.today,"completed":True},400)
+        self.post("task/complete",{"key":daily,"on":self.today,"completed":True})
+        self.assertEqual(self.view()["tasks"],[])
+        self.assertEqual(self.view()["upcoming_tasks"][0]["occurrence"],"2026-01-06")
+
     def test_completion_permission_and_history(self):
         key=self.task()
         self.assertFalse(self.view()["can_complete"])

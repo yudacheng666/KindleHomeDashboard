@@ -170,6 +170,40 @@ class Household:
                 result.append({"id":task["id"],"title":task["title"],"occurrence":occurrence})
         return result
 
+    def _upcoming_tasks(self, db, on, due):
+        """One visible occurrence per task; never expand an endless recurrence."""
+        result = list(due)
+        due_ids = {item["id"] for item in due}
+        today = date.fromisoformat(on)
+        for task in db.execute("SELECT * FROM tasks ORDER BY start,id"):
+            if task["id"] in due_ids:
+                continue
+            start = date.fromisoformat(task["start"])
+            if task["repeat"] == "once":
+                # Overdue uncompleted items are already in due.
+                if start <= today:
+                    continue
+                candidate = start
+                step = 0
+            else:
+                candidate = max(start,today)
+                step = 1 if task["repeat"] == "daily" else 7
+                offset = (-(candidate-start).days) % step
+                if (date.max-candidate).days < offset:
+                    continue
+                candidate += timedelta(days=offset)
+            # Normally at most today's completed occurrence is skipped. Also
+            # respect existing completion markers from an earlier clock setting.
+            while db.execute("SELECT 1 FROM completions WHERE task_id=? AND occurrence=?",
+                             (task["id"],candidate.isoformat())).fetchone():
+                if not step or (date.max-candidate).days < step:
+                    candidate = None
+                    break
+                candidate += timedelta(days=step)
+            if candidate is not None:
+                result.append({"id":task["id"],"title":task["title"],"occurrence":candidate.isoformat()})
+        return sorted(result,key=lambda item:(item["occurrence"],item["id"]))
+
     def complete(self, key, on, completed=True, completed_at=None):
         on = day(on)
         if type(completed) is not bool:
@@ -619,6 +653,6 @@ class Household:
             last=first+timedelta(days=min(settings["days"]-1,(date.max-first).days))
             week=self._menus(db,first.isoformat(),last.isoformat())
             shopping=[dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]
-            return {"date":on,"display_settings":self._display_settings(db),"tasks":tasks,"posters":posters,
+            return {"date":on,"display_settings":self._display_settings(db),"tasks":tasks,"upcoming_tasks":self._upcoming_tasks(db,on,tasks),"posters":posters,
                     "today_menu":[m for m in week if m["day"]==on],
                     "week_menu":week,"menu_display":settings,"menu_range":{"first":first.isoformat(),"last":last.isoformat()},"shopping":shopping}

@@ -12,7 +12,7 @@ const doc={hidden:false,getElementById(id){return nodes[id]||(nodes[id]=new Node
 const el=id=>doc.getElementById(id);
 const descendants=n=>n.children.flatMap(c=>[c,...descendants(c)]);
 const busNodes=()=>descendants(el("body"));
-const date="2026-01-05",task={id:"test-task",title:"Example task"};
+const date="2026-01-05",task={id:"test-task",title:"Example task",occurrence:date};
 const poster={id:"test-poster",title:"Example reminder",body:"Line one\nLine two",note:"Example note"};
 const meal={day:date,meal:"dinner",dishes:["Example dish"]};
 const shopping={id:"test-item",label:"Example ingredient",completed:0};
@@ -57,6 +57,15 @@ doc.hidden=true;events.visibilitychange();const weatherHidden=requests;advance(2
 doc.hidden=false;events.visibilitychange();heading("Example");
 weatherData=weatherExample;advance(30000);heading("Example");assert.equal(el("index").textContent,"");advance(240000);heading("Example");
 click("tasksMode");heading("待办清单");
+data={...sample,upcoming_tasks:[{id:"overdue",title:"Overdue example",occurrence:"2026-01-03"},task,{id:"next",title:"Tomorrow example",occurrence:"2026-01-06"},{id:"far",title:"Future example",occurrence:"2030-01-01"},{id:"same",title:"Another future example",occurrence:"2030-01-01"}]};
+advance(30000);
+assert.equal(descendants(el("body")).filter(n=>n.className==="task-date").length,4);
+assert.equal(descendants(el("body")).filter(n=>n.className==="task-row").length,5);
+assert.ok(descendants(el("body")).some(n=>n.textContent==="逾期"));
+assert.ok(descendants(el("body")).some(n=>n.textContent==="明日"));
+assert.ok(descendants(el("body")).some(n=>n.textContent.indexOf("2030/01/01")===0));
+assert.ok(!descendants(el("body")).some(n=>n.className==="task-complete"));
+data=sample;
 click("drivingMode");heading("驾驶");assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,3);assert.equal(descendants(el("body")).filter(n=>n.tag==="img").length,3);assert.ok(descendants(el("body")).some(n=>n.textContent==="1  10分钟"));click("tasksMode");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");assert.equal(el("displayManage").href,"/home#display/return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
@@ -201,7 +210,7 @@ console.log("Household display simulation passed: automatic switching, override,
 
 // Authorized completion: cancellation, failed write, successful write, no automatic deletion.
 {
-  let confirmed=false, posts=0, postFail=true, current={...sample,can_complete:true};
+  let confirmed=false, posts=0, postFail=true, future={id:"future",title:"Future example",occurrence:"2026-01-06"},current={...sample,can_complete:true,upcoming_tasks:[task,future]};
   class TaskXHR {
     open(method,path){this.method=method;this.path=path;}
     setRequestHeader(){}
@@ -210,7 +219,7 @@ console.log("Household display simulation passed: automatic switching, override,
       if(this.method==="POST"){
         posts++;assert.deepEqual(JSON.parse(body),{key:task.id,on:date,completed:true});
         this.status=postFail?503:200;
-        if(!postFail)current={...current,tasks:[]};
+        if(!postFail)current={...current,tasks:[],upcoming_tasks:[future]};
         this.responseText=JSON.stringify(postFail?{error:"service_error"}:{result:null});
       }else this.responseText=JSON.stringify(current);
       this.readyState=4;this.onreadystatechange();
@@ -219,7 +228,7 @@ console.log("Household display simulation passed: automatic switching, override,
   }
   vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{KHD_ACCESS:{direct:true,openAdmin:true},confirm:()=>confirmed,addEventListener(){}},XMLHttpRequest:TaskXHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
   const completeButton=()=>descendants(el("body")).find(n=>n.tag==="button"&&n.textContent==="完成");
-  assert.ok(completeButton());completeButton().onclick();assert.equal(posts,0);
+  assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,1);assert.ok(completeButton());completeButton().onclick();assert.equal(posts,0);
   confirmed=true;completeButton().onclick();assert.equal(posts,1);assert.ok(completeButton());assert.ok(el("status").textContent.includes("未确认"));
-  postFail=false;completeButton().onclick();assert.equal(posts,2);assert.equal(el("body").children[0].textContent,"暂无待办");
+  postFail=false;completeButton().onclick();assert.equal(posts,2);assert.ok(!completeButton());assert.ok(descendants(el("body")).some(n=>n.textContent==="Future example"));
 }

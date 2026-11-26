@@ -409,6 +409,22 @@ def main():
                 wait(lambda:home.manage("2026-01-05")["history"]==[])
                 wait(lambda:text_in("content","暂无历史待办"))
                 assert len(home.manage("2026-01-05")["tasks"])==1
+                # Upcoming tasks are grouped in the real narrow display; only
+                # due items can be completed, and linked posters remain due-only.
+                old=home.add_task("Fictional overdue","2026-01-03")
+                upcoming=home.add_task("Fictional future","2026-01-06")
+                same=home.add_task("Fictional same day","2026-01-06")
+                repeated=home.add_task("Fictional recurring","2026-01-05","daily")
+                home.complete(repeated,"2026-01-05")
+                far=home.add_task("Fictional far "+("long title "*12),"2030-01-01")
+                go("/display#tasks")
+                wait(lambda:text_in("body","Fictional future"))
+                assert js("return document.querySelectorAll('.task-date').length===4 && document.querySelectorAll('.task-complete').length===2")
+                assert js("return document.querySelectorAll('.task-date-tag').length===2 && document.querySelector('.task-overdue').textContent==='逾期'")
+                assert js("return Array.from(document.querySelectorAll('.task-row')).filter(n=>n.textContent.indexOf('Fictional future')>=0||n.textContent.indexOf('Fictional recurring')>=0).every(n=>!n.querySelector('button'))")
+                assert js("return document.documentElement.scrollWidth<=window.innerWidth")
+                for key in (old,upcoming,same,repeated,far):
+                    home.delete_task(key)
                 go("/bus")
                 wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
                 assert js("return document.getElementById('settings').className!=='hidden'")
