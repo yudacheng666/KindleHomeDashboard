@@ -132,6 +132,43 @@ class HouseholdTests(unittest.TestCase):
             Household(SOURCE)
         self.assertEqual(self.home.path.stat().st_mode & 0o777,0o600)
 
+    def test_upcoming_tasks_are_ordered_and_do_not_expand_repeats(self):
+        overdue=self.home.add_task("Example overdue","2026-01-03")
+        today=self.home.add_task("Example today",self.today)
+        future=self.home.add_task("Example future","2032-02-29")
+        daily=self.home.add_task("Example daily","2026-01-01","daily")
+        weekly=self.home.add_task("Example weekly","2026-01-01","weekly")
+        not_started=self.home.add_task("Example future daily","2026-02-01","daily")
+        self.home.add_poster("Example reminder",None,self.today,task_id=future)
+        def upcoming(on):
+            v=self.home.view(on)
+            return [(t["id"],t["occurrence"]) for t in v["upcoming_tasks"]]
+        rows=upcoming(self.today)
+        self.assertEqual(dict(rows),{overdue:"2026-01-03",today:self.today,future:"2032-02-29",daily:self.today,weekly:"2026-01-08",not_started:"2026-02-01"})
+        self.assertEqual([d for _,d in rows],sorted(d for _,d in rows))
+        self.assertEqual(self.home.view(self.today)["posters"],[])
+        self.assertEqual({t["id"] for t in self.home.view(self.today)["tasks"]},{overdue,today,daily})
+        self.home.complete(daily,self.today)
+        self.home.complete(overdue,self.today)
+        self.assertEqual(dict(upcoming(self.today))[daily],"2026-01-06")
+        self.assertNotIn(overdue,dict(upcoming(self.today)))
+        self.home.delete_history(daily,self.today)
+        self.assertEqual(dict(upcoming(self.today))[daily],"2026-01-06")
+        self.home.complete(daily,self.today,False)
+        self.assertEqual(dict(upcoming(self.today))[daily],self.today)
+        self.assertEqual(dict(upcoming("2026-01-09"))[weekly],"2026-01-15")
+        self.assertEqual(dict(upcoming("2026-01-09"))[daily],"2026-01-09")
+        self.assertEqual(dict(upcoming("2026-01-09"))[today],self.today)
+
+    def test_upcoming_year_boundary_and_completed_marker(self):
+        key=self.home.add_task("Example daily","2026-12-31","daily")
+        self.home.complete(key,"2026-12-31")
+        self.home.complete(key,"2027-01-01")
+        self.assertEqual(self.home.view("2026-12-31")["upcoming_tasks"][0]["occurrence"],"2027-01-02")
+        last=self.home.add_task("Example final day","9999-12-31","daily")
+        self.home.complete(last,"9999-12-31")
+        self.assertNotIn(last,[t["id"] for t in self.home.view("9999-12-31")["upcoming_tasks"]])
+
     def test_once_overdue_and_completion(self):
         key=self.home.add_task("Example task",self.today)
         self.assertEqual(self.home.view("2026-01-04")["tasks"],[])

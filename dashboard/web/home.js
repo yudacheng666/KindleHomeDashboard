@@ -341,6 +341,18 @@ function menuForm(m){
 function row(parent){return node(parent,"div",undefined,"item");}
 function tasks(p,arr,manage){
   if(!arr.length)node(p,"p","暂无待办");
+  if(!manage){
+    var groups={};
+    arr.forEach(function(t){var day=t.occurrence||data.date;(groups[day]||(groups[day]=[])).push(t);});
+    var overdue=false;
+    Object.keys(groups).sort().forEach(function(day){
+      if(day<data.date&&!overdue){node(p,"h3","逾期");overdue=true;}
+      var group=node(p,"section",undefined,"menu-day"),heading=node(group,"h3",day,"menu-date");
+      if(day===data.date)node(heading,"span","今日","menu-today");
+      groups[day].forEach(function(t){node(group,"p",t.title);});
+    });
+    return;
+  }
   arr.forEach(function(t){var n=row(p);node(n,"p",t.title);if(manage){
     node(n,"small",t.start+" · "+({once:"单次",daily:"每日",weekly:"每周"}[t.repeat])+(t.occurrence?(t.completed?" · 已完成":" · 待完成"):" · 非发生日"));
     if(t.occurrence&&!t.completed)btn(n,"完成",function(){if(window.confirm("确认完成「"+t.title+"」？"))mutate("task/complete",{key:t.id,on:data.date,completed:true});});
@@ -395,7 +407,7 @@ function render(){
       btn(p,"新增待办",function(){taskForm(null);});
       node(p,"small","周期任务在本期完成后仍保留管理入口，下个周期自动出现。");
     }
-    tasks(p,admin?data.tasks.filter(function(t){return t.repeat!=="once"||!t.completed;}):data.tasks,admin);
+    tasks(p,admin?data.tasks.filter(function(t){return t.repeat!=="once"||!t.completed;}):(Array.isArray(data.upcoming_tasks)?data.upcoming_tasks:data.tasks),admin);
   }
   else if(tab==="posters"){node(p,"h2","海报");if(admin){btn(p,"新增海报",function(){posterForm(null);});btn(p,"保存轮播设置",displayForm);}posters(p,data.posters,admin);}
   else if(tab==="catalog"){catalogPage(p);}

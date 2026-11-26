@@ -39,7 +39,10 @@ function useSaved(v){
 }
 function makePages(v){
   var p=[];
-  if(section==="tasks")return [{id:"tasks",title:"待办清单",lines:v.tasks.length?v.tasks.map(function(t){return "□ "+t.title;}):["暂无待办"],note:"",tasks:v.tasks,canComplete:v.can_complete===true}];
+  if(section==="tasks"){
+    var tasks=Array.isArray(v.upcoming_tasks)?v.upcoming_tasks:v.tasks;
+    return [{id:"tasks",title:"待办清单",lines:tasks.length?[]:["暂无待办"],note:"",tasks:tasks,canComplete:v.can_complete===true}];
+  }
   if(section==="posters"){
     v.posters.forEach(function(t){p=p.concat(posterPages(t));});
     return p.length?p:[{id:"posters",title:"海报",lines:["暂无有效海报"],note:""}];
@@ -60,18 +63,33 @@ function updateManagementLinks(){
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
 function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&mode==="weather"&&weatherPages.length>1);if(open)updateManagementLinks();}
+function taskDateLabel(day,today){
+  var d=new Date(day+"T00:00:00Z"),base=new Date(today+"T00:00:00Z");
+  var label=(day.slice(0,4)===today.slice(0,4)?"":day.slice(0,4)+"/")+day.slice(5).replace("-","/");
+  if(!isNaN(d.getTime()))label+=" 周"+"日一二三四五六".charAt(d.getUTCDay());
+  return {label:label,tag:day===today?"今日":d.getTime()-base.getTime()===86400000?"明日":""};
+}
 function render(){
   var p=pages[cursor];if(!p||!data)return;
   var key=JSON.stringify([data.date,p,cursor,pages.length]);
   if(key!==lastRender){
     lastRender=key;txt("date",data.date);txt("heading",p.title);
     var root=el("body");clear(root);
-    if(p.tasks&&p.tasks.length&&p.canComplete){
-      var displayedDate=data.date;
-      p.tasks.forEach(function(t){
-        var row=append(root,"div","","task-row");append(row,"span",t.title,"task-text");
-        var action=append(row,"span","","task-action"),button=append(action,"button","完成","task-complete");
-        button.type="button";button.onclick=function(){completeTask(t,displayedDate,button);};
+    if(p.tasks&&p.tasks.length){
+      var displayedDate=data.date,groups={},overdue=false;
+      p.tasks.forEach(function(t){var day=t.occurrence||displayedDate;(groups[day]||(groups[day]=[])).push(t);});
+      Object.keys(groups).sort().forEach(function(day){
+        if(day<displayedDate&&!overdue){append(root,"h2","逾期","task-overdue");overdue=true;}
+        var group=append(root,"section","","task-day"),label=taskDateLabel(day,displayedDate);
+        var heading=append(group,"h3",label.label,"task-date");
+        if(label.tag)append(heading,"span",label.tag,"task-date-tag");
+        groups[day].forEach(function(t){
+          var row=append(group,"div","","task-row");append(row,"span",t.title,"task-text");
+          if(p.canComplete&&day<=displayedDate){
+            var action=append(row,"span","","task-action"),button=append(action,"button","完成","task-complete");
+            button.type="button";button.onclick=function(){completeTask(t,displayedDate,button);};
+          }
+        });
       });
     }else if(p.menus&&p.menus.length){
       var days={},names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
@@ -92,7 +110,7 @@ function render(){
   txt("pause",running?"暂停轮播":"开始轮播");
 }
 function completeTask(t,on,button){
-  if(!token||!data||data.date!==on||data.can_complete!==true||section!=="tasks"||mode!=="family"||settingsOpen)return;
+  if(!token||!data||data.date!==on||(t.occurrence&&t.occurrence>on)||data.can_complete!==true||section!=="tasks"||mode!=="family"||settingsOpen)return;
   if(busy){txt("status","正在同步，请稍后再试。");return;}
   if(!window.confirm("确认完成「"+t.title+"」？完成后保留历史记录。"))return;
   var g=epoch,x=new XMLHttpRequest(),ended=false,timer;
@@ -102,6 +120,7 @@ function completeTask(t,on,button){
     busy=false;button.disabled=false;
     if(ok&&data&&data.date===on){
       data.tasks=data.tasks.filter(function(item){return item.id!==t.id;});
+      if(Array.isArray(data.upcoming_tasks))data.upcoming_tasks=data.upcoming_tasks.filter(function(item){return item.id!==t.id;});
       data.posters=data.posters.filter(function(item){return item.task_id!==t.id;});
       accept(data);refresh();
     }else{
