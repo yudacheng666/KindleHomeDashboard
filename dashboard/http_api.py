@@ -68,7 +68,7 @@ class API:
         if self.household is not None and not self.runtime.active():
             return {"mode": "family", "view": self.household.get(READ)}
         bus = self.runtime.read()
-        if self.household is not None and (bus.trip is None or bus.snapshot.status == "disabled"):
+        if self.household is not None and (bus.trip is None or bus.snapshot.status in ("disabled", "config_error")):
             return {"mode": "family", "view": self.household.get(READ)}
         # During the configured commute, keep bus failures visible rather than
         # silently presenting a timetable or hiding the failure.
@@ -220,7 +220,7 @@ class Handler(BaseHTTPRequestHandler):
         except AccessBlocked:
             self.send_json(503, {"error": "provider_blocked"})
         except BudgetWait as exc:
-            self.send_json(503 if exc.code == "bus_disabled" else 429, {"error": exc.code})
+            self.send_json(503 if exc.code in ("bus_disabled", "bus_config_error") else 429, {"error": exc.code})
         except BusError:
             self.send_json(502, {"error": "provider_error"})
         except (ValueError, TypeError, KeyError, RecursionError):
