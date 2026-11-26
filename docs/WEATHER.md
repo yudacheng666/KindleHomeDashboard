@@ -1,9 +1,9 @@
-# 天气模块（开发候选）
+# 天气模块（rc.13 现场验收候选）
 ## 接入
 - 个人家庭非商用：和风天气优先，Open-Meteo 免费公共预报备用。默认关闭；不注册帐号、不购买计划、不自动扣款。
 - 从和风开发者控制台创建专用项目/凭据，取得专属 API Host（仅 *.qweatherapi.com，不填写 https://）和 API Key。只在 NAS 私有 Compose 环境变量 KHD_QWEATHER_HOST、KHD_QWEATHER_KEY 填写，不提交仓库、不发送聊天或截图、不复用其他应用的密钥。新 release Compose 模板已预留可选变量，保留现有镜像与命名卷；旧 YAML 若不加这两项，仍能使用 Open-Meteo，但不能使用和风。Docker 管理员能看到容器环境变量；HTTP 网页不收发密钥。不要把账户和其他高流量项目共用。
 - 设置页读取天气设置，填地点显示名与区县中心近似经纬度（2位小数），阅读供应商条款并同意向两家供应商发送坐标及其正常联网可见的 NAS 出口 IP，开启并保存。仅管理权限可写。没有和风凭据时可先启用备用源。此版手动输入近似坐标，未接入 GeoAPI 城市搜索或 GPS。
-- [和风定价](https://dev.qweather.com/docs/finance/pricing/)、[认证](https://dev.qweather.com/docs/configuration/authentication/)、[专属域名](https://dev.qweather.com/docs/configuration/api-host/)、[归因](https://dev.qweather.com/docs/terms/attribution/)、[Open-Meteo 条款](https://open-meteo.com/en/terms)。注意和风从 2027-01-01 起计划限制 API Key 每日调用量，具体上限未确认；本候选使用 header API Key，尚未支持 JWT。今后若额度不足优先合法 JWT 接入，不绕过限制。
+- [和风定价](https://dev.qweather.com/docs/finance/pricing/)、[认证](https://dev.qweather.com/docs/configuration/authentication/)、[专属域名](https://dev.qweather.com/docs/configuration/api-host/)、[归因](https://dev.qweather.com/docs/terms/attribution/)、[Open-Meteo 条款](https://open-meteo.com/en/terms)。注意和风[认证文档](https://dev.qweather.com/docs/configuration/authentication/)及[凭据文档](https://dev.qweather.com/docs/configuration/project-and-key/)分别给出2027-01-01与2027-02-01的API Key每日限额实施时间，按较早日期准备，具体上限未确认；本候选使用 header API Key，尚未支持 JWT。今后若额度不足优先合法 JWT 接入，不绕过限制。
 ## 采集及防收费
 - 新版 weather/v1/current、hourly、daily，airquality/v1/current、weatheralert/v1/current；临近降水当前文档仍为 v7/minutely/5m，中国未来2小时每5分钟。固定间隔分别10/30/60/30/10/10分钟，31天理论 17,112 次，失败/手动变更额外计数；每次出网前 SQLite 事务预约，失败也计入，账户无关、滚动32天硬上限40,000，比自然月更保守；时钟倒退、损坏数据不继续调用。HTTP 401/402/403/429 或对应业务拒绝持久阻断，切备用，不自动解除。备用源访问拒绝亦独立持久阻断。没有供应商全账户计费控制，密钥泄露、其他应用、删除/恢复旧卷、供应商调价均可能影响零费保证；账户控制台核对用量及免费档，勿添加收费服务。
 - 现有单容器增加一个独立天气采集线程，不阻塞公交或家庭；禁用时不出网。每次最多处理一个到期主源接口，失败后按接口退避，主源故障时 Open-Meteo 30分钟一次综合请求，最多补当前/逐时/逐日，不冒充官方预警、分钟降雨或中国 AQI。失败字段显示暂不可用；每组独立来源与采集时间，当前/临近降雨检查源时间，过期隐藏，切换地点清空缓存；网络进行中的旧位置请求可能已发送，但旧回调不得污染新地点。局域网读缓存，不触发采集；30秒读取，ES5/XHR、内容变化才改 DOM，后台暂停。
