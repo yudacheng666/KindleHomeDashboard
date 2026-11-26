@@ -362,6 +362,8 @@ def main():
                 click("overviewMode")
                 wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===2 && document.querySelector('#body .overview-pair')!==null"))
                 assert text_in("body","另 1 个目的地")
+                assert not text_in("body","已知拥堵") and not text_in("body","路况未知")
+                assert js("return Array.from(document.querySelectorAll('#body .driving-routes')).every(function(n){return /km/.test(n.textContent)&&/分钟/.test(n.textContent);})")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
                 # Real rendered sizes, visible header geometry and reachable navigation.
                 readable = """return (function(){

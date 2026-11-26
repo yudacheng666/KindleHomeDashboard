@@ -598,7 +598,7 @@ el("weatherSave").onclick=function(){
   weatherSettingsRequest({enabled:enabled,consent:consent,name:main.name,latitude:main.latitude,longitude:main.longitude,additional:places});
 };
 
-function renderDrivingGroups(root,v,limit){
+function renderDrivingGroups(root,v,limit,summary){
     if(!v.enabled||!v.groups.length)append(root,"p","驾驶未启用或未配置，请前往设置。","note");
     var messages={disabled:"未启用",paused:"不在采集时段",waiting:"等待采集",not_configured:"请在NAS配置高德密钥",credential_error:"高德密钥配置有误",storage_error:"配置或额度存储异常",blocked:"已停止请求，请核查高德账号",stale:"旧数据",unavailable:"暂不可用",ok:""};
     (v.groups||[]).slice(0,limit).forEach(function(g){
@@ -610,8 +610,8 @@ function renderDrivingGroups(root,v,limit){
       (g.routes||[]).forEach(function(r,i){
         var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
         append(list,"p",text,i===0?"driving-fast":"");
-        append(list,"p",(r.meters/1000).toFixed(1)+"km"+(r.congested_meters===null?" · 路况未知":" · 已知拥堵 "+(r.congested_meters/1000).toFixed(1)+"km"));
-        if(r.traffic_covered_meters<r.meters*0.9&&r.congested_meters!==null)append(list,"p","部分路况未知","driving-foot");
+        append(list,"p",(r.meters/1000).toFixed(1)+"km"+(summary?"":r.congested_meters===null?" · 路况未知":" · 已知拥堵 "+(r.congested_meters/1000).toFixed(1)+"km"));
+        if(!summary&&r.traffic_covered_meters<r.meters*0.9&&r.congested_meters!==null)append(list,"p","部分路况未知","driving-foot");
       });
       if(!g.routes||!g.routes.length)append(list,"p","暂无可用路线");
       var note=(messages[g.status]||"")+(g.fetched_at?" · 采集 "+weatherTime(g.fetched_at):"");
@@ -830,7 +830,7 @@ function acceptOverviewWeather(v){
 function renderOverviewDriving(v){
   var key=JSON.stringify([v.enabled,v.groups.length,v.groups.slice(0,2)]);if(key===overviewKeys.driving)return;
   overviewKeys.driving=key;var root=overviewRoots.driving;clear(root);
-  renderDrivingGroups(root,v,2);
+  renderDrivingGroups(root,v,2,true);
   overviewLink(root,v.groups.length>2?"另 "+(v.groups.length-2)+" 个目的地 · 全部路线":"全部路线",function(){switchMode("driving");});
 }
 function renderOverviewHome(v){
