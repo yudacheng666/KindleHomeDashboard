@@ -21,11 +21,15 @@ class BusView:
 
 class BusService:
     def __init__(self, directory, *, enabled=False, clock=lambda: datetime.now(timezone.utc),
-                 request=post, daily_limit=1000):
+                 request=post, daily_limit=1000, config_error=False):
         self.clock = clock
+        self.config_error = config_error
+        if config_error:
+            enabled = False
         self.store = TripStore(directory)
         self.gate = RequestGate(self.store, enabled=enabled, clock=clock,
-                                request=request, daily_limit=daily_limit)
+                                request=request, daily_limit=daily_limit,
+                                disabled_code="bus_config_error" if config_error else "bus_disabled")
         self.lock = RLock()
         self.trip = self.store.load()
         self.poller = None
@@ -85,7 +89,7 @@ class BusService:
             if self.gate.blocked:
                 return BusView(self.trip, Snapshot("blocked", now))
             if not self.gate.enabled:
-                return BusView(self.trip, Snapshot("disabled", now))
+                return BusView(self.trip, Snapshot("config_error" if self.config_error else "disabled", now))
             if self.poller:
                 return BusView(self.trip, self.poller.current())
             return BusView(self.trip, Snapshot(self.restore_status, now))
