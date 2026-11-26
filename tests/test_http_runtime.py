@@ -201,6 +201,7 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.req("POST",path,self.admin,{"enabled":True,"windows":[]})[0],400)
         self.assertEqual(self.req("POST",path,self.admin,off)[0],200)
         self.assertFalse(self.bus.gate.enabled)
+        self.assertFalse(self.runtime.active())
         self.assertEqual(self.req("POST","/api/bus/search",self.admin,{"keyword":"Example"})[0],503)
         self.assertEqual(self.req("POST",path,self.admin,on)[0],200)
         self.assertTrue(self.bus.gate.enabled)
