@@ -86,10 +86,10 @@ class API:
                 self.selection = None
                 return result
             if path == "/api/bus/search":
-                if set(body) not in ({"keyword"}, {"keyword", "broad"}) or type(body.get("broad", False)) is not bool:
+                if set(body) != {"keyword"}:
                     raise ValueError("Invalid search")
                 self.selection = None
-                return {"lines": [asdict(x) for x in bus.search_lines(body["keyword"], broad=body.get("broad", False))]}
+                return {"lines": [asdict(x) for x in bus.search_lines(body["keyword"])]}
             if path == "/api/bus/route":
                 if set(body) != {"line", "direction"} or not isinstance(body["line"], dict):
                     raise ValueError("Invalid route")
