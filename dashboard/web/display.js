@@ -872,7 +872,7 @@ function modeLabel(){
 function manual(){
   if(!automatic)return;
   automatic=false;epoch++;busy=false;clearTimeout(refreshTimer);
-  refreshTimer=setTimeout(refresh,mode==="bus"?15000:30000);modeLabel();
+  refreshTimer=setTimeout(refresh,(mode==="bus"||mode==="overview")?15000:30000);modeLabel();
 }
 function switchMode(next){
   if(!token)return;
