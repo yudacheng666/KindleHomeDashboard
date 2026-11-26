@@ -54,7 +54,7 @@ class Runtime:
         if self.failed.is_set():
             return BusView(view.trip, Snapshot("service_error", self.clock()))
         if not self.active() and view.snapshot.status not in (
-                "blocked", "disabled", "unconfigured", "needs_selection"):
+                "blocked", "disabled", "config_error", "unconfigured", "needs_selection"):
             return BusView(view.trip, Snapshot("paused", self.clock()))
         return view
 
