@@ -408,7 +408,7 @@ function renderWeather(){
   groups.forEach(function(g){append(root,"p",g.labels.join("、")+" · "+g.key,"weather-foot");});
   attrs.forEach(function(a){append(root,"p",a,"weather-foot");});
   if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="QWeather";})){
-    var attribution=append(root,"a","天气服务由和风天气驱动","weather-source");attribution.href="https://www.qweather.com";attribution.rel="noreferrer";
+    var attribution=append(root,"a","和风天气","weather-source");attribution.href="https://www.qweather.com";attribution.rel="noreferrer";
   }
   if(Object.keys(s).some(function(k){return s[k].status==="available"&&s[k].source==="Open-Meteo";})){
     var meteoLink=append(root,"a"," · Open-Meteo (CC BY 4.0)","weather-source");meteoLink.href="https://open-meteo.com/";meteoLink.rel="noreferrer";
@@ -810,7 +810,7 @@ function renderOverviewWeather(){
     append(root,"p",weatherNum(c.data.temp,"°")+"　"+c.data.text,"weather-main");
     append(root,"p","体感 "+weatherNum(c.data.feels,"°")+" · 湿度 "+weatherNum(c.data.humidity,"%"),"weather-summary");
     append(root,"p","观测 "+weatherTime(c.data.time),"weather-foot");
-    if(c.source==="QWeather"){var a=append(root,"a","天气服务由和风天气驱动","weather-source");a.href="https://www.qweather.com";a.rel="noreferrer";}
+    if(c.source==="QWeather"){var a=append(root,"a","和风天气","weather-source");a.href="https://www.qweather.com";a.rel="noreferrer";}
     if(c.source==="Open-Meteo"){var b=append(root,"a","Open-Meteo (CC BY 4.0)","weather-source");b.href="https://open-meteo.com/";b.rel="noreferrer";}
   }else append(root,"p","当前天气暂不可用","note");
   weatherPages.forEach(function(p){var a=p.sections&&p.sections.alerts;

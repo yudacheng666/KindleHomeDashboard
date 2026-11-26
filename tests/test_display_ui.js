@@ -68,9 +68,11 @@ assert.ok(descendants(el("body")).some(n=>n.textContent==="另 1 个目的地 ·
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example dish"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example task"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="20°　晴"));
+assert.ok(descendants(el("body")).some(n=>n.tag==="a"&&n.textContent==="和风天气"&&n.href==="https://www.qweather.com"));
+assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));
 click("settings");assert.equal(el("manageLink").href,"/bus#return-overview");click("returnDisplay");
 data=sample;weatherData=weatherExample;
-click("weatherMode");heading("Example");assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
+click("weatherMode");heading("Example");assert.ok(descendants(el("body")).some(n=>n.tag==="a"&&n.textContent==="和风天气"&&n.href==="https://www.qweather.com"));assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
 advance(240000);heading("Example");assert.equal(el("index").textContent,"");
 weatherData={...weatherExample,additional:[{...weatherExample,name:"Example second",sections:{current:{...weatherExample.sections.current,data:{...weatherExample.sections.current.data,temp:25}}}}]};
 advance(30000);heading("Example");assert.equal(el("index").textContent,"1 / 2");
