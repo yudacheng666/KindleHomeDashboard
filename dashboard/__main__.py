@@ -41,6 +41,13 @@ def apply_private_settings(args, env):
         ZoneInfo(args.timezone)
     except (ValueError, ZoneInfoNotFoundError):
         raise ValueError("Invalid local timezone") from None
+    if args.daily_limit is None:
+        value = env.get("KHD_BUS_DAILY_LIMIT", "1000")
+        if not re.fullmatch(r"[0-9]{1,4}", value):
+            raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
+        args.daily_limit = int(value)
+    if not 1 <= args.daily_limit <= 1000:
+        raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
     enabled = env.get("KHD_BUS_ENABLED", "0")
     if enabled not in ("0", "1"):
         raise BusSettingsError("KHD_BUS_ENABLED must be 0 or 1")
@@ -58,13 +65,6 @@ def apply_private_settings(args, env):
     args.enable_bus = args.enable_bus or enabled == "1"
     if args.enable_bus and not args.window:
         raise BusSettingsError("KHD_BUS_WINDOWS required when bus enabled")
-    if args.daily_limit is None:
-        value = env.get("KHD_BUS_DAILY_LIMIT", "1000")
-        if not re.fullmatch(r"[0-9]{1,4}", value):
-            raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
-        args.daily_limit = int(value)
-    if not 1 <= args.daily_limit <= 1000:
-        raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
     return args
 
 
@@ -77,7 +77,8 @@ def startup_settings(args, env):
             raise
         args.enable_bus = False
         args.window = []
-        args.daily_limit = 1000
+        if type(args.daily_limit) is not int or not 1 <= args.daily_limit <= 1000:
+            args.daily_limit = 1000
         return str(exc)
     return ""
 
@@ -121,7 +122,8 @@ def main():
         fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         bus = BusService(args.directory, enabled=args.enable_bus, daily_limit=args.daily_limit,
                          config_error=bool(bus_config_error))
-        runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone)
+        runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone,
+                          web_settings=not bus_config_error.startswith("KHD_BUS_DAILY_LIMIT"))
         household = Household(args.directory) if args.enable_household else None
         tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
         api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, direct=direct)
