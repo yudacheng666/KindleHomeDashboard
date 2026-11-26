@@ -55,7 +55,10 @@ class RequestGate:
             return None
         if len(row[0]) > 16384:
             raise ValueError("Invalid stored bus schedule")
-        return json.loads(row[0])
+        value = json.loads(row[0])
+        if not isinstance(value, dict):
+            raise ValueError("Invalid stored bus schedule")
+        return value
 
     def save_schedule(self, value):
         with self.lock, self._db() as db:
