@@ -48,9 +48,9 @@ input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} but
 <div id="config" class="panel hidden">
 <h2>选择公交</h2>
 <label for="keyword">线路名称</label>
-<input id="keyword" maxlength="80" autocomplete="off" placeholder="输入公交线路">
-<button id="search" type="button">搜索</button> <button id="broadSearch" type="button">简写搜索</button>
-<p class="small">可省略数字后面的“路”；简写搜索按线路数字扩大范围。选好方向后直接获取站点，无需重新搜索。</p>
+<input id="keyword" maxlength="80" autocomplete="off" placeholder="输入线路名称或简称">
+<button id="search" type="button">搜索</button>
+<p class="small">选好方向后直接获取站点，无需重新搜索。</p>
 <div id="results" class="hidden">
 <label for="route">线路及方向</label><select id="route"></select>
 <label for="direction">查询方向</label><select id="direction"><option value="0">上行</option><option value="1">下行</option></select>
