@@ -5,8 +5,9 @@ var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
 var seconds=180, editing=false, section="tasks", settingsOpen=false;
-var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
+var refreshTimer=null, rotationTimer=null, lastRender="", mode="overview", savedKey="", resumePage="";
 var weatherPages=[],weatherCursor=0,weatherOrder="",WEATHER_SECONDS=120;
+var overviewData=null,overviewKeys={};
 var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null,busStatusNode=null,expiryTimer=null;
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
@@ -70,6 +71,7 @@ function taskDateLabel(day,today){
   return {label:label,tag:day===today?"今日":d.getTime()-base.getTime()===86400000?"明日":""};
 }
 function render(){
+  show("overview",false);show("legacyDisplay",true);show("overviewBack",true);
   var p=pages[cursor];if(!p||!data)return;
   var key=JSON.stringify([data.date,p,cursor,pages.length]);
   if(key!==lastRender){
@@ -110,7 +112,7 @@ function render(){
   txt("pause",running?"暂停轮播":"开始轮播");
 }
 function completeTask(t,on,button){
-  if(!token||!data||data.date!==on||(t.occurrence&&t.occurrence>on)||data.can_complete!==true||section!=="tasks"||mode!=="family"||settingsOpen)return;
+  if(!token||!data||data.date!==on||(t.occurrence&&t.occurrence>on)||data.can_complete!==true||section!=="tasks"||(mode!=="family"&&mode!=="overview")||settingsOpen)return;
   if(busy){txt("status","正在同步，请稍后再试。");return;}
   if(!window.confirm("确认完成「"+t.title+"」？完成后保留历史记录。"))return;
   var g=epoch,x=new XMLHttpRequest(),ended=false,timer;
@@ -121,8 +123,10 @@ function completeTask(t,on,button){
     if(ok&&data&&data.date===on){
       data.tasks=data.tasks.filter(function(item){return item.id!==t.id;});
       if(Array.isArray(data.upcoming_tasks))data.upcoming_tasks=data.upcoming_tasks.filter(function(item){return item.id!==t.id;});
-      data.posters=data.posters.filter(function(item){return item.task_id!==t.id;});
-      accept(data);refresh();
+      if(Array.isArray(data.posters))data.posters=data.posters.filter(function(item){return item.task_id!==t.id;});
+      if(mode==="overview"){if(overviewData)overviewData.home=data;overviewKeys.tasks="";renderOverviewTasks();}
+      else accept(data);
+      refresh();
     }else{
       txt("status","完成未确认成功，请刷新核对后再试。");
       refreshTimer=setTimeout(refresh,30000);
@@ -165,12 +169,14 @@ function restoreResume(){
 function stopRotation(){clearTimeout(rotationTimer);rotationTimer=null;}
 function scheduleRotation(){
   stopRotation();
-  if(mode==="weather"){
+  if(mode==="overview"||mode==="weather"){
     if(settingsOpen||document.hidden||!token||automatic||weatherPages.length<2)return;
     rotationTimer=setTimeout(function(){
       rotationTimer=null;
-      if(mode!=="weather"||settingsOpen||document.hidden||!token||automatic)return;
-      weatherCursor=(weatherCursor+1)%weatherPages.length;renderWeather();scheduleRotation();
+      if((mode!=="overview"&&mode!=="weather")||settingsOpen||document.hidden||!token||automatic)return;
+      weatherCursor=(weatherCursor+1)%weatherPages.length;
+      if(mode==="overview")renderOverviewWeather();else renderWeather();
+      scheduleRotation();
     },WEATHER_SECONDS*1000);
     return;
   }
@@ -187,6 +193,7 @@ function advance(step,auto){
   }
 }
 function accept(v){
+  show("overview",false);show("legacyDisplay",true);show("overviewBack",true);
   useSaved(v);
   var old=pages[cursor], id=old?old.id:resumePage, next=makePages(v), found=-1;
   for(var i=0;id&&i<next.length;i++)if(next[i].id===id)found=i;
@@ -273,6 +280,7 @@ function paintAge(){
   if(valid)expiryTimer=setTimeout(paintAge,90000-(now-stamp));
 }
 function acceptBus(v){
+  show("overview",false);show("legacyDisplay",true);show("overviewBack",true);
   data=null;pages=[];cursor=0;resumePage="";stopRotation();
   var s=v.snapshot,t=v.trip;
   var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查 Docker 日志",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
@@ -404,6 +412,7 @@ function renderWeather(){
   }
 }
 function acceptWeather(v){
+  show("overview",false);show("legacyDisplay",true);show("overviewBack",true);
   data=null;pages=[];cursor=0;stopAge();
   var first={name:v.name,status:v.status,sections:v.sections},next=[first];
   if(v.status!=="disabled"&&v.status!=="storage_error")next=next.concat(v.additional||[]);
@@ -542,6 +551,7 @@ el("weatherSave").onclick=function(){
 };
 
 function acceptDriving(v){
+  show("overview",false);show("legacyDisplay",true);show("overviewBack",true);
   data=null;pages=[];cursor=0;stopRotation();stopAge();
   var key=JSON.stringify(v);
   if(key!==lastRender){
@@ -569,6 +579,176 @@ function acceptDriving(v){
     append(root,"p","路线及地图：高德地图 · 预计耗时为采集时的估算","driving-foot");
   }
   show("login",false);show("display",true);txt("status","");
+}
+var overviewKeys={};
+function overviewDate(value){
+  if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return "日期未知";
+  var d=new Date(value+"T00:00:00Z"),week="日一二三四五六".charAt(d.getUTCDay());
+  return Number(value.slice(5,7))+"月"+Number(value.slice(8,10))+"日 星期"+week;
+}
+function overviewTomorrow(value){
+  var d=new Date(value+"T00:00:00Z");if(isNaN(d.getTime()))return "";
+  d.setUTCDate(d.getUTCDate()+1);return d.toISOString().slice(0,10);
+}
+function renderOverviewHeader(){
+  var home=overviewData&&overviewData.home||{},now=serverNow();
+  txt("overviewDate",overviewDate(home.date));
+  txt("overviewTime",isFinite(now)?clockTime(now,now):"时间未知");
+}
+function overviewStatusLabel(status){
+  var labels={live:"实时预计",stale:"旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口受限",disabled:"未启用",config_error:"配置错误",unconfigured:"请先设置公交",unverified:"核对线路中",needs_selection:"请重新选择站点",unavailable:"等待首次采集",no_live_data:"等待发车",error:"接口请求失败",service_error:"服务暂不可用"};
+  return labels[status]||"状态未知";
+}
+function overviewBusItem(item,s,now,valid){
+  if(!valid)return {main:"等待更新",sub:"到站数据已过期"};
+  if(item.plan){
+    var p=item.plan,delta=null;
+    if(p.time){var a=p.time.split(":");if(a.length===2){var local=new Date(now+zoneOffset*60000);delta=Number(a[0])*60+Number(a[1])-(local.getUTCHours()*60+local.getUTCMinutes());}}
+    return {main:p.imminent===true||delta===0||delta===1?"计划即将发车":"等待首站发车",
+      sub:"首站计划 "+(p.time||"时间未知")+" · 本站到站时间未知"};
+  }
+  var v=item.vehicle,target=s.fetched_at_ms+v.eta_min*60000;
+  var remaining=s.status==="stale"?v.eta_min:Math.ceil((target-now)/60000),label;
+  if(v.eta_min===0&&v.distance_m===0&&v.stops_remaining===0)label="车辆已到站附近";
+  else if(remaining<=0)label="等待到站确认";
+  else if(remaining===1)label="即将到站";
+  else label="约 "+remaining+"分钟";
+  var sub=[];
+  if(v.stops_remaining!==null&&v.stops_remaining!==undefined)sub.push(v.stops_remaining+"站");
+  if(isFinite(target))sub.push("预计 "+clockTime(target,now));
+  if(s.status==="stale")sub.unshift("旧数据");
+  return {main:label,sub:sub.join(" · ")};
+}
+function renderOverviewBus(){
+  var root=el("overviewBusContent"),v=overviewData&&overviewData.bus||{},s=v.snapshot||{status:"unavailable",vehicles:[],departure_plans:[]};
+  var now=serverNow(),stamp=s.fetched_at_ms,age=now-stamp,valid=typeof stamp==="number"&&isFinite(stamp)&&isFinite(now)&&age>=0&&age<90000;
+  var items=slotItems(s),key=JSON.stringify([v.trip,s.status,items,stamp,Math.floor(now/60000),valid]);
+  if(overviewKeys.bus===key)return;overviewKeys.bus=key;clear(root);
+  if(items.length){
+    var first=overviewBusItem(items[0],s,now,valid);
+    append(root,"div",first.main,"overview-bus-main");
+    if(first.sub)append(root,"div",first.sub,"overview-bus-sub");
+    if(items.length>1){
+      var next=overviewBusItem(items[1],s,now,valid);
+      append(root,"div","下一辆 "+next.main.replace(/^约 /,""),"overview-bus-next");
+      if(next.sub)append(root,"div",next.sub,"overview-bus-foot");
+    }
+  }else append(root,"div",overviewStatusLabel(s.status),"overview-bus-main");
+  var ageText=valid?"更新"+(age<60000?Math.floor(age/1000)+"秒前":Math.floor(age/60000)+"分钟前"):"";
+  if(ageText)append(root,"div",ageText,"overview-bus-foot");
+}
+function renderOverviewWeather(){
+  var root=el("overviewWeatherContent"),v=weatherPages[weatherCursor];
+  if(!v){clear(root);append(root,"div","天气暂不可用","overview-weather-meta");return;}
+  var sections=v.sections||{},current=sections.current,alerts=sections.alerts;
+  var key=JSON.stringify([v.name,v.status,current,alerts,weatherCursor]);
+  if(overviewKeys.weather===key)return;overviewKeys.weather=key;clear(root);
+  append(root,"div",v.name||"","overview-weather-name");
+  if(v.status==="disabled"){append(root,"div","未启用","overview-weather-meta");return;}
+  if(!current||current.status!=="available"){
+    append(root,"div","当前天气暂不可用","overview-weather-meta");return;
+  }
+  var c=current.data||{};
+  append(root,"div",weatherNum(c.temp,"°")+" "+(c.text||""),"overview-weather-main");
+  append(root,"div","湿度 "+weatherNum(c.humidity,"%"),"overview-weather-meta");
+  if(typeof c.feels==="number")append(root,"div","体感 "+weatherNum(c.feels,"°"),"overview-weather-meta");
+  if(alerts&&alerts.status==="available"&&alerts.data&&alerts.data.length)
+    append(root,"div","⚠ "+alerts.data[0].headline,"overview-weather-alert");
+}
+function overviewMapStatus(g){
+  var labels={disabled:"未启用",paused:"暂停采集",waiting:"等待采集",not_configured:"未配置密钥",credential_error:"密钥配置有误",storage_error:"存储异常",blocked:"接口受限",stale:"数据较旧",unavailable:"路线暂不可用"};
+  return labels[g.status]||"";
+}
+function renderOverviewMap(slot,group,index,total){
+  var key=group?JSON.stringify([group.name,group.status,group.fetched_at,group.image?group.image.length:0,(group.routes||[]).map(function(r){return [r.seconds,r.meters,r.congested_meters,r.traffic_covered_meters];})]):"empty";
+  if(overviewKeys["map"+index]===key)return;overviewKeys["map"+index]=key;clear(slot);
+  var panel=append(slot,"div","","overview-map-panel");
+  var map=append(panel,"div","","overview-map-image");
+  var stats=append(panel,"div","","overview-map-stats");
+  if(!group){
+    append(map,"div","地图暂不可用","overview-map-empty");append(stats,"div","尚未配置","overview-route-state");return;
+  }
+  if(typeof group.image==="string"&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(group.image)){
+    var image=append(map,"img","");image.alt=group.name+" 路线图";image.src=group.image;
+  }else append(map,"div","地图暂不可用","overview-map-empty");
+  append(stats,"div",group.name||"","overview-map-name");
+  var routes=Array.isArray(group.routes)?group.routes:[];
+  if(routes.length){
+    var first=routes[0];
+    append(stats,"div",Math.ceil(first.seconds/60)+"分钟","overview-route-main");
+    append(stats,"div",(first.meters/1000).toFixed(1)+"km","overview-route-distance");
+    for(var i=1;i<routes.length&&i<3;i++)
+      append(stats,"div",Math.ceil(routes[i].seconds/60)+"分 · "+(routes[i].meters/1000).toFixed(1)+"km","overview-route-alt");
+    if(first.congested_meters===null)append(stats,"div","路况未知","overview-route-state");
+    else if(first.congested_meters>0)append(stats,"div","拥堵 "+(first.congested_meters/1000).toFixed(1)+"km","overview-route-state");
+    else if(first.traffic_covered_meters>=first.meters*0.9)append(stats,"div","畅通","overview-route-state");
+    else append(stats,"div","部分路况未知","overview-route-state");
+  }else append(stats,"div",overviewMapStatus(group)||"等待路线","overview-route-state");
+  if(group.status!=="ok"&&overviewMapStatus(group))append(stats,"div",overviewMapStatus(group),"overview-route-state");
+  if(index===1&&total>2){
+    var more=append(stats,"button","还有"+(total-2)+"个目的地","overview-map-more");more.type="button";
+    more.onclick=function(e){if(e&&e.stopPropagation)e.stopPropagation();switchMode("driving");};
+  }
+  panel.onclick=function(){switchMode("driving");};
+}
+function renderOverviewMaps(){
+  var driving=overviewData&&overviewData.driving||{},groups=driving.groups||[],total=driving.group_count||groups.length;
+  renderOverviewMap(el("overviewMap1"),groups[0],0,total);
+  renderOverviewMap(el("overviewMap2"),groups[1],1,total);
+}
+function renderOverviewMenus(){
+  var root=el("overviewMenuContent"),home=overviewData&&overviewData.home||{},today=home.date||"",tomorrow=overviewTomorrow(today);
+  var menus=Array.isArray(home.week_menu)?home.week_menu:[],key=JSON.stringify([today,menus]);
+  if(overviewKeys.menus===key)return;overviewKeys.menus=key;clear(root);
+  var names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
+  [today,tomorrow].forEach(function(day,i){
+    var rows=menus.filter(function(m){return m.day===day;}).sort(function(a,b){return order[a.meal]-order[b.meal];});
+    var block=append(root,"div","","overview-menu-day");
+    append(block,"div",i===0?"今日":"明日","overview-menu-date");
+    if(!rows.length)append(block,"div","暂无安排","overview-menu-meal");
+    rows.forEach(function(m){append(block,"div",(names[m.meal]||m.meal)+"："+(m.dishes||[]).join("、"),"overview-menu-meal");});
+  });
+}
+function renderOverviewTasks(){
+  var root=el("overviewTaskContent"),home=overviewData&&overviewData.home||{},today=home.date||"",tomorrow=overviewTomorrow(today);
+  var tasks=Array.isArray(home.upcoming_tasks)?home.upcoming_tasks:(home.tasks||[]);
+  tasks=tasks.slice().sort(function(a,b){return (a.occurrence||today).localeCompare(b.occurrence||today)||a.id.localeCompare(b.id);});
+  var shown=tasks.slice(0,3),key=JSON.stringify([today,shown,home.can_complete]);
+  if(overviewKeys.tasks===key)return;overviewKeys.tasks=key;clear(root);
+  if(!shown.length){append(root,"div","暂无待办","overview-task-date");return;}
+  var groups={};
+  shown.forEach(function(t){var day=t.occurrence||today;(groups[day]||(groups[day]=[])).push(t);});
+  Object.keys(groups).sort().forEach(function(day){
+    var block=append(root,"div","","overview-task-day"),label=day<today?"逾期":day===today?"今天":day===tomorrow?"明天":day.slice(5).replace("-","/");
+    append(block,"div",label+"（"+groups[day].length+"项）","overview-task-date");
+    groups[day].forEach(function(t){
+      var row=append(block,"div","","overview-task-row");append(row,"span",t.title,"overview-task-text");
+      if(home.can_complete===true&&day<=today){
+        var action=append(row,"span","","overview-task-action"),button=append(action,"button","□","");
+        button.type="button";button.setAttribute("aria-label","完成 "+t.title);
+        button.onclick=function(){completeTask(t,today,button);};
+      }
+    });
+  });
+  if(tasks.length>shown.length)append(root,"div","另有 "+(tasks.length-shown.length)+" 项","overview-note");
+}
+function renderOverview(){
+  renderOverviewHeader();renderOverviewBus();renderOverviewWeather();
+  renderOverviewMaps();renderOverviewMenus();renderOverviewTasks();
+}
+function acceptOverview(v){
+  overviewData=v;data=v.home||{date:"",tasks:[],upcoming_tasks:[],posters:[],week_menu:[],can_complete:false};
+  useSaved(data);pages=[];cursor=0;stopAge();
+  var weather=v.weather||{status:"disabled",sections:{}},next=[weather];
+  if(weather.status!=="disabled"&&weather.status!=="storage_error")next=next.concat(weather.additional||[]);
+  var order=JSON.stringify(next.map(function(p){return p.name||"";}));
+  if(order!==weatherOrder){weatherCursor=0;weatherOrder=order;stopRotation();overviewKeys.weather="";}
+  weatherPages=next;if(weatherCursor>=next.length)weatherCursor=0;
+  if(v.bus&&v.bus.snapshot)syncClock(v.bus.snapshot);
+  show("login",false);show("display",true);show("overview",true);show("legacyDisplay",false);show("overviewBack",false);
+  txt("status","");renderOverview();
+  if(next.length<2||settingsOpen||document.hidden)stopRotation();
+  else if(rotationTimer===null)scheduleRotation();
 }
 var drivingEpoch=0,drivingBusy=false,drivingFields=[];
 function clearDrivingForm(){
@@ -687,7 +867,7 @@ el("drivingSave").onclick=function(){
   });
 };
 function modeLabel(){
-  txt("modeStatus",automatic?"自动分时 · 按 NAS 采集时段":"手动显示 · 不自动切换模块");updateManagementLinks();
+  txt("modeStatus","综合看板 · 所有主要信息同页显示");updateManagementLinks();
 }
 function manual(){
   if(!automatic)return;
@@ -700,6 +880,7 @@ function switchMode(next){
   if(next===mode)return;
   epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;editing=false;
   show("options",false);resumePage="";forgetResume();mode=next;
+  show("overview",next==="overview");show("legacyDisplay",next!=="overview");show("overviewBack",next!=="overview");
   tabs();hide("正在读取");refresh();
 }
 function switchSection(next){
@@ -711,6 +892,7 @@ function switchSection(next){
   if(data)accept(data);else if(!busy)refresh();
 }
 function hide(reason){
+  if(mode==="overview"){txt("status",reason);return;}
   stopAge();
   data=null;pages=[];cursor=0;lastRender="";stopRotation();weatherPages=[];weatherCursor=0;weatherOrder="";el("body").className="";
   txt("date","");txt("heading","");clear(el("body"));txt("index","");txt("status",reason);
@@ -725,18 +907,19 @@ function refresh(){
         if(mode!==v.mode){resumePage="";forgetResume();mode=v.mode;editing=false;show("options",false);tabs();hide("");}
         v=v.view;
       }
-      if(mode==="bus")acceptBus(v);else if(mode==="weather")acceptWeather(v);else if(mode==="driving")acceptDriving(v);else accept(v);
+      if(mode==="overview")acceptOverview(v);else if(mode==="bus")acceptBus(v);else if(mode==="weather")acceptWeather(v);else if(mode==="driving")acceptDriving(v);else accept(v);
       modeLabel();
     }
-    else if((status===404&&mode==="family")||status===503){show("login",false);show("display",true);hide(status===404?"家庭模块未启用，可切换至公交。":"当前模块暂不可用，可切换其他模块。");}
-    else{hide(status===401?"令牌无效，请重新连接。":status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
-      if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
+    else if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}
+    else if(mode==="overview"){show("login",false);show("display",true);txt("status","连接异常，保留上次看板内容；正在等待恢复。");}
+    else if((status===404&&mode==="family")||status===503){show("login",false);show("display",true);hide(status===404?"家庭模块未启用，可返回综合看板。":"当前模块暂不可用，可返回综合看板。");}
+    else hide(status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
     clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,mode==="bus"?15000:30000);
   }
-  try{x.open("GET",automatic?"/api/display/auto":mode==="bus"?"/api/bus/view":mode==="weather"?"/api/weather/view":mode==="driving"?"/api/driving/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+  try{x.open("GET",automatic?"/api/display/auto":mode==="overview"?"/api/display/overview":mode==="bus"?"/api/bus/view":mode==="weather"?"/api/weather/view":mode==="driving"?"/api/driving/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
       var next=automatic&&v?v.mode:mode, payload=automatic&&v?v.view:v;
-      var valid=payload&&(next==="bus"?payload.snapshot&&Array.isArray(payload.snapshot.vehicles):next==="weather"?typeof payload.status==="string"&&payload.sections&&typeof payload.sections==="object":next==="driving"?typeof payload.enabled==="boolean"&&Array.isArray(payload.groups):next==="family"&&Array.isArray(payload.tasks)&&Array.isArray(payload.posters)&&Array.isArray(payload.week_menu));
+      var valid=payload&&(next==="overview"?payload.bus&&payload.bus.snapshot&&payload.weather&&payload.driving&&payload.home:next==="bus"?payload.snapshot&&Array.isArray(payload.snapshot.vehicles):next==="weather"?typeof payload.status==="string"&&payload.sections&&typeof payload.sections==="object":next==="driving"?typeof payload.enabled==="boolean"&&Array.isArray(payload.groups):next==="family"&&Array.isArray(payload.tasks)&&Array.isArray(payload.posters)&&Array.isArray(payload.week_menu));
       finish(x.status===200&&valid,v,x.status);};
     timeout=setTimeout(function(){finish(false,null,0);try{x.abort();}catch(e){}},12000);x.send(null);
   }catch(e){finish(false,null,0);}
@@ -745,16 +928,12 @@ function reset(keepResume){
   clearDrivingForm();
   weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");
   if(keepResume!==true)forgetResume();resumePage="";
-  epoch++;busy=false;token="";automatic=false;modeLabel();mode="family";section="tasks";savedKey="";tabs();running=false;editing=false;seconds=180;
+  epoch++;busy=false;token="";automatic=false;mode="overview";section="tasks";savedKey="";tabs();running=false;editing=false;seconds=180;overviewData=null;overviewKeys={};modeLabel();
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   panel(false);show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#bus"||hash==="#weather"||hash==="#driving")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
-el("autoMode").onclick=function(){
-  if(!token)return;
-  panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";tabs();show("options",false);
-  clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
-};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=false;var hash=typeof location!=="undefined"?location.hash:"";if(hash==="#bus"||hash==="#weather"||hash==="#driving"){mode=hash.slice(1);resumePage="";forgetResume();}else if(["#tasks","#posters","#menus"].indexOf(hash)>=0){mode="family";if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}else{mode="overview";section="tasks";}restoreResume();tabs();modeLabel();show("overview",mode==="overview");show("legacyDisplay",mode!=="overview");show("overviewBack",mode!=="overview");clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("autoMode").onclick=function(){if(!token)return;switchMode("overview");};
 el("tasksMode").onclick=function(){switchSection("tasks");};
 el("postersMode").onclick=function(){switchSection("posters");};
 el("menusMode").onclick=function(){switchSection("menus");};
@@ -765,6 +944,7 @@ el("previous").onclick=function(){if(editing||section!=="posters"||mode!=="famil
 el("next").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(1,false);};
 el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(running)manual();running=!running;render();scheduleRotation();};
 el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
+el("overviewBack").onclick=function(){if(token)switchMode("overview");};
 function closeSettings(){clearDrivingForm();weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
 el("returnDisplay").onclick=closeSettings;
 el("weatherNext").onclick=function(){if(mode!=="weather"||weatherPages.length<2||!settingsOpen)return;weatherCursor=(weatherCursor+1)%weatherPages.length;closeSettings();renderWeather();};
