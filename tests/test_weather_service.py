@@ -139,6 +139,36 @@ class WeatherServiceTests(unittest.TestCase):
         self.service.step()
         self.assertEqual(self.service.read()["status"],"disabled")
         self.assertEqual(len(self.calls),1)
+    def test_multiple_locations_and_budget(self):
+        extra={"name":"Fictional second","latitude":3.45,"longitude":4.56}
+        third={"name":"Fictional third","latitude":5.67,"longitude":6.78}
+        self.service.configure({**CONFIG,"additional":[extra,third]})
+        for _ in range(12): self.service.step()
+        self.assertEqual(len(self.calls),12)
+        self.assertEqual(self.service.ledger.usage()["used"],12)
+        view=self.service.read()
+        self.assertEqual([x["name"] for x in view["additional"]],["Fictional second","Fictional third"])
+        self.assertEqual(set(view["additional"][0]["sections"]),{"current","rain","alerts"})
+        self.assertTrue(all(x["status"]=="available" for x in view["additional"][0]["sections"].values()))
+        self.assertEqual(self.new().settings_view()["additional"],[extra,third])
+        with self.assertRaises(ValueError):
+            self.service.configure(CONFIG)
+        with self.assertRaises(ValueError):
+            self.service.configure({**CONFIG,"additional":[extra,third,extra]})
+        with self.assertRaises(ValueError):
+            self.service.configure({**CONFIG,"additional":[{**extra,"latitude":CONFIG["latitude"],"longitude":CONFIG["longitude"]}]})
+        self.service.configure({**CONFIG,"additional":[third]})
+        self.assertEqual(self.service.read()["additional"][0]["status"],"waiting")
+        self.assertEqual(self.service.ledger.usage()["used"],12)
+
+    def test_legacy_location_upgrade(self):
+        self.service.configure(CONFIG)
+        self.service.path.write_text(json.dumps(CONFIG))
+        restored=self.new()
+        self.assertEqual(restored.settings_view()["name"],CONFIG["name"])
+        self.assertEqual(restored.settings_view()["additional"],[])
+        self.assertTrue(restored.settings_view()["enabled"])
+
     def test_city_search_consent_quota_and_selection(self):
         with self.assertRaises(ValueError):
             self.service.search_locations({"keyword":"Fictional","consent":False})

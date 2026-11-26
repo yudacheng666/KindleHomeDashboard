@@ -20,20 +20,47 @@ CORE = ("current", "hourly", "daily")
 DEFAULT = {"enabled": False, "consent": False, "name": "", "latitude": 0, "longitude": 0}
 TTL = {"current": 1800, "hourly": 5400, "daily": 10800, "rain": 900, "air": 5400, "alerts": 900}
 BACKUP_INTERVAL = 1800
+MAX_LOCATIONS = 3
+SECONDARY_INTERVALS = {"current": 1200, "rain": 600, "alerts": 900}
+LOCATION_KEYS = {"name", "latitude", "longitude"}
+
+
+def location(value, *, required=True):
+    if not isinstance(value, dict) or set(value) != LOCATION_KEYS:
+        raise ValueError("invalid_weather_location")
+    name = value["name"]
+    if not isinstance(name, str) or len(name.strip()) > 40 or any(ord(c)<32 for c in name) or (required and not name.strip()):
+        raise ValueError("invalid_weather_name")
+    lat, lon = coordinates(value["latitude"], value["longitude"])
+    return {"name": name.strip(), "latitude": float(lat), "longitude": float(lon)}
 
 
 def config(value):
-    if not isinstance(value, dict) or set(value) != set(DEFAULT):
+    if not isinstance(value, dict) or set(value) not in (set(DEFAULT), set(DEFAULT)|{"additional"}):
         raise ValueError("invalid_weather_config")
     if type(value["enabled"]) is not bool or type(value["consent"]) is not bool:
         raise ValueError("invalid_weather_config")
-    name = value["name"]
-    if not isinstance(name, str) or len(name.strip()) > 40 or any(ord(c)<32 for c in name):
-        raise ValueError("invalid_weather_name")
-    lat, lon = coordinates(value["latitude"], value["longitude"])
-    if value["enabled"] and (not value["consent"] or not name.strip()):
+    main = location({k:value[k] for k in LOCATION_KEYS}, required=value["enabled"])
+    extra = value.get("additional", [])
+    if not isinstance(extra, list) or len(extra) >= MAX_LOCATIONS:
+        raise ValueError("invalid_weather_locations")
+    extra = [location(x) for x in extra]
+    if extra and not main["name"]:
+        raise ValueError("primary_location_required")
+    positions = [(x["latitude"],x["longitude"]) for x in [main]+extra]
+    if len(set(positions)) != len(positions):
+        raise ValueError("duplicate_weather_location")
+    if value["enabled"] and not value["consent"]:
         raise ValueError("weather_consent_required")
-    return {**value, "name": name.strip(), "latitude": float(lat), "longitude": float(lon)}
+    return {**main, "enabled":value["enabled"], "consent":value["consent"], "additional":extra}
+
+
+def locations(settings):
+    return [{k:settings[k] for k in LOCATION_KEYS}]+settings.get("additional", [])
+
+
+def intervals(index):
+    return INTERVALS if index == 0 else SECONDARY_INTERVALS
 
 
 def number(value, low=-200, high=200):
@@ -197,7 +224,7 @@ class WeatherService:
         self.thread = None
         self.clock, self.monotonic = clock, monotonic
         self.display_zone = ZoneInfo(timezone_name)
-        self.settings = dict(DEFAULT)
+        self.settings = config(DEFAULT)
         self.error = ""
         self.primary = None
         self.primary_blocked = False
@@ -210,7 +237,7 @@ class WeatherService:
         self.failures = {}
         self.due = {}
         self.backup_records = {}
-        self.backup_due = 0
+        self.backup_due = {}
         self.backup = OpenMeteo(**({"transport":backup_transport} if backup_transport else {}))
         try:
             if self.path.exists() or self.path.is_symlink():
@@ -223,7 +250,7 @@ class WeatherService:
                 if not (root/"weather-budget.sqlite3").exists():
                     raise ValueError("missing_weather_budget")
             self.ledger = RequestLedger(str(root), clock)
-            self.primary_blocked = self.primary_blocked
+            self.backup_blocked = self.ledger.usage()["backup_blocked"]
         except Exception:
             self.error = "storage_error"
             self.ledger = None
@@ -269,8 +296,11 @@ class WeatherService:
                 self.search_busy = False
 
     def configure(self, value):
+        legacy = isinstance(value, dict) and "additional" not in value
         value = config(value)
         with self.lock:
+            if legacy and self.settings.get("additional"):
+                raise ValueError("reload_multi_location_settings")
             if not self.ledger or self.error=="storage_error":
                 raise ValueError("weather_storage_unavailable")
             if value == self.settings:
@@ -293,7 +323,7 @@ class WeatherService:
             self.backup_records.clear()
             self.failures.clear()
             self.due.clear()
-            self.backup_due=0
+            self.backup_due.clear()
             self.wake.set()
             return self.settings_view()
 
@@ -305,70 +335,112 @@ class WeatherService:
         return record is not None and 0 <= now-record["mono"] <= TTL[kind]
 
     def step(self):
-        # Only the dedicated worker invokes this method. Never hold the lock
-        # while doing network I/O; settings changes invalidate in-flight data.
+        # A single scheduler shares the durable account budget across all
+        # locations. One primary request and at most one fallback per step.
         with self.lock:
             if self.stop.is_set() or not self.settings["enabled"] or not self.settings["consent"] or not self.ledger:
                 return
             generation = self.generation
-            lat,lon = self.settings["latitude"],self.settings["longitude"]
+            places = locations(self.settings)
             now = self.monotonic()
             primary = self.primary
             blocked = self.ledger.usage()["blocked"]
-            kind = next((k for k in KINDS if now>=self.due.get(k,0)),None) if primary and not blocked else None
-            if kind:
-                self.due[kind] = now + INTERVALS[kind]
-            need_backup = (not primary or blocked or any(k in self.failures for k in CORE))
-            backup_due = not self.backup_blocked and need_backup and now >= self.backup_due
-            if backup_due:
-                self.backup_due = now + BACKUP_INTERVAL
-        if kind:
+            pending = [(i,k) for i in range(len(places)) for k in intervals(i)
+                       if now >= self.due.get((i,k),0)] if primary and not blocked else []
+            task = min(pending, key=lambda t:self.due.get(t,0)) if pending else None
+            if task:
+                i,kind = task
+                self.due[task] = now + intervals(i)[kind]
+        if task:
             with self.lock:
-                if self.stop.is_set() or generation!=self.generation:
+                if self.stop.is_set() or generation != self.generation:
                     return
+            place = places[i]
             try:
-                data,attrs=q_normalize(kind,primary.fetch(kind,lat,lon))
+                data,attrs = q_normalize(kind,primary.fetch(kind,place["latitude"],place["longitude"]))
                 if kind in ("current","rain"):
-                    source_time=datetime.fromisoformat(data["time"].replace("Z","+00:00"))
-                    age=(self.clock()-source_time).total_seconds()
-                    if age < -300 or age > TTL[kind]:
+                    age = (self.clock()-datetime.fromisoformat(data["time"].replace("Z","+00:00"))).total_seconds()
+                    if not -300 <= age <= TTL[kind]:
                         raise WeatherError("source_time_outdated")
-                record=self._record(data,attrs,"QWeather")
+                record = self._record(data,attrs,"QWeather")
                 with self.lock:
-                    if generation==self.generation:
-                        self.records[kind]=record
-                        self.failures.pop(kind,None)
+                    if generation == self.generation:
+                        self.records[task] = record
+                        self.failures.pop(task,None)
             except Exception as exc:
                 with self.lock:
                     if isinstance(exc, WeatherBlocked):
-                        self.primary_blocked=True
-                    if generation==self.generation:
-                        count=self.failures.get(kind,0)+1
-                        self.failures[kind]=count
-                        self.due[kind]=self.monotonic()+min(3600,INTERVALS[kind]*(2**min(count,4)))
-                        if kind in CORE and not self.backup_blocked and self.monotonic()>=self.backup_due:
-                            self.backup_due=self.monotonic()+BACKUP_INTERVAL
-                            backup_due=True
-        if backup_due:
+                        self.primary_blocked = True
+                        blocked = True
+                    if generation == self.generation:
+                        count = self.failures.get(task,0)+1
+                        self.failures[task] = count
+                        self.due[task] = self.monotonic()+min(3600,intervals(i)[kind]*(2**min(count,4)))
+        with self.lock:
+            if self.stop.is_set() or generation != self.generation or self.backup_blocked or not self.ledger:
+                return
+            now = self.monotonic()
+            pending = [j for j in range(len(places))
+                       if now >= self.backup_due.get(j,0) and
+                       (not primary or blocked or any((j,k) in self.failures for k in (CORE if j==0 else ("current",))))]
+            if not pending:
+                return
+            j = min(pending,key=lambda x:self.backup_due.get(x,0))
+            self.backup_due[j] = now + BACKUP_INTERVAL
+        place = places[j]
+        try:
+            normalized = meteo_normalize(self.backup.fetch(place["latitude"],place["longitude"]))
+            age = (self.clock()-datetime.fromisoformat(normalized["current"]["time"])).total_seconds()
+            if not -300 <= age <= TTL["current"]:
+                raise WeatherError("source_time_outdated")
+            records = {(j,k):self._record(v,["Open-Meteo (CC BY 4.0)"],"Open-Meteo")
+                       for k,v in normalized.items() if k in intervals(j)}
             with self.lock:
-                if self.stop.is_set() or generation != self.generation or not self.settings["enabled"]:
-                    return
-            try:
-                normalized=meteo_normalize(self.backup.fetch(lat,lon))
-                age=(self.clock()-datetime.fromisoformat(normalized["current"]["time"])).total_seconds()
-                if not -300 <= age <= TTL["current"]:
-                    raise WeatherError("source_time_outdated")
-                records={k:self._record(v,["Open-Meteo (CC BY 4.0)"],"Open-Meteo") for k,v in normalized.items()}
-                with self.lock:
-                    if generation==self.generation:
-                        self.backup_records=records
-            except WeatherBlocked:
-                self.ledger.block_backup()
-                with self.lock:
-                    self.backup_blocked=True
-                    self.backup_records.clear()
-            except Exception:
-                pass
+                if generation == self.generation:
+                    self.backup_records.update(records)
+        except WeatherBlocked:
+            self.ledger.block_backup()
+            with self.lock:
+                self.backup_blocked=True
+                self.backup_records.clear()
+        except Exception:
+            pass
+
+    def _location_view(self,index,place,now):
+        sections={}
+        for kind in intervals(index):
+            task=(index,kind)
+            primary=self.records.get(task)
+            backup=self.backup_records.get(task)
+            chosen=None
+            if task not in self.failures and self._fresh(kind,primary,now):
+                chosen=primary
+            elif self._fresh(kind,backup,now):
+                chosen=backup
+            if chosen is None:
+                sections[kind]={"status":"unavailable"}
+                continue
+            data=chosen["data"]
+            if kind in ("current","rain"):
+                age=(self.clock()-datetime.fromisoformat(data["time"].replace("Z","+00:00"))).total_seconds()
+                if not -300<=age<=TTL[kind]:
+                    sections[kind]={"status":"unavailable"}
+                    continue
+            if kind=="hourly":
+                data=[x for x in data if datetime.fromisoformat(x["time"].replace("Z","+00:00"))>=self.clock()]
+                if not data:
+                    sections[kind]={"status":"unavailable"}
+                    continue
+            if kind=="alerts":
+                moment=self.clock()
+                data=[x for x in data if datetime.fromisoformat(x["expires"].replace("Z","+00:00"))>moment]
+                if not data and chosen["data"]:
+                    sections[kind]={"status":"unavailable"}
+                    continue
+            sections[kind]={k:v for k,v in chosen.items() if k!="mono"}
+            sections[kind].update(status="available",data=data)
+        return {"status":"ready" if any(x["status"]=="available" for x in sections.values()) else "waiting",
+                "name":place["name"],"sections":sections}
 
     def read(self):
         with self.lock:
@@ -377,41 +449,8 @@ class WeatherService:
             if not self.ledger:
                 return {"status":"storage_error","sections":{}}
             now=self.monotonic()
-            sections={}
-            for kind in KINDS:
-                primary=self.records.get(kind)
-                backup=self.backup_records.get(kind)
-                chosen=None
-                if kind not in self.failures and self._fresh(kind,primary,now):
-                    chosen=primary
-                elif self._fresh(kind,backup,now):
-                    chosen=backup
-                if chosen is None:
-                    sections[kind]={"status":"unavailable"}
-                else:
-                    data=chosen["data"]
-                    if kind in ("current","rain"):
-                        age=(self.clock()-datetime.fromisoformat(data["time"].replace("Z","+00:00"))).total_seconds()
-                        if not -300<=age<=TTL[kind]:
-                            sections[kind]={"status":"unavailable"}
-                            continue
-                    if kind=="hourly":
-                        data=[x for x in data if datetime.fromisoformat(x["time"].replace("Z","+00:00"))>=self.clock()]
-                        if not data:
-                            sections[kind]={"status":"unavailable"}
-                            continue
-                    if kind=="alerts":
-                        moment=self.clock()
-                        data=[x for x in data if datetime.fromisoformat(x["expires"].replace("Z","+00:00"))>moment]
-                        # Expired/cancelled or superseded alerts are not a fresh
-                        # affirmative "no warnings" result.
-                        if not data and chosen["data"]:
-                            sections[kind]={"status":"unavailable"}
-                            continue
-                    sections[kind]={k:v for k,v in chosen.items() if k!="mono"}
-                    sections[kind].update(status="available",data=data)
-            return {"status":"ready" if any(x["status"]=="available" for x in sections.values()) else "waiting",
-                    "name":self.settings["name"],"sections":sections}
+            views=[self._location_view(i,p,now) for i,p in enumerate(locations(self.settings))]
+            return {**views[0],"additional":views[1:]}
 
     def _loop(self):
         while not self.stop.is_set():

@@ -35,6 +35,7 @@ label{display:block;margin:8px 0}a{color:#111}button.selected{background:#111;co
 .weather-strip{display:table;table-layout:fixed;width:100%;font-size:14px;text-align:center}
 .weather-cell{display:table-cell;padding:2px 0;vertical-align:top;word-wrap:break-word}
 .weather-cell p{margin:2px 0}.weather-source{font-size:12px;color:#555;word-wrap:break-word}
+.weather-location{border-top:2px solid #333;padding:6px 0;margin:8px 0}.weather-location h2{margin:4px 0;font-size:20px}.rain-bars{display:table;table-layout:fixed;width:100%;height:32px}.rain-bars span{display:table-cell;vertical-align:bottom;padding:0 1px}.rain-bars b{display:block;background:#333;min-height:1px}.weather-compact{font-size:30px;font-weight:bold;margin:4px 0}
 .weather-alert{border:2px solid #222;padding:5px;margin:5px 0}
 #weatherForm input[type=text],#weatherForm input[type=number]{width:100%;display:block}
 @media(max-width:360px){.display-nav button{font-size:14px}.weather-strip{font-size:12px}}
@@ -54,14 +55,17 @@ label{display:block;margin:8px 0}a{color:#111}button.selected{background:#111;co
 <button id="weatherLoad" type="button">读取天气设置</button><p id="weatherSettingStatus" class="status" role="status"></p>
 <div id="weatherForm" class="hidden"><label><input id="weatherEnabled" type="checkbox"> 开启天气采集</label>
 <label><input id="weatherConsent" type="checkbox"> 同意 NAS 向和风天气发送搜索的城市名称，并向和风天气及 Open-Meteo 发送所选地点近似坐标查询天气；接受服务条款，知悉和风超额可能收费。</label>
+<p class="status">最多3个地点；第1个为主地点，其他地点独立显示实时天气、降水和预警。</p>
+<div id="weatherLocations"></div><button id="weatherAdd" type="button">添加地点</button><button id="weatherMakePrimary" type="button">设为主地点</button><button id="weatherRemove" type="button">移除当前地点</button>
 <p id="weatherSelected" class="status"></p>
 <label for="weatherKeyword">搜索城市或区县</label><input id="weatherKeyword" type="text" maxlength="40" placeholder="输入城市、区县名称" autocomplete="off">
 <button id="weatherSearch" type="button">搜索地点</button><p id="weatherSearchStatus" class="status" role="status"></p>
 <div id="weatherResults"></div>
-<button id="weatherManual" type="button">手动输入坐标</button>
-<div id="weatherCoordinates" class="hidden"><label for="weatherName">显示地点名称</label><input id="weatherName" type="text" maxlength="40">
-<label for="weatherLat">纬度（建议区县中心，最多两位小数）</label><input id="weatherLat" type="text" inputmode="decimal" maxlength="12">
-<label for="weatherLon">经度（建议区县中心，最多两位小数）</label><input id="weatherLon" type="text" inputmode="decimal" maxlength="12">
+<label for="weatherName">显示地点名称（可自定义）</label><input id="weatherName" type="text" maxlength="40">
+<button id="weatherManual" type="button">手动输入 / 查看坐标</button>
+<div id="weatherCoordinates" class="hidden">
+<label for="weatherLat">纬度（WGS84，最多两位小数）</label><input id="weatherLat" type="text" inputmode="decimal" maxlength="12">
+<label for="weatherLon">经度（WGS84，最多两位小数）</label><input id="weatherLon" type="text" inputmode="decimal" maxlength="12">
 </div>
 <p id="weatherBudget" class="status"></p><button id="weatherSave" type="button">保存天气设置</button></div>
 <h2>系统信息</h2><p id="version" class="status"></p><p class="status">数据由本地 NAS 提供；各模块显示采集及错误状态。</p><button id="logout" type="button">退出连接</button></div>
