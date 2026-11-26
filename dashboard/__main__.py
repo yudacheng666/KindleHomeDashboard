@@ -102,8 +102,6 @@ def main():
         bus_config_error = startup_settings(args, os.environ)
     except ValueError as exc:
         parser.error(str(exc))
-    if bus_config_error:
-        print("Bus disabled; household remains available: " + bus_config_error, flush=True)
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error("Specify both TLS certificate and key")
     direct = bool(args.lan_host and args.lan_network)
@@ -124,6 +122,10 @@ def main():
                          config_error=bool(bus_config_error))
         runtime = Runtime(bus, windows=args.window, timezone_name=args.timezone,
                           web_settings=not bus_config_error.startswith("KHD_BUS_DAILY_LIMIT"))
+        if bus_config_error:
+            prefix = ("Bus disabled; household remains available: " if bus.config_error else
+                      "Initial bus settings invalid; saved local settings restored: ")
+            print(prefix + bus_config_error, flush=True)
         household = Household(args.directory) if args.enable_household else None
         tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
         api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, direct=direct)
