@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
-var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false,historyOpen=false,catalogCategory="",catalogQuery="";
+var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false,historyOpen=false,catalogCategory="",catalogQuery="",menusLoaded=false;
 function initialTab(){var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#catalog"?"catalog":h==="#display"?"displaySettings":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
@@ -29,11 +29,11 @@ function req(path,body,done){
   }catch(e){finish(false,{});}
 }
 function closeEditor(){editing=false;clear(el("editor"));show("editor",false);}
-function reset(){epoch++;busy=false;token="";admin=false;data=null;menus=[];menuDate="";tab=initialTab();historyOpen=false;catalogCategory="";catalogQuery="";
+function reset(){epoch++;busy=false;token="";admin=false;data=null;menus=[];menusLoaded=false;menuDate="";tab=initialTab();historyOpen=false;catalogCategory="";catalogQuery="";
   closeEditor();clear(el("content"));el("date").textContent="";el("token").value="";show("home",false);show("login",true);note("");}
 function load(){
   req(admin?"manage":"view",null,function(ok,v){
-    if(!ok){data=null;menus=[];clear(el("content"));closeEditor();el("date").textContent="";return;}
+    if(!ok){data=null;menus=[];menusLoaded=false;clear(el("content"));closeEditor();el("date").textContent="";return;}
     data=v;el("date").textContent=v.date;menuDate=menuDate||v.date;
     show("login",false);show("home",true);render();
   });
@@ -151,6 +151,7 @@ function weekDates(anchor){
   var days=[];for(var i=0;i<7;i++)days.push(new Date(monday.getTime()+i*86400000).toISOString().slice(0,10));return days;
 }
 function quickMenu(){
+  if(!menusLoaded){note("请先成功查询所在周的菜单，再快捷排餐。");return;}
   var p=editor("快捷排餐"),days=weekDates(menuDate||data.date),selectedDay=days.indexOf(menuDate)>=0?menuDate:days[0],selectedMeal="dinner",drafts={},original={};
   menus.forEach(function(m){original[m.day+"/"+m.meal]={dishes:m.dishes.join("\n"),ingredients:m.ingredients.join("\n")};});
   var dates=node(p,"div",undefined,"week-days"),meals=node(p,"div",undefined,"meal-pick");
@@ -171,9 +172,9 @@ function quickMenu(){
   btn(p,"保存本餐菜单",function(){
     capture();var k=key(),b={on:selectedDay,meal:selectedMeal,dishes:uniqueLines(dishes.value),ingredients:lines(ingredients.value)};
     if(!b.dishes.length){note("请至少选择或输入一道菜；删除整餐请使用菜单列表。");return;}
-    if(original[k]){b.old_on=selectedDay;b.old_meal=selectedMeal;}
-    req(original[k]?"menu/edit":"menu/set",b,function(ok){
-      if(!ok){note("本餐保存未确认，请核对后重试；草稿仍保留。");return;}
+    b.expected=original[k]?{dishes:lines(original[k].dishes),ingredients:lines(original[k].ingredients)}:null;
+    req("menu/plan",b,function(ok,v){
+      if(!ok){note(v.error==="invalid_selection_or_request"?"菜单可能已被其他设备修改，或填写内容无效。请核对后重试；草稿仍保留。":"本餐保存未确认，请核对后重试；草稿仍保留。");return;}
       original[k]={dishes:b.dishes.join("\n"),ingredients:b.ingredients.join("\n")};delete drafts[k];
       menus=menus.filter(function(m){return m.day!==b.on||m.meal!==b.meal;});menus.push({day:b.on,meal:b.meal,dishes:b.dishes,ingredients:b.ingredients});
       note("本餐已保存。");draw();
@@ -236,11 +237,12 @@ function menuRows(p,arr,manage){
   });
 }
 function readMenus(p){
+  menusLoaded=false;menus=[];
   var monday=new Date(menuDate+"T00:00:00Z");
   if(isNaN(monday.getTime())){node(p,"p","请选择有效日期");return;}
   monday.setUTCDate(monday.getUTCDate()-(monday.getUTCDay()+6)%7);
   var sunday=new Date(monday.getTime()+6*86400000);
-  req("menu/list",{first:monday.toISOString().slice(0,10),last:sunday.toISOString().slice(0,10)},function(ok,v){if(ok){menus=v.result;menuRows(p,menus,true);}else{menus=[];node(p,"p","菜单读取失败");}});
+  req("menu/list",{first:monday.toISOString().slice(0,10),last:sunday.toISOString().slice(0,10)},function(ok,v){if(ok&&Array.isArray(v.result)){menus=v.result;menusLoaded=true;menuRows(p,menus,true);}else{menus=[];node(p,"p","菜单读取失败");}});
 }
 function render(){
   var p=el("content");clear(p);if(!data)return;

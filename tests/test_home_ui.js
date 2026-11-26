@@ -54,7 +54,7 @@ click(el("editor"),"Catalog dish");let q=all(el("editor"),n=>n.tag==="textarea")
 assert.equal(q.value,"Example dinner\nCatalog dish");
 click(el("editor"),"午餐");assert.equal(q.value,"Example dish");click(el("editor"),"晚餐");assert.equal(q.value,"Example dinner\nCatalog dish");
 q.value+="\nHandwritten dish";click(el("editor"),"保存本餐菜单");
-assert.ok(calls.some(c=>c[0].endsWith("/menu/edit")&&c[1].dishes.includes("Handwritten dish")&&c[1].dishes.includes("Catalog dish")));
+assert.ok(calls.some(c=>c[0].endsWith("/menu/plan")&&c[1].expected.dishes[0]==="Example dinner"&&c[1].dishes.includes("Handwritten dish")&&c[1].dishes.includes("Catalog dish")));
 click(el("editor"),"完成排餐");
 click(el("content"),"新增菜单");const ta=all(el("editor"),n=>n.tag==="textarea");ta[0].value="Dish A\nDish B";ta[1].value="Ingredient A";
 click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/menu/set")&&c[1].dishes.length===2));

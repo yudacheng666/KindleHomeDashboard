@@ -19,6 +19,16 @@ class HouseholdTests(unittest.TestCase):
         for key in ("tasks","posters","today_menu","week_menu","shopping"):
             self.assertEqual(view[key],[])
 
+    def test_quick_menu_rejects_stale_snapshot(self):
+        self.home.plan_menu(self.today,"dinner",["Example dish"],[],None)
+        with self.assertRaises(ValueError):
+            self.home.plan_menu(self.today,"dinner",["Another dish"],[],None)
+        with self.assertRaises(ValueError):
+            self.home.plan_menu(self.today,"dinner",["Another dish"],[],{"dishes":["Wrong"],"ingredients":[]})
+        self.assertEqual(self.home.view(self.today)["week_menu"][0]["dishes"],["Example dish"])
+        self.home.plan_menu(self.today,"dinner",["Another dish"],[],{"dishes":["Example dish"],"ingredients":[]})
+        self.assertEqual(self.home.view(self.today)["week_menu"][0]["dishes"],["Another dish"])
+
     def test_catalog_crud_preserves_menu_snapshot(self):
         c = self.home.add_category("Example category")
         d = self.home.add_dish("Example dish", c)

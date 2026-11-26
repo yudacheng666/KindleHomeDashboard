@@ -345,6 +345,29 @@ class Household:
             # Shopping entries are independent snapshots; preserve labels,
             # sources and completed states just as with menu replacement/deletion.
 
+    def plan_menu(self, on, meal, dishes, ingredients, expected):
+        """Save a selected meal only if its current snapshot still matches."""
+        on = day(on)
+        if meal not in MEALS:
+            raise ValueError("Invalid meal")
+        dishes, ingredients = strings(dishes), strings(ingredients,80)
+        if not dishes:
+            raise ValueError("At least one dish required")
+        if expected is not None:
+            if not isinstance(expected, dict) or set(expected) != {"dishes", "ingredients"}:
+                raise ValueError("Invalid expected menu")
+            expected = {"dishes": strings(expected["dishes"]),
+                        "ingredients": strings(expected["ingredients"],80)}
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            current = db.execute("SELECT dishes,ingredients FROM menus WHERE day=? AND meal=?",
+                                 (on,meal)).fetchone()
+            actual = None if current is None else {k:json.loads(current[k]) for k in ("dishes","ingredients")}
+            if actual != expected:
+                raise ValueError("Menu changed; reload before saving")
+            db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
+                       (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
+
     def delete_menu(self, on, meal):
         on = day(on)
         if meal not in MEALS:

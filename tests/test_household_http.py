@@ -110,6 +110,15 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.assertEqual(self.req("GET","home/view",self.read_token)[0],404)
         self.assertEqual(self.req("POST","home/task/add",self.admin_token,{})[0],404)
 
+    def test_quick_menu_snapshot_conflict(self):
+        body={"on":self.today,"meal":"dinner","dishes":["Example dish"],"ingredients":[],"expected":None}
+        self.assertEqual(self.req("POST","home/menu/plan",self.read_token,body)[0],401)
+        self.post("menu/plan",body)
+        self.post("menu/plan",{**body,"dishes":["Other dish"]},400)
+        self.assertEqual(self.view()["week_menu"][0]["dishes"],["Example dish"])
+        self.post("menu/plan",{**body,"dishes":["Other dish"],"expected":{"dishes":["Example dish"],"ingredients":[]}})
+        self.assertEqual(self.view()["week_menu"][0]["dishes"],["Other dish"])
+
     def test_catalog_permissions_and_menu_independence(self):
         c=self.post("category/add",{"name":"Example category"})
         b={"name":"Example dish","category":c}

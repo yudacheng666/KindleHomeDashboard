@@ -23,6 +23,7 @@ OPERATIONS = {
     "dish/edit": ("edit_dish", ("key","name","category")),
     "dish/delete": ("delete_dish", ("key",)),
     "dish/import": ("add_dishes", ("names","category")),
+    "menu/plan": ("plan_menu", ("on","meal","dishes","ingredients","expected")),
     "menu/set": ("set_menu", ("on","meal","dishes","ingredients")),
     "menu/edit": ("edit_menu", ("old_on","old_meal","on","meal","dishes","ingredients")),
     "menu/delete": ("delete_menu", ("on","meal")),
