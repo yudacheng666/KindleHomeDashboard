@@ -83,6 +83,8 @@ def main():
                 def js(script, args=()):
                     return wd("/session/"+sid+"/execute/sync", {"script":script,"args":list(args)})
                 def go(path):
+                    # Force a new document even when only the hash changes. The access mode is injected at page load.
+                    wd("/session/"+sid+"/url", {"url":"about:blank"})
                     wd("/session/"+sid+"/url", {"url":"http://127.0.0.1:"+str(server.server_port)+path})
                     wait(lambda:js("return !!document.getElementById('connect').onclick"))
                 def click(id):
