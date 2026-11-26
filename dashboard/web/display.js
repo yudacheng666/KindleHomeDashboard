@@ -43,7 +43,8 @@ function makePages(v){
     v.posters.forEach(function(t){p=p.concat(posterPages(t));});
     return p.length?p:[{id:"posters",title:"海报",lines:["暂无有效海报"],note:""}];
   }
-  return [{id:"week",title:"本周菜单",menus:v.week_menu,lines:["暂无本周菜单"],note:""}];
+  var settings=v.menu_display||{mode:"week",days:7},title=settings.mode==="week"?"本周菜单":"未来"+settings.days+"天菜单";
+  return [{id:"week",title:title,menus:v.week_menu,lines:["暂无"+title],note:""}];
 }
 function eligible(p){return section==="posters";}
 function tabs(){

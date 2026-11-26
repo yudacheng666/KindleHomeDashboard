@@ -9,7 +9,7 @@ class Node {
 const nodes={},events={},doc={hidden:false,getElementById(id){return nodes[id]||(nodes[id]=new Node(id));},createElement(tag){return new Node(tag);},addEventListener(n,f){events[n]=f;}};
 const el=id=>doc.getElementById(id);
 const date="2026-01-05",task={id:"synthetic-task",title:"Example task",start:date,repeat:"daily",occurrence:date,completed:false};
-const manage={date,tasks:[task],posters:[],shopping:[],history:[{...task,completed_at:null,restorable:true}],catalog:{categories:[{id:"cat",name:"Example category"}],dishes:[{id:"dish",name:"Catalog dish",category:"cat"}]}};
+const manage={date,tasks:[task],posters:[],shopping:[],history:[{...task,completed_at:null,restorable:true}],catalog:{categories:[{id:"cat",name:"Example category"},{id:"other",name:"其他"}],dishes:[{id:"dish",name:"Catalog dish",category:"cat"}]}};
 const view={date,tasks:[task],posters:[],shopping:[],today_menu:[],week_menu:[]};
 const calls=[];let fail=false,confirmed=true;
 const sampleMenu={day:date,meal:"lunch",dishes:["Example dish"],ingredients:["Example ingredient"]};
@@ -23,12 +23,14 @@ class XHR {
   send(body){
     calls.push([this.path,body&&JSON.parse(body)]);
     let response=this.path.endsWith("/manage")?manage:this.path.endsWith("/view")?view:this.path.endsWith("/menu/list")?{result:shared}:{result:[]};
-    if(!fail&&this.path.endsWith("/menu/dish")){
-      const b=JSON.parse(body),m=shared.find(x=>x.day===b.on&&x.meal===b.meal),d=m?m.dishes.slice():[];
+    if(this.path.endsWith("/menu/sync")){const b=JSON.parse(body);response={result:{menus:shared.filter(m=>m.day>=b.first&&m.day<=b.last),catalog_revision:"test",catalog:manage.catalog}};}
+    if(!fail&&(this.path.endsWith("/menu/dish")||this.path.endsWith("/menu/manual"))){
+      const b=JSON.parse(body);if(this.path.endsWith("/menu/manual")){b.present=true;if(!manage.catalog.dishes.some(d=>d.name===b.name))manage.catalog.dishes.push({id:"manual-"+b.name,name:b.name,category:"other"});}const m=shared.find(x=>x.day===b.on&&x.meal===b.meal),d=m?m.dishes.slice():[];
       let dishes=b.present?[...new Set([...d,b.name])]:d.filter(x=>x!==b.name);
       const result=dishes.length?{day:b.on,meal:b.meal,dishes,ingredients:m?m.ingredients:[]}:null;
       shared=shared.filter(x=>x.day!==b.on||x.meal!==b.meal);if(result)shared.push(result);response={result};
     }
+    if(!fail&&this.path.endsWith("/dish/move-other")){const b=JSON.parse(body);manage.catalog.dishes.forEach(d=>{if(b.keys.includes(d.id))d.category=b.category;});}
     this.status=fail?503:200;this.responseText=JSON.stringify(response);this.readyState=4;this.onreadystatechange();
   }
   abort(){}
@@ -70,6 +72,11 @@ assert.ok(all(el("editor"),n=>n.textContent==="Remote dish").length);
 manual.value="Handwritten dish";click(el("editor"),"午餐");assert.equal(manual.value,"");click(el("editor"),"晚餐");assert.equal(manual.value,"Handwritten dish");
 click(el("editor"),"添加菜品");assert.equal(manual.value,"");
 assert.ok(shared.find(m=>m.day===date&&m.meal==="dinner").dishes.includes("Handwritten dish"));
+assert.ok(manage.catalog.dishes.some(d=>d.name==="Handwritten dish"&&d.category==="other"));
+click(el("editor"),"下一周");assert.ok(calls.some(c=>c[0].endsWith("/menu/sync")&&c[1].first==="2026-01-12"));
+const jump=all(el("editor"),n=>n.id==="quickDate")[0];jump.value="2030-01-01";click(el("editor"),"跳转");
+manual.value="Future dish";click(el("editor"),"添加菜品");assert.ok(shared.some(m=>m.day==="2030-01-01"&&m.dishes.includes("Future dish")));
+click(el("editor"),"回到今日");assert.ok(calls.some(c=>c[0].endsWith("/menu/sync")&&c[1].first==="2026-01-05"));
 fail=true;tick();let writes=calls.filter(c=>c[0].endsWith("/menu/dish")).length;
 click(el("editor"),"Catalog dish");assert.equal(calls.filter(c=>c[0].endsWith("/menu/dish")).length,writes);
 fail=false;tick();assert.ok(quickStatus.textContent.includes("已同步"));
@@ -78,6 +85,12 @@ fail=false;tick();assert.ok(quickStatus.textContent.includes("核对"));assert.e
 doc.hidden=true;events.visibilitychange();let countPoll=calls.length;tick();assert.equal(calls.length,countPoll);
 doc.hidden=false;events.visibilitychange();assert.ok(calls.length>countPoll);
 click(el("editor"),"完成排餐");countPoll=calls.length;tick();assert.equal(calls.length,countPoll);
+el("catalog").onclick();click(el("content"),"其他");
+const check=all(el("content"),n=>n.type==="checkbox")[0];check.checked=true;click(el("content"),"移动所选菜品");
+assert.ok(calls.some(c=>c[0].endsWith("/dish/move-other")&&c[1].keys.length===1&&c[1].category==="cat"));
+el("displaySettings").onclick();click(el("content"),"菜单展示范围");all(el("editor"),n=>n.tag==="select")[0].value="custom";all(el("editor"),n=>n.tag==="input")[0].value="14";click(el("editor"),"保存");
+assert.ok(calls.some(c=>c[0].endsWith("/menu/display")&&c[1].mode==="custom"&&c[1].days===14));
+el("menus").onclick();
 click(el("content"),"新增菜单");const ta=all(el("editor"),n=>n.tag==="textarea");ta[0].value="Dish A\nDish B";ta[1].value="Ingredient A";
 click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/menu/plan")&&c[1].expected===null&&c[1].dishes.length===2));
 click(el("content"),"编辑");

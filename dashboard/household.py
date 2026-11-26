@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 from datetime import date, timedelta
 import json
+from hashlib import sha256
 import os
 import sqlite3
 from uuid import uuid4
@@ -88,11 +89,16 @@ class Household:
                     seconds INTEGER NOT NULL, include_week INTEGER NOT NULL,
                     include_shopping INTEGER NOT NULL, autoplay INTEGER NOT NULL);
                 INSERT OR IGNORE INTO display_settings VALUES (1,180,0,0,0);
+                CREATE TABLE IF NOT EXISTS menu_display_settings (
+                    id INTEGER PRIMARY KEY CHECK(id=1), mode TEXT NOT NULL, days INTEGER NOT NULL);
+                INSERT OR IGNORE INTO menu_display_settings VALUES (1,'week',7);
                 PRAGMA user_version=1;
             """)
             if seed_catalog:
                 db.executemany("INSERT OR IGNORE INTO dish_categories VALUES (?,?)",
                                [(uuid4().hex, name) for name in ("荤菜","素菜","半荤菜","汤羹","主食","早餐","其他")])
+            # Restore a missing reserved category when upgrading an older catalog.
+            self._other_category(db)
 
     @contextmanager
     def db(self):
@@ -247,6 +253,33 @@ class Household:
             if db.execute("UPDATE posters SET enabled=? WHERE id=?",(enabled,key)).rowcount!=1:
                 raise ValueError("Unknown poster")
 
+    @staticmethod
+    def _other_category(db):
+        db.execute("INSERT OR IGNORE INTO dish_categories VALUES (?,?)", (uuid4().hex,"其他"))
+        return db.execute("SELECT id FROM dish_categories WHERE name=?", ("其他",)).fetchone()[0]
+
+    @staticmethod
+    def _auto_catalog(db, names):
+        if names:
+            other=Household._other_category(db)
+            db.executemany("INSERT OR IGNORE INTO dishes VALUES (?,?,?)",
+                           [(uuid4().hex, name, other) for name in names])
+
+    def move_other_dishes(self, keys, category):
+        if (not isinstance(keys,list) or not 1 <= len(keys) <= 100
+                or any(not isinstance(key,str) or len(key)!=32 for key in keys)
+                or len(set(keys))!=len(keys)):
+            raise ValueError("Invalid dish selection")
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            other=self._other_category(db)
+            if category==other or not db.execute("SELECT 1 FROM dish_categories WHERE id=?", (category,)).fetchone():
+                raise ValueError("Invalid destination category")
+            for key in keys:
+                if db.execute("UPDATE dishes SET category=? WHERE id=? AND category=?",
+                              (category,key,other)).rowcount!=1:
+                    raise ValueError("Dish moved or deleted; reload catalog")
+
     def add_category(self, name):
         name = text(name, 60)
         key = uuid4().hex
@@ -260,6 +293,9 @@ class Household:
     def edit_category(self, key, name):
         name = text(name, 60)
         with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if key==self._other_category(db):
+                raise ValueError("Reserved category")
             try:
                 if db.execute("UPDATE dish_categories SET name=? WHERE id=?", (name,key)).rowcount != 1:
                     raise ValueError("Unknown category")
@@ -268,6 +304,9 @@ class Household:
 
     def delete_category(self, key):
         with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if key==self._other_category(db):
+                raise ValueError("Reserved category")
             try:
                 if db.execute("DELETE FROM dish_categories WHERE id=?", (key,)).rowcount != 1:
                     raise ValueError("Unknown category")
@@ -359,6 +398,8 @@ class Household:
             if (old_on, old_meal) != (on, meal) and db.execute(
                     "SELECT 1 FROM menus WHERE day=? AND meal=?", (on, meal)).fetchone():
                 raise ValueError("Target meal already exists")
+            original = self._menu_snapshot(db,old_on,old_meal)
+            self._auto_catalog(db,[name for name in dishes if name not in original["dishes"]])
             db.execute("UPDATE menus SET day=?,meal=?,dishes=?,ingredients=? WHERE day=? AND meal=?",
                        (on, meal, json.dumps(dishes,ensure_ascii=False),
                         json.dumps(ingredients,ensure_ascii=False), old_on, old_meal))
@@ -376,10 +417,15 @@ class Household:
         with self.db() as db:
             db.execute("BEGIN IMMEDIATE")
             self._check_menu_snapshot(db,on,meal,expected)
+            previous = self._menu_snapshot(db,on,meal)
+            self._auto_catalog(db,[name for name in dishes if previous is None or name not in previous["dishes"]])
             db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
                        (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
 
-    def change_menu_dish(self, on, meal, name, present, confirm_empty, expected_ingredients):
+    def add_manual_menu_dish(self, on, meal, name):
+        return self.change_menu_dish(on,meal,name,True,False,None,manual=True)
+
+    def change_menu_dish(self, on, meal, name, present, confirm_empty, expected_ingredients, manual=False):
         """Apply explicit single-dish intent to the current shared meal atomically."""
         on, name = day(on), text(name)
         if meal not in MEALS or type(present) is not bool or type(confirm_empty) is not bool:
@@ -409,6 +455,8 @@ class Household:
                     return None
             if len(dishes) > 30:
                 raise ValueError("Too many dishes")
+            if manual:
+                self._auto_catalog(db,[name])
             db.execute("INSERT OR REPLACE INTO menus VALUES (?,?,?,?)",
                        (on,meal,json.dumps(dishes,ensure_ascii=False),json.dumps(ingredients,ensure_ascii=False)))
             return {"day":on,"meal":meal,"dishes":dishes,"ingredients":ingredients}
@@ -508,9 +556,36 @@ class Household:
             for record in history:
                 record["restorable"] = by_id[record["id"]]["occurrence"] == record["occurrence"]
             return {"date": on, "display_settings": self._display_settings(db), "tasks": tasks,
-                    "history": history, "catalog": self._catalog(db),
+                    "history": history, "catalog": self._catalog(db), "menu_display":self._menu_display(db),
                     "posters": [dict(r) for r in db.execute("SELECT * FROM posters ORDER BY start,id")],
                     "shopping": [dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]}
+
+    @staticmethod
+    def _menu_display(db):
+        row=db.execute("SELECT mode,days FROM menu_display_settings WHERE id=1").fetchone()
+        return dict(row)
+
+    def set_menu_display(self, mode, days):
+        if (mode not in ("week","rolling","custom") or type(days) is not int
+                or not 1<=days<=31 or (mode in ("week","rolling") and days!=7)):
+            raise ValueError("Invalid menu display range")
+        with self.db() as db:
+            db.execute("UPDATE menu_display_settings SET mode=?,days=? WHERE id=1",(mode,days))
+
+    def sync_menus(self, first, last, catalog_revision):
+        first,last=day(first),day(last)
+        if last<first or (date.fromisoformat(last)-date.fromisoformat(first)).days>6:
+            raise ValueError("Select up to seven days")
+        if not isinstance(catalog_revision,str) or len(catalog_revision)>64:
+            raise ValueError("Invalid catalog revision")
+        with self.db() as db:
+            db.execute("BEGIN")
+            catalog=self._catalog(db)
+            revision=sha256(json.dumps(catalog,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
+            result={"menus":self._menus(db,first,last),"catalog_revision":revision}
+            if revision!=catalog_revision:
+                result["catalog"]=catalog
+            return result
 
     def menus_between(self, first, last):
         first, last = day(first), day(last)
@@ -539,8 +614,11 @@ class Household:
                 if p["task_id"] is not None and p["task_id"] not in due:
                     continue
                 posters.append({"id":p["id"],"title":p["title"],"body":due[p["task_id"]] if p["task_id"] else p["body"],"note":p["note"],"task_id":p["task_id"]})
-            week=self._menus(db,monday.isoformat(),(monday+timedelta(days=6)).isoformat())
+            settings=self._menu_display(db)
+            first=monday if settings["mode"]=="week" else date.fromisoformat(on)
+            last=first+timedelta(days=min(settings["days"]-1,(date.max-first).days))
+            week=self._menus(db,first.isoformat(),last.isoformat())
             shopping=[dict(r) for r in db.execute("SELECT * FROM shopping ORDER BY completed,id")]
             return {"date":on,"display_settings":self._display_settings(db),"tasks":tasks,"posters":posters,
                     "today_menu":[m for m in week if m["day"]==on],
-                    "week_menu":week,"shopping":shopping}
+                    "week_menu":week,"menu_display":settings,"menu_range":{"first":first.isoformat(),"last":last.isoformat()},"shopping":shopping}

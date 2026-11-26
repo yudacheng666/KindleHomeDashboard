@@ -19,6 +19,51 @@ class HouseholdTests(unittest.TestCase):
         for key in ("tasks","posters","today_menu","week_menu","shopping"):
             self.assertEqual(view[key],[])
 
+    def test_unbounded_planning_and_display_range(self):
+        for day in ("2026-01-01","2026-01-05","2026-01-11","2026-01-12","2026-02-01","2032-04-09"):
+            self.home.add_manual_menu_dish(day,"dinner","Example dish")
+        self.assertEqual([m["day"] for m in self.home.view(self.today)["week_menu"]],["2026-01-05","2026-01-11"])
+        self.home.set_menu_display("custom",31)
+        view=Household(self.temp.name).view(self.today)
+        self.assertEqual(view["menu_range"],{"first":self.today,"last":"2026-02-04"})
+        self.assertEqual([m["day"] for m in view["week_menu"]],["2026-01-05","2026-01-11","2026-01-12","2026-02-01"])
+        self.assertEqual(len(self.home.menus_between("2032-04-09","2032-04-09")),1)
+        for mode,days in (("custom",0),("custom",32),("week",8),("rolling",False)):
+            with self.assertRaises(ValueError):
+                self.home.set_menu_display(mode,days)
+        self.home.set_menu_display("rolling",7)
+        self.assertEqual(self.home.view("2026-01-06")["menu_range"]["last"],"2026-01-12")
+
+    def test_manual_catalog_and_batch_classification(self):
+        from concurrent.futures import ThreadPoolExecutor
+        target=self.home.add_category("Example target")
+        known=self.home.add_dish("Known dish",target)
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            list(pool.map(lambda n:self.home.add_manual_menu_dish(self.today,"dinner",n),[" New dish ","New dish","Known dish"]))
+        catalog=self.home.manage(self.today)["catalog"]
+        other=next(c["id"] for c in catalog["categories"] if c["name"]=="其他")
+        new=next(d for d in catalog["dishes"] if d["name"]=="New dish")
+        self.assertEqual(len(catalog["dishes"]),2)
+        self.assertEqual(new["category"],other)
+        self.assertEqual(next(d["category"] for d in catalog["dishes"] if d["id"]==known),target)
+        for op in (lambda:self.home.edit_category(other,"Renamed"),lambda:self.home.delete_category(other)):
+            with self.assertRaises(ValueError):op()
+        self.home.add_manual_menu_dish(self.today,"lunch","Another dish")
+        second=next(d["id"] for d in self.home.manage(self.today)["catalog"]["dishes"] if d["name"]=="Another dish")
+        with self.assertRaises(ValueError):
+            self.home.move_other_dishes([new["id"],known],target)
+        self.assertEqual(next(d["category"] for d in self.home.manage(self.today)["catalog"]["dishes"] if d["id"]==new["id"]),other)
+        self.home.move_other_dishes([new["id"],second],target)
+        self.assertTrue(all(d["category"]==target for d in self.home.manage(self.today)["catalog"]["dishes"]))
+        first=self.home.sync_menus(self.today,self.today,"")
+        self.assertIn("catalog",first)
+        self.assertNotIn("catalog",self.home.sync_menus(self.today,self.today,first["catalog_revision"]))
+        self.home.add_manual_menu_dish("2030-01-01","dinner","Future dish")
+        self.assertIn("catalog",self.home.sync_menus(self.today,self.today,first["catalog_revision"]))
+        self.assertIn("New dish",self.home.view(self.today)["week_menu"][1]["dishes"])
+        self.home.plan_menu(self.today,"breakfast",["Manual form dish"],[],None)
+        self.assertIn("Manual form dish",[d["name"] for d in self.home.manage(self.today)["catalog"]["dishes"]])
+
     def test_shared_dishes_concurrent_and_last_confirmation(self):
         from concurrent.futures import ThreadPoolExecutor
         def add(name):

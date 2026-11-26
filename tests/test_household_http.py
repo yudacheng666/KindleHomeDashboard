@@ -110,6 +110,29 @@ class HouseholdHTTPTests(unittest.TestCase):
         self.assertEqual(self.req("GET","home/view",self.read_token)[0],404)
         self.assertEqual(self.req("POST","home/task/add",self.admin_token,{})[0],404)
 
+    def test_manual_menu_range_and_batch_permissions(self):
+        body={"on":"2030-01-01","meal":"dinner","name":"Example manual dish"}
+        self.assertEqual(self.req("POST","home/menu/manual",self.read_token,body)[0],401)
+        self.post("menu/manual",body)
+        self.post("menu/manual",body)
+        catalog=self.manage()["catalog"]
+        other=next(c["id"] for c in catalog["categories"] if c["name"]=="其他")
+        self.assertEqual(len(catalog["dishes"]),1)
+        self.assertEqual(catalog["dishes"][0]["category"],other)
+        target=self.post("category/add",{"name":"Example destination"})
+        move={"keys":[catalog["dishes"][0]["id"]],"category":target}
+        self.assertEqual(self.req("POST","home/dish/move-other",self.read_token,move)[0],401)
+        self.post("dish/move-other",move)
+        self.assertEqual(self.manage()["catalog"]["dishes"][0]["category"],target)
+        self.post("dish/move-other",move,400)
+        self.post("category/delete",{"key":other,"confirm":True},400)
+        settings={"mode":"custom","days":10}
+        self.assertEqual(self.req("POST","home/menu/display",self.read_token,settings)[0],401)
+        self.post("menu/display",settings)
+        self.assertEqual(self.view()["menu_display"],settings)
+        self.assertEqual(self.view()["week_menu"],[])
+        self.assertEqual(len(self.post("menu/list",{"first":body["on"],"last":body["on"]})),1)
+
     def test_collaborative_dish_permissions_and_concurrency(self):
         from concurrent.futures import ThreadPoolExecutor
         b={"on":self.today,"meal":"dinner","name":"Example A","present":True,"confirm_empty":False,"expected_ingredients":None}
