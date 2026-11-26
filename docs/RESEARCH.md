@@ -9,3 +9,8 @@
 - [BusArrivalBoard](https://github.com/Garfield-Wuu/BusArrivalBoard)（MIT）：Python 独立后端、墨水屏帧服务、变化检测和多车显示；其车来了数据源授权未确认，仅参考独立显示与缓存机制。
 - [HA REST](https://developers.home-assistant.io/docs/api/rest/) 按需接入，核心通勤独立运行。
 - [Kindle 越狱](https://kindlemodding.org/jailbreaking/index.html)、[FBInk](https://github.com/NiLuJe/FBInk)、[paperwhite-weather](https://github.com/estcarisimo/paperwhite-weather)；设备兼容、许可、15–30秒级刷新与恢复待实测。
+
+## 免费家庭手机入口候选（2026-11-26，待用户确认）
+- 首选复用现有 NAS 同源网页：iPhone Safari [添加到主屏幕/作为网页 App 打开](https://support.apple.com/guide/iphone/open-as-web-app-iphea86e5236/ios)，Android 浏览器桌面快捷方式；建议手机专用管理布局、统一入口、图标与独立窗口，Kindle 原 ES5 页面不变。现有 LAN HTTP 可先尝试桌面网页入口；完整 PWA 安装及 Service Worker 等安全上下文能力通常要求可信 HTTPS（[MDN](https://developer.mozilla.org/zh-CN/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable)），私有 LAN IP 不等于 localhost。先实测手机 HTTP 桌面入口/独立窗口，不承诺完整 PWA 或推送；若确有必要再评估免费本地可信证书及维护成本，不为安装而暴露公网，不离线缓存家庭内容，不新增常驻服务。
+- 微信小程序体验版备选：网络文档转载及[腾讯云社区资料](https://cloud.tencent.com/developer/article/2364320)表明 wx.request 支持同网段非本机 IP；微信官方原页本次不可达，[腾讯云体验版说明](https://free-plat-test.qcloudcdn.com/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/App-Publishing/Mini-Program)支持体验成员免正式审核，但长期有效性、个人账号注册/认证费用与真机 HTTP 请求（尤其 Host/Origin/Referer）未验收。正式发布可能涉及认证及备案，不能承诺长期零费用。小程序需另做客户端，不允许为接入而放宽现有网络安全校验；不上传私有地址或家庭内容、不引入微信云数据库。当前仅调研，不建账号或上传代码。
+- [Apple Developer Program](https://developer.apple.com/cn/programs/) 年费99美元，[TestFlight](https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/) 单构建最长90天，排除为零费用长期家庭方案。Android APK 可自行分发但需处理签名与安装更新且不覆盖 iOS，暂非优先。以上未开发、未测试、不改变发布或产品范围。
