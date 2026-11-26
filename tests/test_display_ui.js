@@ -39,27 +39,26 @@ class XHR {
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
 function click(id){el(id).onclick();}
 function heading(expected){assert.equal(el("heading").textContent,expected);}
-el("token").value="example-display-token";click("connect");heading("今日生活");
-assert.equal(el("token").value,"");assert.equal(el("pause").textContent,"开始轮播");
+el("token").value="example-display-token";click("connect");heading("待办清单");
+assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);
-advance(180000);heading("今日生活"); // No rotation until opted in.
-const before=requests;click("next");heading("今日待办");click("next");heading("Example reminder");
+const before=requests;click("postersMode");heading("Example reminder");
 assert.equal(el("body").children[0].textContent,"Line one\nLine two");
-assert.equal(requests,before); // manual changes are local only.
-click("pause");advance(180000);heading("今日菜单");advance(180000);heading("今日生活");
-click("settings");el("seconds").value="120";el("week").checked=true;el("shopping").checked=true;click("apply");
-advance(120000);heading("今日待办");advance(120000);heading("Example reminder");
-advance(120000);heading("今日菜单");advance(120000);heading("本周菜单");advance(120000);heading("购物清单");
-click("previous");heading("本周菜单");advance(120000);heading("本周菜单"); // manual pin
-click("previous");click("previous");heading("Example reminder");
-data={...sample,posters:[]};advance(30000);heading("今日生活"); // removed page falls back
-data={date,tasks:[],posters:[],today_menu:[],week_menu:[],shopping:[]};advance(30000);
-heading("今日生活");assert.equal(el("body").children[0].textContent,"暂无家庭安排");
-click("pause");advance(300000);heading("今日生活"); // single page stays put
+click("menusMode");heading("本周菜单");assert.ok(el("body").children[0].textContent.includes("Example dish"));
+assert.equal(requests,before);
+click("postersMode");data={...sample,posters:[poster,{...poster,id:"test-poster-2",title:"Second reminder"}]};advance(30000);
+click("settings");el("seconds").value="120";click("apply");click("pause");
+advance(120000);heading("Second reminder");advance(120000);heading("Example reminder");
+click("next");heading("Second reminder");advance(120000);heading("Second reminder");
+click("menusMode");advance(180000);heading("本周菜单");
+click("postersMode");data={...sample,posters:[]};advance(30000);heading("海报");
+assert.equal(el("body").children[0].textContent,"暂无有效海报");
+click("tasksMode");data={date,tasks:[],posters:[],week_menu:[]};advance(30000);
+heading("待办清单");assert.equal(el("body").children[0].textContent,"暂无待办");
 doc.hidden=true;events.visibilitychange();const hiddenCount=requests;advance(120000);assert.equal(requests,hiddenCount);
-doc.hidden=false;data=sample;events.visibilitychange();heading("今日生活");
+doc.hidden=false;data=sample;events.visibilitychange();heading("待办清单");
 fail=503;advance(30000);heading("");assert.equal(el("body").children.length,0);
-fail=0;advance(30000);heading("今日生活");
+fail=0;advance(30000);heading("待办清单");
 busData={...bus,snapshot:{...bus.snapshot,fetched_at:new Date(FakeDate.now()-5000).toISOString()}};click("busMode");heading("Example line");assert.equal(el("familyControls").className,"hidden");
 assert.ok(el("body").children.some(n=>n.textContent==="约 4 分钟"));
 assert.ok(el("body").children.some(n=>n.textContent==="约 9 分钟"));
@@ -81,7 +80,7 @@ advance(45000);assert.ok(el("body").children.some(n=>n.textContent==="等待到�
 advance(30000);assert.ok(el("body").children.some(n=>n.textContent==="等待数据更新"));
 busData={...bus,snapshot:{...bus.snapshot,status:"expired",vehicles:[]}};advance(15000);
 assert.ok(!el("body").children.some(n=>n.className==="eta"));assert.ok(!el("body").children.some(n=>n.textContent.includes("数据更新于")));
-click("familyMode");heading("今日生活");assert.equal(el("familyControls").className,"");
+click("tasksMode");heading("待办清单");assert.equal(el("familyControls").className,"hidden");
 const endBus=busRequests;advance(60000);assert.equal(busRequests,endBus);
 fail=401;advance(30000);assert.equal(el("display").className,"hidden");assert.equal(el("login").className,"");
 assert.equal(el("body").children.length,0);assert.equal(timers.size,0);
@@ -95,9 +94,9 @@ assert.equal(timers.size,0);
 const longBody="示例文字".repeat(25)+"😀\n"+"第二行\n".repeat(7)+"末尾";
 data={...sample,tasks:[],posters:[{...poster,body:longBody}],today_menu:[],week_menu:[],shopping:[],
   display_settings:{seconds:120,include_week:true,include_shopping:true,autoplay:true}};
-el("token").value="example-display-token";click("connect");heading("今日生活");
+el("token").value="example-display-token";click("connect");click("postersMode");
 assert.equal(el("pause").textContent,"暂停轮播");
-advance(120000);assert.ok(el("heading").textContent.indexOf("Example reminder · 1/")===0);
+assert.ok(el("heading").textContent.indexOf("Example reminder · 1/")===0);
 let joined="",last=false;
 while(!last){
   const title=el("heading").textContent;
@@ -109,39 +108,37 @@ assert.equal(joined,longBody);
 assert.equal(el("body").children[1].textContent,"Example note");
 assert.equal(el("pause").textContent,"开始轮播");
 const pinned=el("heading").textContent;advance(120000);heading(pinned);
-click("logout");el("token").value="example-display-token";click("connect");
+click("logout");el("token").value="example-display-token";click("connect");click("postersMode");
 assert.equal(el("pause").textContent,"暂停轮播");click("logout");assert.equal(timers.size,0);
 data=sample;busData=bus;autoMode="family";
-el("token").value="example-display-token";click("connect");heading("今日生活");
-const autoBefore=autoRequests;click("autoMode");heading("今日生活");assert.equal(autoRequests,autoBefore+1);
+el("token").value="example-display-token";click("connect");heading("待办清单");
+const autoBefore=autoRequests;click("autoMode");heading("待办清单");assert.equal(autoRequests,autoBefore+1);
 autoMode="bus";advance(30000);heading("Example line");
 assert.equal(el("familyControls").className,"hidden");
-autoMode="family";advance(15000);heading("今日生活");
-assert.equal(el("familyControls").className,"");
-click("next");heading("今日待办");const pinnedAuto=autoRequests;
-autoMode="bus";advance(60000);heading("今日待办");assert.equal(autoRequests,pinnedAuto);
+autoMode="family";advance(15000);heading("待办清单");
+click("postersMode");heading("Example reminder");const pinnedAuto=autoRequests;
+autoMode="bus";advance(60000);heading("Example reminder");assert.equal(autoRequests,pinnedAuto);
 click("autoMode");heading("Example line");
 click("busMode");const manualAuto=autoRequests;autoMode="family";advance(30000);heading("Example line");assert.equal(autoRequests,manualAuto);
-click("autoMode");heading("今日生活");click("settings");const settingsAuto=autoRequests;autoMode="bus";advance(60000);heading("今日生活");assert.equal(autoRequests,settingsAuto);click("cancel");
+click("autoMode");heading("待办清单");click("postersMode");click("settings");const settingsAuto=autoRequests;autoMode="bus";advance(60000);heading("Example reminder");assert.equal(autoRequests,settingsAuto);click("cancel");
 click("autoMode");heading("Example line");doc.hidden=true;events.visibilitychange();
 const asleep=autoRequests;advance(60000);assert.equal(autoRequests,asleep);
-autoMode="family";doc.hidden=false;events.visibilitychange();heading("今日生活");
-fail=503;advance(30000);heading("");fail=0;advance(30000);heading("今日生活");
+autoMode="family";doc.hidden=false;events.visibilitychange();heading("待办清单");
+fail=503;advance(30000);heading("");fail=0;advance(30000);heading("待办清单");
 click("logout");assert.equal(timers.size,0);
-// Foregrounding must re-read fresh content without jumping to page one.
-data=sample;fail=0;el("token").value="example-display-token";click("connect");
-click("next");click("next");heading("Example reminder");
+// Foregrounding must re-read fresh content without jumping to another tab.
+data={...sample,posters:[poster,{...poster,id:"test-poster-2",title:"Second reminder"}]};fail=0;el("token").value="example-display-token";click("connect");
+click("postersMode");click("next");heading("Second reminder");
 doc.hidden=true;events.visibilitychange();const pausedRequests=requests;
 advance(300000);assert.equal(requests,pausedRequests);
-doc.hidden=false;events.visibilitychange();heading("Example reminder");
+doc.hidden=false;events.visibilitychange();heading("Second reminder");
 assert.equal(el("pause").textContent,"开始轮播");
 click("pause");doc.hidden=true;events.visibilitychange();advance(300000);
-doc.hidden=false;events.visibilitychange();heading("Example reminder");
+doc.hidden=false;events.visibilitychange();heading("Second reminder");
 assert.equal(el("pause").textContent,"暂停轮播");
-advance(180000);heading("今日菜单");
-click("previous");heading("Example reminder");
+advance(180000);heading("Example reminder");
 doc.hidden=true;events.visibilitychange();data={...sample,posters:[]};
-doc.hidden=false;events.visibilitychange();heading("今日生活");
+doc.hidden=false;events.visibilitychange();heading("海报");
 click("logout");assert.equal(timers.size,0);
 // Direct manual display: a new script instance (mobile tab reload) restores
 // only tab-local page identity and rotation metadata after a fresh response.
@@ -153,8 +150,8 @@ function directDisplay(){
     location:{pathname:"/display"},XMLHttpRequest:XHR,setTimeout:setTimer,clearTimeout:clearTimer
   });
 }
-data=sample;directDisplay();heading("今日生活");
-click("next");click("next");heading("Example reminder");
+data={...sample,posters:[poster,{...poster,id:"test-poster-2",title:"Second reminder"}]};directDisplay();heading("待办清单");
+click("postersMode");heading("Example reminder");
 click("pause");doc.hidden=true;events.visibilitychange();
 assert.equal(storage.size,1);
 const serialized=[...storage.values()][0];
@@ -162,8 +159,8 @@ assert.ok(!serialized.includes("Line one")&&!serialized.includes("Example remind
 windowEvents.pagehide();assert.equal(timers.size,0);
 doc.hidden=false;directDisplay();heading("Example reminder");
 assert.equal(el("pause").textContent,"暂停轮播");
-advance(180000);heading("今日菜单");
-windowEvents.pagehide();windowEvents.pageshow({persisted:true});heading("今日菜单");
+advance(180000);heading("Second reminder");
+windowEvents.pagehide();windowEvents.pageshow({persisted:true});heading("Second reminder");
 click("logout");assert.equal(storage.size,0);assert.equal(timers.size,0);
-directDisplay();heading("今日生活");click("logout");
+directDisplay();heading("待办清单");click("logout");
 console.log("Household display simulation passed: automatic switching, override, saved settings, long poster preservation, unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");

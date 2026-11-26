@@ -8,16 +8,15 @@ button,input,select{box-sizing:border-box;font:inherit;background:white;color:#1
 button{margin:4px 4px 4px 0}input[type=password]{display:block;width:100%;margin:8px 0}
 .hidden{display:none}.frame{border-top:2px solid #111;border-bottom:2px solid #111;min-height:220px;padding:16px 0}
 .poster{text-align:center;font-size:38px;line-height:1.5;font-weight:bold}.poster.medium{font-size:30px}.poster.compact{font-size:24px}.note{font-size:16px;color:#333}.eta{font-size:44px;line-height:1.2;font-weight:bold}
-label{display:block;margin:8px 0}a{color:#111}.status{font-size:15px;color:#444}
+label{display:block;margin:8px 0}a{color:#111}button.selected{background:#111;color:#fff}.status{font-size:15px;color:#444}
 </style></head>
-<body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button><p><a href="/home">家庭管理</a> · <a href="/">公交</a></p></div>
+<body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button><p><a href="/home#tasks">内容管理</a> · <a href="/">公交</a></p></div>
 <p id="status" class="status" role="status"></p>
-<div id="display" class="hidden"><p><button id="autoMode" type="button">自动分时</button><button id="familyMode" type="button">家庭生活</button><button id="busMode" type="button">实时公交</button><button id="logout" type="button">退出</button></p><p id="modeStatus" class="status"></p><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div>
+<div id="display" class="hidden"><p><button id="busMode" type="button">公交</button><button id="tasksMode" type="button">待办清单</button><button id="postersMode" type="button">海报</button><button id="menusMode" type="button">本周菜单</button></p><p><button id="autoMode" type="button">自动分时</button><button id="logout" type="button">退出</button></p><p id="modeStatus" class="status"></p><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div>
 <p id="index" class="status"></p>
 <div id="familyControls"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button><button id="pause" type="button">开始轮播</button>
 <button id="settings" type="button">轮播设置</button>
 <div id="options" class="hidden"><label for="seconds">每页停留</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select>
-<label><input id="week" type="checkbox"> 本周菜单加入轮播</label><label><input id="shopping" type="checkbox"> 购物清单加入轮播</label>
 <p class="status">本次调整不会修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>
-</div><p><small><a href="/auto">自动显示入口</a> · <a href="/home">家庭管理</a> · <a href="/">公交页面</a></small></p>
+</div><p><small><a href="/auto">自动显示入口</a> · <a id="manageLink" href="/home#tasks">内容管理</a> · <a href="/">公交页面</a></small></p>
 </div><script src="/access-mode.js"></script><script src="/display.js"></script></body></html>
