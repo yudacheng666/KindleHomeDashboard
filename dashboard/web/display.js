@@ -450,7 +450,7 @@ function canLeaveSettings(){
   return !dirty||window.confirm("放弃尚未保存的设置？");
 }
 function clearWeatherForm(){
-  weatherSettingsEpoch++;weatherSettingsBusy=false;weatherSaved=null;weatherDraft=[];clearWeatherSearch();
+  lockForm("weather",false);weatherSettingsEpoch++;weatherSettingsBusy=false;weatherSaved=null;weatherDraft=[];clearWeatherSearch();
   show("weatherForm",false);show("weatherRetry",false);settingStatus("weather","");
 }
 function leaveDetail(){
@@ -623,7 +623,7 @@ function acceptDriving(v){
 }
 var drivingEpoch=0,drivingBusy=false,drivingFields=[],drivingActive=0;
 function clearDrivingForm(){
-  drivingEpoch++;drivingBusy=false;drivingFields=[];drivingActive=0;drivingSaved=null;clear(el("drivingGroups"));clear(el("drivingLocations"));show("drivingForm",false);show("drivingRetry",false);settingStatus("driving","");
+  lockForm("driving",false);drivingEpoch++;drivingBusy=false;drivingFields=[];drivingActive=0;drivingSaved=null;clear(el("drivingGroups"));clear(el("drivingLocations"));show("drivingForm",false);show("drivingRetry",false);settingStatus("driving","");
 }
 function drivingRequest(path,body,callback){
   if(!settingsOpen||settingsDetail!=="driving"||!token||drivingBusy)return;
@@ -983,7 +983,7 @@ el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);sto
 function closeSettings(){if(!leaveDetail())return false;editing=false;panel(false);show("options",false);scheduleRotation();return true;}
 el("returnDisplay").onclick=closeSettings;
 el("weatherNext").onclick=function(){if((mode!=="weather"&&mode!=="overview")||weatherPages.length<2||!settingsOpen)return;if(!closeSettings())return;weatherCursor=(weatherCursor+1)%weatherPages.length;if(mode==="overview")renderOverviewWeather();else renderWeather();};
-el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;if(closeSettings())seconds=n;};
+el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;if(closeSettings()){seconds=n;scheduleRotation();}};
 el("cancel").onclick=closeSettings;
 el("logout").onclick=function(){if(canLeaveSettings())reset();};
 ["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage"].forEach(function(id){el(id).onclick=canLeaveSettings;});
