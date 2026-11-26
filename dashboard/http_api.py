@@ -81,6 +81,10 @@ class API:
             if path in POST_PATHS and self.household is not None:
                 return self.household.post(path, body)
             bus = self.runtime.bus
+            if path == "/api/bus/schedule":
+                result = self.runtime.configure_schedule(body)
+                self.selection = None
+                return result
             if path == "/api/bus/search":
                 if set(body) != {"keyword"}:
                     raise ValueError("Invalid search")
@@ -174,14 +178,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.guard(True):
                 self.send_json(200, {"admin": True})
             return
-        if not self.guard(self.path == MANAGE):
+        if not self.guard(self.path in (MANAGE, "/api/bus/schedule")):
             return
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
-        if self.path not in ("/api/bus/view", "/api/display/auto") and not home:
+        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/bus/schedule") and not home:
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            if self.path == "/api/display/auto":
+            if self.path == "/api/bus/schedule":
+                payload = self.server.api.runtime.schedule_view()
+            elif self.path == "/api/display/auto":
                 payload = self.server.api.automatic_view()
             else:
                 payload = (self.server.api.household.get(self.path) if home
@@ -195,7 +201,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self.guard(True):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
-        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save") and not home:
+        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home:
             self.send_json(404, {"error": "not_found"})
             return
         if self.headers.get("Transfer-Encoding") is not None or self.headers.get_content_type() != "application/json":
