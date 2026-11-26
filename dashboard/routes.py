@@ -1,6 +1,7 @@
 """Route discovery and local trip selection; no networking until explicitly called."""
 from dataclasses import dataclass
 import re
+import unicodedata
 
 from .bus import BusError, Stop, post
 
@@ -73,10 +74,33 @@ class Trip:
                     self.line.direction, self.line.city_code)
 
 
-def search(keyword: str, city_code="310100", *, request=post) -> tuple[Line, ...]:
+class DirectionUnavailable(BusError):
+    """The provider did not confirm the requested direction."""
+
+
+def normalize_keyword(keyword):
     keyword = _text(keyword)
     if len(keyword) > 80:
         raise ValueError("Search term too long")
+    keyword = re.sub(r"\s+", "", unicodedata.normalize("NFKC", keyword))
+    if not keyword or len(keyword) > 80:
+        raise ValueError("Invalid search term")
+    return keyword
+
+
+def search_keyword(keyword, broad=False):
+    keyword = normalize_keyword(keyword)
+    if broad:
+        # One explicit broader request, never automatic retry or pagination.
+        digits = re.search(r"[0-9]+", keyword)
+        if digits:
+            return digits.group()
+    # A common shorthand omits the 路 character before a letter suffix.
+    return re.sub(r"([0-9]+)([A-Za-z]+)(线?)$", r"\1路\2\3", keyword)
+
+
+def search(keyword: str, city_code="310100", *, request=post, broad=False) -> tuple[Line, ...]:
+    keyword = search_keyword(keyword, broad)
     payload = request("/traffic/v2/querytrafficline",
                       {"keywords": keyword, "type": 0, "pageNo": 1, "pageSize": 20},
                       city_code)
@@ -115,7 +139,7 @@ def detail(line: Line, direction=None, *, request=post) -> Route:
         if not isinstance(row, dict) or row.get("lineId") != line.line_id:
             raise ValueError("Route mismatch")
         if _direction(row.get("upDown")) != direction:
-            raise ValueError("Direction mismatch")
+            raise DirectionUnavailable("Requested direction not confirmed")
         if _text(row.get("lineName")) != line.name:
             raise ValueError("Route name mismatch")
         raw = row.get("stop")
@@ -127,7 +151,7 @@ def detail(line: Line, direction=None, *, request=post) -> Route:
                 raise ValueError("Invalid stop")
             # Do not reverse an outbound list to invent an inbound route.
             if item.get("upDown") is not None and _direction(item["upDown"]) != direction:
-                raise ValueError("Stop direction mismatch")
+                raise DirectionUnavailable("Requested stop direction not confirmed")
             stops.append(Station(_text(item.get("stopId")), _text(item.get("stopName"))))
         verified = Line(line.line_id, line.name, direction, stops[0].name,
                         stops[-1].name, line.city_code)
