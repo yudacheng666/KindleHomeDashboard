@@ -59,7 +59,7 @@ const readCount=requests;
 doc.hidden=true;events.visibilitychange();advance(30000);assert.equal(requests,readCount);
 doc.hidden=false;events.visibilitychange();
 assert.equal(el("body").className,"overview-page");
-assert.equal(el("displayNav").className,"overview-nav");
+assert.equal(el("displayNav").className,"");
 assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,2);
 assert.ok(descendants(el("body")).some(n=>n.textContent==="另 1 个目的地 · 全部路线"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example dish"));

@@ -55,7 +55,6 @@ function eligible(p){return section==="posters";}
 function tabs(){
   var active=mode==="family"?section:mode;
   ["overview","bus","tasks","posters","menus","weather","driving"].forEach(function(t){el(t+"Mode").className=t===active?"selected":"";});
-  if(!settingsOpen)el("displayNav").className=mode==="overview"?"overview-nav":"";
   updateManagementLinks();
   show("familyControls",mode==="family"&&section==="posters");
 }
@@ -64,7 +63,7 @@ function updateManagementLinks(){
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
-function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);if(!open&&mode==="overview")el("displayNav").className="overview-nav";show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();}
 function taskDateLabel(day,today){
   var d=new Date(day+"T00:00:00Z"),base=new Date(today+"T00:00:00Z");
   var label=(day.slice(0,4)===today.slice(0,4)?"":day.slice(0,4)+"/")+day.slice(5).replace("-","/");
@@ -982,8 +981,8 @@ el("autoMode").onclick=function(){
   panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";if(mode==="overview"){mode="family";hide("");}tabs();show("options",false);
   clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
 };
-el("overviewMode").onclick=el("overviewView").onclick=function(){switchMode("overview");};
-el("posterView").onclick=function(){switchSection("posters");};
+el("overviewMode").onclick=function(){switchMode("overview");};
+
 el("tasksMode").onclick=function(){switchSection("tasks");};
 el("postersMode").onclick=function(){switchSection("posters");};
 el("menusMode").onclick=function(){switchSection("menus");};

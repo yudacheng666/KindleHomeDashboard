@@ -363,6 +363,24 @@ def main():
                 wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===2 && document.querySelector('#body .overview-pair')!==null"))
                 assert text_in("body","另 1 个目的地")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
+                # Real rendered sizes, visible header geometry and reachable navigation.
+                readable = """return (function(){
+                  var nav=document.getElementById('displayNav'), menu=document.getElementById('settingsMenu');
+                  var visible=function(n){return n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0;};
+                  var rules=[['.overview-link',20],['.driving-fast',26],['.driving-routes',18],['.driving-foot',16],['.menu-dishes',20],['.task-row',20]];
+                  var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return nodes.length>0&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
+                  return nav.querySelectorAll('button').length===1&&visible(document.getElementById('settings'))
+                    &&menu.contains(document.getElementById('busMode'))&&!visible(document.getElementById('busMode'))
+                    &&ok&&document.documentElement.scrollWidth<=window.innerWidth;
+                })()"""
+                assert js(readable)
+                original_rect=wd("/session/"+sid+"/window/rect")
+                wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
+                assert js(readable)
+                wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
+                click("settings")
+                assert js("return document.getElementById('busMode').getBoundingClientRect().height>=44 && document.getElementById('weatherMode').getBoundingClientRect().height>=44")
+                click("returnDisplay")
                 button("body","另 1 个目的地 · 全部路线")
                 wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===3"))
                 click("postersMode")
