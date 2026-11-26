@@ -93,7 +93,7 @@ class Runtime:
     def active(self):
         with self.settings_lock:
             local = self.clock().astimezone(self.zone)
-            return any(w.contains(local) for w in self.windows)
+            return self.bus.gate.enabled and any(w.contains(local) for w in self.windows)
 
     def read(self):
         with self.settings_lock:
