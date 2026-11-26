@@ -140,4 +140,7 @@ assert.ok(text(el("overviewTaskContent")).includes("Tomorrow task"));
 assert.equal(descendants(el("overviewTaskContent")).filter(n=>n.tag==="button").length,1);
 assert.equal(el("overview").className,"");
 assert.ok(requests>1);
+el("settings").onclick();el("logout").onclick();
+assert.equal(timers.size,0);
+for(const id of ["overviewBusContent","overviewWeatherContent","overviewMap1","overviewMap2","overviewMenuContent","overviewTaskContent","body"])assert.equal(el(id).children.length,0);
 console.log("Kindle single-page overview simulation passed: bus/weather split, current-only weather, two real map slots, first two of three destinations, today/tomorrow menus, task grouping and confirmation, weather rotation, settings, and local cached polling.");

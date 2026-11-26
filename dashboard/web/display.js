@@ -59,11 +59,11 @@ function tabs(){
   show("familyControls",mode==="family"&&section==="posters");
 }
 function updateManagementLinks(){
-  var target=automatic?"auto":mode==="bus"||mode==="weather"||mode==="driving"?mode:section;
+  var target=mode==="overview"||automatic?"auto":mode==="bus"||mode==="weather"||mode==="driving"?mode:section;
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
-function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&mode==="weather"&&weatherPages.length>1);if(open)updateManagementLinks();}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();}
 function taskDateLabel(day,today){
   var d=new Date(day+"T00:00:00Z"),base=new Date(today+"T00:00:00Z");
   var label=(day.slice(0,4)===today.slice(0,4)?"":day.slice(0,4)+"/")+day.slice(5).replace("-","/");
@@ -580,7 +580,6 @@ function acceptDriving(v){
   }
   show("login",false);show("display",true);txt("status","");
 }
-var overviewKeys={};
 function overviewDate(value){
   if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return "日期未知";
   var d=new Date(value+"T00:00:00Z"),week="日一二三四五六".charAt(d.getUTCDay());
@@ -604,37 +603,37 @@ function overviewBusItem(item,s,now,valid){
   if(item.plan){
     var p=item.plan,delta=null;
     if(p.time){var a=p.time.split(":");if(a.length===2){var local=new Date(now+zoneOffset*60000);delta=Number(a[0])*60+Number(a[1])-(local.getUTCHours()*60+local.getUTCMinutes());}}
-    return {main:p.imminent===true||delta===0||delta===1?"计划即将发车":"等待首站发车",
+    return {main:p.imminent===true||delta===0||delta===1?"计划即将发车":delta!==null&&delta<0&&delta>=-720?"等待发车确认":"等待首站发车",
       sub:"首站计划 "+(p.time||"时间未知")+" · 本站到站时间未知"};
   }
   var v=item.vehicle,target=s.fetched_at_ms+v.eta_min*60000;
   var remaining=s.status==="stale"?v.eta_min:Math.ceil((target-now)/60000),label;
   if(v.eta_min===0&&v.distance_m===0&&v.stops_remaining===0)label="车辆已到站附近";
   else if(remaining<=0)label="等待到站确认";
-  else if(remaining===1)label="即将到站";
+  else if(remaining===1)label="预计即将到站";
   else label="约 "+remaining+"分钟";
   var sub=[];
   if(v.stops_remaining!==null&&v.stops_remaining!==undefined)sub.push(v.stops_remaining+"站");
-  if(isFinite(target))sub.push("预计 "+clockTime(target,now));
+  if(isFinite(target))sub.push((s.status==="stale"?"原预计 ":"预计 ")+clockTime(target,now));
   if(s.status==="stale")sub.unshift("旧数据");
   return {main:label,sub:sub.join(" · ")};
 }
 function renderOverviewBus(){
   var root=el("overviewBusContent"),v=overviewData&&overviewData.bus||{},s=v.snapshot||{status:"unavailable",vehicles:[],departure_plans:[]};
   var now=serverNow(),stamp=s.fetched_at_ms,age=now-stamp,valid=typeof stamp==="number"&&isFinite(stamp)&&isFinite(now)&&age>=0&&age<90000;
-  var items=slotItems(s),key=JSON.stringify([v.trip,s.status,items,stamp,Math.floor(now/60000),valid]);
+  var items=slotItems(s),key=JSON.stringify([v.trip,s.status,items,stamp,items.map(function(item){return overviewBusItem(item,s,now,valid);}),valid]);
   if(overviewKeys.bus===key)return;overviewKeys.bus=key;clear(root);
   if(items.length){
     var first=overviewBusItem(items[0],s,now,valid);
-    append(root,"div",first.main,"overview-bus-main");
+    append(root,"div",first.main,"overview-bus-main"+(first.main.indexOf("分钟")<0?" overview-bus-state":""));
     if(first.sub)append(root,"div",first.sub,"overview-bus-sub");
     if(items.length>1){
       var next=overviewBusItem(items[1],s,now,valid);
       append(root,"div","下一辆 "+next.main.replace(/^约 /,""),"overview-bus-next");
       if(next.sub)append(root,"div",next.sub,"overview-bus-foot");
     }
-  }else append(root,"div",overviewStatusLabel(s.status),"overview-bus-main");
-  var ageText=valid?"更新"+(age<60000?Math.floor(age/1000)+"秒前":Math.floor(age/60000)+"分钟前"):"";
+  }else append(root,"div",overviewStatusLabel(s.status),"overview-bus-main overview-bus-state");
+  var ageText=valid&&items.length?"更新 "+clockTime(stamp,now):"";
   if(ageText)append(root,"div",ageText,"overview-bus-foot");
 }
 function renderOverviewWeather(){
@@ -661,8 +660,11 @@ function overviewMapStatus(g){
 }
 function renderOverviewMap(slot,group,index,total){
   var key=group?JSON.stringify([group.name,group.status,group.fetched_at,group.image?group.image.length:0,(group.routes||[]).map(function(r){return [r.seconds,r.meters,r.congested_meters,r.traffic_covered_meters];})]):"empty";
-  if(overviewKeys["map"+index]===key)return;overviewKeys["map"+index]=key;clear(slot);
-  var panel=append(slot,"div","","overview-map-panel");
+  key+="|"+total;
+  var source=group&&group.image||null;
+  if(overviewKeys["map"+index]===key&&overviewKeys["image"+index]===source)return;
+  overviewKeys["map"+index]=key;overviewKeys["image"+index]=source;clear(slot);
+  var panel=append(slot,"div","","overview-map-panel");panel.onclick=function(){switchMode("driving");};
   var map=append(panel,"div","","overview-map-image");
   var stats=append(panel,"div","","overview-map-stats");
   if(!group){
@@ -681,7 +683,7 @@ function renderOverviewMap(slot,group,index,total){
       append(stats,"div",Math.ceil(routes[i].seconds/60)+"分 · "+(routes[i].meters/1000).toFixed(1)+"km","overview-route-alt");
     if(first.congested_meters===null)append(stats,"div","路况未知","overview-route-state");
     else if(first.congested_meters>0)append(stats,"div","拥堵 "+(first.congested_meters/1000).toFixed(1)+"km","overview-route-state");
-    else if(first.traffic_covered_meters>=first.meters*0.9)append(stats,"div","畅通","overview-route-state");
+    else if(first.traffic_covered_meters>=first.meters*0.9)append(stats,"div","未见明显拥堵","overview-route-state");
     else append(stats,"div","部分路况未知","overview-route-state");
   }else append(stats,"div",overviewMapStatus(group)||"等待路线","overview-route-state");
   if(group.status!=="ok"&&overviewMapStatus(group))append(stats,"div",overviewMapStatus(group),"overview-route-state");
@@ -698,14 +700,14 @@ function renderOverviewMaps(){
 }
 function renderOverviewMenus(){
   var root=el("overviewMenuContent"),home=overviewData&&overviewData.home||{},today=home.date||"",tomorrow=overviewTomorrow(today);
-  var menus=Array.isArray(home.week_menu)?home.week_menu:[],key=JSON.stringify([today,menus]);
+  var menus=Array.isArray(home.week_menu)?home.week_menu:[],key=JSON.stringify([today,menus,home.status]);
   if(overviewKeys.menus===key)return;overviewKeys.menus=key;clear(root);
   var names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
   [today,tomorrow].forEach(function(day,i){
     var rows=menus.filter(function(m){return m.day===day;}).sort(function(a,b){return order[a.meal]-order[b.meal];});
     var block=append(root,"div","","overview-menu-day");
     append(block,"div",i===0?"今日":"明日","overview-menu-date");
-    if(!rows.length)append(block,"div","暂无安排","overview-menu-meal");
+    if(!rows.length)append(block,"div",home.status==="unavailable"?"暂不可用":home.status==="disabled"?"未启用":"暂无安排","overview-menu-meal");
     rows.forEach(function(m){append(block,"div",(names[m.meal]||m.meal)+"："+(m.dishes||[]).join("、"),"overview-menu-meal");});
   });
 }
@@ -713,9 +715,9 @@ function renderOverviewTasks(){
   var root=el("overviewTaskContent"),home=overviewData&&overviewData.home||{},today=home.date||"",tomorrow=overviewTomorrow(today);
   var tasks=Array.isArray(home.upcoming_tasks)?home.upcoming_tasks:(home.tasks||[]);
   tasks=tasks.slice().sort(function(a,b){return (a.occurrence||today).localeCompare(b.occurrence||today)||a.id.localeCompare(b.id);});
-  var shown=tasks.slice(0,3),key=JSON.stringify([today,shown,home.can_complete]);
+  var shown=tasks.slice(0,3),key=JSON.stringify([today,shown,tasks.length,home.can_complete,home.status]);
   if(overviewKeys.tasks===key)return;overviewKeys.tasks=key;clear(root);
-  if(!shown.length){append(root,"div","暂无待办","overview-task-date");return;}
+  if(!shown.length){append(root,"div",home.status==="unavailable"?"暂不可用":home.status==="disabled"?"未启用":"暂无待办","overview-task-date");return;}
   var groups={};
   shown.forEach(function(t){var day=t.occurrence||today;(groups[day]||(groups[day]=[])).push(t);});
   Object.keys(groups).sort().forEach(function(day){
@@ -736,6 +738,14 @@ function renderOverview(){
   renderOverviewHeader();renderOverviewBus();renderOverviewWeather();
   renderOverviewMaps();renderOverviewMenus();renderOverviewTasks();
 }
+function scheduleOverviewExpiry(){
+  clearTimeout(expiryTimer);expiryTimer=null;
+  if(!overviewData||document.hidden||!token||mode!=="overview")return;
+  var s=overviewData.bus.snapshot,now=serverNow(),age=now-s.fetched_at_ms;
+  if(typeof s.fetched_at_ms==="number"&&age>=0&&age<90000){
+    expiryTimer=setTimeout(function(){expiryTimer=null;renderOverviewBus();},Math.max(1,90000-age));
+  }
+}
 function acceptOverview(v){
   overviewData=v;data=v.home||{date:"",tasks:[],upcoming_tasks:[],posters:[],week_menu:[],can_complete:false};
   useSaved(data);pages=[];cursor=0;stopAge();
@@ -746,7 +756,7 @@ function acceptOverview(v){
   weatherPages=next;if(weatherCursor>=next.length)weatherCursor=0;
   if(v.bus&&v.bus.snapshot)syncClock(v.bus.snapshot);
   show("login",false);show("display",true);show("overview",true);show("legacyDisplay",false);show("overviewBack",false);
-  txt("status","");renderOverview();
+  txt("status","");renderOverview();scheduleOverviewExpiry();
   if(next.length<2||settingsOpen||document.hidden)stopRotation();
   else if(rotationTimer===null)scheduleRotation();
 }
@@ -892,8 +902,10 @@ function switchSection(next){
   if(data)accept(data);else if(!busy)refresh();
 }
 function hide(reason){
-  if(mode==="overview"){txt("status",reason);return;}
   stopAge();
+  overviewData=null;overviewKeys={};serverBase=NaN;
+  ["overviewBusContent","overviewWeatherContent","overviewMap1","overviewMap2","overviewMenuContent","overviewTaskContent"].forEach(function(id){clear(el(id));});
+  txt("overviewDate","");txt("overviewTime","");
   data=null;pages=[];cursor=0;lastRender="";stopRotation();weatherPages=[];weatherCursor=0;weatherOrder="";el("body").className="";
   txt("date","");txt("heading","");clear(el("body"));txt("index","");txt("status",reason);
 }
@@ -911,7 +923,7 @@ function refresh(){
       modeLabel();
     }
     else if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}
-    else if(mode==="overview"){show("login",false);show("display",true);txt("status","连接异常，保留上次看板内容；正在等待恢复。");}
+    else if(mode==="overview"){hide("连接异常，旧内容已隐藏；正在等待恢复。");show("login",false);show("display",true);renderOverview();}
     else if((status===404&&mode==="family")||status===503){show("login",false);show("display",true);hide(status===404?"家庭模块未启用，可返回综合看板。":"当前模块暂不可用，可返回综合看板。");}
     else hide(status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
     clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,(mode==="bus"||mode==="overview")?15000:30000);
@@ -933,7 +945,7 @@ function reset(keepResume){
   panel(false);show("options",false);show("display",false);show("login",true);
 }
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=false;var hash=typeof location!=="undefined"?location.hash:"";if(hash==="#bus"||hash==="#weather"||hash==="#driving"){mode=hash.slice(1);resumePage="";forgetResume();}else if(["#tasks","#posters","#menus"].indexOf(hash)>=0){mode="family";if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}else{mode="overview";section="tasks";}restoreResume();tabs();modeLabel();show("overview",mode==="overview");show("legacyDisplay",mode!=="overview");show("overviewBack",mode!=="overview");clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
-el("autoMode").onclick=function(){if(!token)return;switchMode("overview");};
+el("autoMode").onclick=function(){if(!token)return;if(settingsOpen)closeSettings();switchMode("overview");};
 el("tasksMode").onclick=function(){switchSection("tasks");};
 el("postersMode").onclick=function(){switchSection("posters");};
 el("menusMode").onclick=function(){switchSection("menus");};
@@ -947,7 +959,10 @@ el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);sto
 el("overviewBack").onclick=function(){if(token)switchMode("overview");};
 function closeSettings(){clearDrivingForm();weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
 el("returnDisplay").onclick=closeSettings;
-el("weatherNext").onclick=function(){if(mode!=="weather"||weatherPages.length<2||!settingsOpen)return;weatherCursor=(weatherCursor+1)%weatherPages.length;closeSettings();renderWeather();};
+el("weatherNext").onclick=function(){if((mode!=="weather"&&mode!=="overview")||weatherPages.length<2||!settingsOpen)return;weatherCursor=(weatherCursor+1)%weatherPages.length;closeSettings();if(mode==="overview")renderOverviewWeather();else renderWeather();};
+el("overviewBus").onclick=function(){switchMode("bus");};
+el("overviewWeather").onclick=function(){switchMode("weather");};
+el("overviewMenuContent").onclick=function(){switchSection("menus");};
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;seconds=n;closeSettings();};
 el("cancel").onclick=closeSettings;
 el("logout").onclick=reset;
