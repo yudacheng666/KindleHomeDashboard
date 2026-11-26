@@ -59,8 +59,10 @@ input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} but
 <p class="small">选择星期及开始、结束时间。时间为 24 小时制，结束早于开始表示跨午夜。仅在指定时段自动采集；手动线路搜索也会消耗本地额度。</p>
 <div id="scheduleRows"></div>
 <button id="scheduleAdd" type="button">添加时段</button>
+<p id="scheduleStored" class="small"></p>
 <button id="scheduleSave" class="primary" type="button">保存采集设置</button>
-<button id="scheduleCancel" type="button">取消</button>
+<button id="scheduleCancel" type="button">取消 / 返回</button>
+<p id="scheduleMessage" role="status" aria-live="polite"></p>
 </div>
 <div id="config" class="panel hidden">
 <h2>选择公交</h2>
