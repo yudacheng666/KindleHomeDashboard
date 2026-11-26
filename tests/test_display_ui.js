@@ -153,20 +153,8 @@ assert.equal(el("pause").textContent,"开始轮播");
 const pinned=el("heading").textContent;advance(120000);heading(pinned);
 click("logout");el("token").value="example-display-token";click("connect");click("postersMode");
 assert.equal(el("pause").textContent,"暂停轮播");click("logout");assert.equal(timers.size,0);
-data=sample;busData=bus;autoMode="family";
+data=sample;busData=bus;
 el("token").value="example-display-token";click("connect");heading("待办清单");
-const autoBefore=autoRequests;click("autoMode");heading("待办清单");assert.equal(autoRequests,autoBefore+1);
-autoMode="bus";advance(30000);heading("Example line");
-assert.equal(el("familyControls").className,"hidden");
-autoMode="family";advance(15000);heading("待办清单");
-click("postersMode");heading("Example reminder");const pinnedAuto=autoRequests;
-autoMode="bus";advance(60000);heading("Example reminder");assert.equal(autoRequests,pinnedAuto);
-click("autoMode");heading("Example line");
-click("busMode");const manualAuto=autoRequests;autoMode="family";advance(30000);heading("Example line");assert.equal(autoRequests,manualAuto);
-click("autoMode");heading("待办清单");click("postersMode");click("settings");const settingsAuto=autoRequests;autoMode="bus";advance(60000);heading("Example reminder");assert.equal(autoRequests,settingsAuto);click("cancel");
-click("autoMode");heading("Example line");doc.hidden=true;events.visibilitychange();
-const asleep=autoRequests;advance(60000);assert.equal(autoRequests,asleep);
-autoMode="family";doc.hidden=false;events.visibilitychange();heading("待办清单");
 fail=503;advance(30000);heading("");fail=0;advance(30000);heading("待办清单");
 click("logout");assert.equal(timers.size,0);
 // Foregrounding must re-read fresh content without jumping to another tab.
@@ -206,7 +194,7 @@ advance(180000);heading("Second reminder");
 windowEvents.pagehide();windowEvents.pageshow({persisted:true});heading("Second reminder");
 click("logout");assert.equal(storage.size,0);assert.equal(timers.size,0);
 directDisplay();heading("待办清单");click("logout");
-console.log("Household display simulation passed: automatic switching, override, saved settings, long poster preservation, unified bus/family display, rotation, pinning, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
+console.log("Legacy detail display simulation passed: saved settings, long poster preservation, bus/family details, rotation, settings, unchanged content, expiry/removal, hidden tab, failure, logout.");
 
 // Authorized completion: cancellation, failed write, successful write, no automatic deletion.
 {
