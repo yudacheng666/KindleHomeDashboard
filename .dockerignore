@@ -6,3 +6,4 @@
 !dashboard/web/
 !dashboard/web/*.html
 !dashboard/web/*.js
+!VERSION

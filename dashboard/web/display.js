@@ -56,7 +56,7 @@ function tabs(){
 function updateManagementLinks(){
   var target=automatic?"auto":mode==="bus"?"bus":section;
   el("manageLink").href="/bus#return-"+target;
-  ["tasks","posters","menus"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
+  ["tasks","posters","menus","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
 function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);if(open)updateManagementLinks();}
 function render(){
@@ -66,7 +66,7 @@ function render(){
     lastRender=key;txt("date",data.date);txt("heading",p.title);
     var root=el("body");clear(root);p.lines.forEach(function(line){append(root,"p",line,p.poster?(line.length>38?"poster compact":line.length>18?"poster medium":"poster"):"");});
     if(p.note)append(root,"p",p.note,"note");
-    txt("index",(cursor+1)+" / "+pages.length);
+    txt("index",section==="posters"?(cursor+1)+" / "+pages.length:"");
   }
   txt("pause",running?"暂停轮播":"开始轮播");
 }
@@ -312,5 +312,6 @@ if(document.addEventListener)document.addEventListener("visibilitychange",functi
     hide("正在重新读取");refresh();
   }
 },false);
+panel(false);show("options",false);txt("version",access.version?"软件版本："+access.version:"软件版本：未知");
 if(direct){el("connect").onclick();}
 }());

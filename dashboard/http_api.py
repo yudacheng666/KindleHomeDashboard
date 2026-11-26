@@ -29,6 +29,17 @@ ASSETS = {"/": ("display.html", "text/html; charset=utf-8"),
           "/display.js": ("display.js", "application/javascript; charset=utf-8")}
 
 
+def _public_version():
+    try:
+        value = (WEB.parent.parent / "VERSION").read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return None
+    return value if re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", value) else None
+
+
+VERSION = _public_version()
+
+
 def _default(value):
     if isinstance(value, datetime):
         return value.isoformat()
@@ -168,7 +179,7 @@ class Handler(BaseHTTPRequestHandler):
             if not self.same_origin():
                 return
             direct = self.server.api.direct
-            flags = {"direct": direct, "openAdmin": direct and self.server.api.admin_token is None}
+            flags = {"direct": direct, "openAdmin": direct and self.server.api.admin_token is None, "version": VERSION}
             self.send_content(200, ("window.KHD_ACCESS="+json.dumps(flags)+";").encode(),
                               "application/javascript; charset=utf-8")
             return

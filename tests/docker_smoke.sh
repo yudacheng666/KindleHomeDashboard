@@ -54,6 +54,8 @@ else:
     raise RuntimeError("Container service unavailable")
 assert call("/api/bus/view","KHD_READ_TOKEN")["snapshot"]["status"]=="disabled"
 assert urlopen(base+"/display",timeout=3).status==200
+with urlopen(base+"/access-mode.js",timeout=3) as r:
+    assert b'"version": "v' in r.read()
 if sys.argv[1]=="write":
     assert not view["tasks"]
     try:

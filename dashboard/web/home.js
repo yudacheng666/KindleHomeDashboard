@@ -3,7 +3,7 @@
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false;
-function initialTab(){var h=typeof location!=="undefined"?location.hash.split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":"tasks";}
+function initialTab(){var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#display"?"displaySettings":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -118,8 +118,9 @@ function readMenus(p){
 }
 function render(){
   var p=el("content");clear(p);if(!data)return;
-  ["tasks","posters","menus"].forEach(function(t){el(t).className=t===tab?"primary":"";});
-  if(tab==="tasks"){node(p,"h2","待办清单");if(admin)btn(p,"新增待办",function(){taskForm(null);});tasks(p,data.tasks,admin);}
+  ["tasks","posters","menus","displaySettings"].forEach(function(t){el(t).className=t===tab?"primary":"";});
+  if(tab==="displaySettings"){node(p,"h2","显示设置");var s=data.display_settings||{};node(p,"p","海报轮播："+(s.autoplay?"开启":"关闭")+" · 每页 "+(s.seconds||180)/60+" 分钟");if(admin)btn(p,"保存轮播设置",displayForm);}
+  else if(tab==="tasks"){node(p,"h2","待办清单");if(admin)btn(p,"新增待办",function(){taskForm(null);});tasks(p,data.tasks,admin);}
   else if(tab==="posters"){node(p,"h2","海报");if(admin){btn(p,"新增海报",function(){posterForm(null);});btn(p,"保存轮播设置",displayForm);}posters(p,data.posters,admin);}
   else if(tab==="menus"){node(p,"h2","本周菜单");if(admin){
       var d=field(p,"查询所在周",menuDate,"date");btn(p,"查询",function(){menuDate=d.value;render();});btn(p,"新增菜单",function(){menuDate=d.value;menuForm(null);});
@@ -127,7 +128,7 @@ function render(){
     }else menuRows(p,data.week_menu,false);}
 }
 function canLeave(){return !editing||window.confirm("放弃未保存的编辑？");}
-["tasks","posters","menus"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;render();}};});
+["tasks","posters","menus","displaySettings"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;render();}};});
 var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/(?:^#|\/)return-(bus|tasks|posters|menus|auto)$/):null;
 var returnMode=returnMatch?returnMatch[1]:"tasks";
 el("returnLink").href=returnMode==="auto"?"/auto":"/display#"+returnMode;
