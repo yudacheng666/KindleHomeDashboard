@@ -53,9 +53,10 @@ def _token(value):
 
 
 class API:
-    def __init__(self, runtime, read_token, admin_token, household=None, *, direct=False, weather=None):
+    def __init__(self, runtime, read_token, admin_token, household=None, *, direct=False, weather=None, driving=None):
         self.runtime = runtime
         self.weather = weather
+        self.driving = driving
         self.direct = direct
         self.household = HouseholdAPI(household, runtime) if household is not None else None
         self.read_token = None if direct else _token(read_token)
@@ -97,6 +98,10 @@ class API:
         return {"mode": "bus", "view": self.bus_view(bus)}
 
     def dispatch(self, path, body):
+        if path == "/api/driving/search" and self.driving is not None:
+            return self.driving.search_locations(body)
+        if path == "/api/driving/settings" and self.driving is not None:
+            return self.driving.configure(body)
         if path == "/api/weather/search" and self.weather is not None:
             return self.weather.search_locations(body)
         # Single selection session: a newer route preview invalidates the old
@@ -157,7 +162,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(raw)
@@ -204,15 +209,19 @@ class Handler(BaseHTTPRequestHandler):
             if self.guard(True):
                 self.send_json(200, {"admin": True})
             return
-        if not self.guard(self.path in (MANAGE, "/api/bus/schedule", "/api/weather/settings")):
+        if not self.guard(self.path in (MANAGE, "/api/bus/schedule", "/api/weather/settings", "/api/driving/settings")):
             return
         home = self.path in (READ, MANAGE) and self.server.api.household is not None
         weather = self.path in ("/api/weather/view", "/api/weather/settings") and self.server.api.weather is not None
-        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/bus/schedule") and not home and not weather:
+        driving = self.path in ("/api/driving/view", "/api/driving/settings") and self.server.api.driving is not None
+        if self.path not in ("/api/bus/view", "/api/display/auto", "/api/bus/schedule") and not home and not weather and not driving:
             self.send_json(404, {"error": "not_found"})
             return
         try:
-            if weather:
+            if driving:
+                payload = (self.server.api.driving.settings_view() if self.path == "/api/driving/settings"
+                           else self.server.api.driving.read())
+            elif weather:
                 payload = (self.server.api.weather.settings_view() if self.path == "/api/weather/settings"
                            else self.server.api.weather.read())
             elif self.path == "/api/bus/schedule":
@@ -236,7 +245,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
         weather = self.path in ("/api/weather/settings", "/api/weather/search") and self.server.api.weather is not None
-        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home and not weather:
+        driving = self.path in ("/api/driving/settings", "/api/driving/search") and self.server.api.driving is not None
+        if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home and not weather and not driving:
             self.send_json(404, {"error": "not_found"})
             return
         if self.headers.get("Transfer-Encoding") is not None or self.headers.get_content_type() != "application/json":

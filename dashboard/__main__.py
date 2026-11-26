@@ -13,6 +13,7 @@ from .runtime import Runtime, Window
 from .service import BusService
 from .trip_store import TripStore
 from .weather_service import WeatherService
+from .driving_service import DrivingService
 
 
 def window_arg(value):
@@ -129,8 +130,9 @@ def main():
             print(prefix + bus_config_error, flush=True)
         household = Household(args.directory) if args.enable_household else None
         weather = WeatherService(args.directory, os.environ, timezone_name=args.timezone)
+        driving = DrivingService(args.directory, os.environ, timezone_name=args.timezone)
         tls = tls_context(args.tls_cert, args.tls_key) if args.tls_cert else None
-        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, direct=direct, weather=weather)
+        api = API(runtime, os.environ.get("KHD_READ_TOKEN"), os.environ.get("KHD_ADMIN_TOKEN"), household=household, direct=direct, weather=weather, driving=driving)
         with LocalServer(api, args.port, tls=tls, lan_host=args.lan_host, lan_network=args.lan_network) as server:
             stopping = Event()
             def stop_signal(signum, frame):
@@ -141,12 +143,18 @@ def main():
             try:
                 runtime.start()
                 weather.start()
+                driving.start()
                 while not stopping.is_set():
                     server.handle_request()
             finally:
                 try:
-                    weather.close()
-                    runtime.close()
+                    try:
+                        driving.close()
+                    finally:
+                        try:
+                            weather.close()
+                        finally:
+                            runtime.close()
                 finally:
                     for s, handler in old_handlers.items():
                         signal.signal(s, handler)

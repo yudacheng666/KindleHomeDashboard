@@ -21,6 +21,7 @@ services:
       KHD_BUS_DAILY_LIMIT: "${KHD_BUS_DAILY_LIMIT:-1000}"
       KHD_QWEATHER_HOST: "${KHD_QWEATHER_HOST:-}"
       KHD_QWEATHER_KEY: "${KHD_QWEATHER_KEY:-}"
+      KHD_AMAP_KEY: "${KHD_AMAP_KEY:-}"
     volumes:
       - type: bind
         source: "${KHD_DATA_DIR:?Set an absolute private data directory}"
