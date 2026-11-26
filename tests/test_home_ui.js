@@ -46,9 +46,11 @@ const menuOn=all(el("editor"),n=>n.tag==="input")[0],menuMeal=all(el("editor"),n
 assert.ok(!menuOn.disabled&&!menuMeal.disabled);
 menuOn.value="2026-01-06";menuMeal.value="dinner";click(el("editor"),"保存");
 assert.ok(calls.some(c=>c[0].endsWith("/menu/edit")&&c[1].old_on===date&&c[1].old_meal==="lunch"&&c[1].on==="2026-01-06"&&c[1].meal==="dinner"));
-el("shopping").onclick();click(el("content"),"导入菜单食材");click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/shopping/import")));
+assert.ok(calls.some(c=>c[0].endsWith("/menu/list")&&c[1].first==="2026-01-05"&&c[1].last==="2026-01-11"));
+assert.ok(!calls.some(c=>c[0].includes("/shopping/")));
+el("posters").onclick();click(el("content"),"保存轮播设置");all(el("editor"),n=>n.tag==="select")[1].value="true";click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/display/set")&&c[1].autoplay===true&&!c[1].include_shopping));
 fail=true;el("refresh").onclick();assert.equal(el("content").children.length,0);
 el("logout").onclick();assert.equal(el("home").className,"hidden");assert.equal(el("date").textContent,"");
 fail=false;el("mode").value="read";el("token").value="example-reader";el("connect").onclick();el("tasks").onclick();
 assert.equal(all(el("content"),n=>n.tag==="button").length,0);
-console.log("Household browser logic simulation passed: read/admin, task, poster, menu, shopping, cancellation, logout.");
+console.log("Household browser logic simulation passed: read/admin, task, poster, weekly menu, poster rotation settings, cancellation, logout.");

@@ -2,7 +2,8 @@
 (function(){
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
-var token="",admin=false,busy=false,epoch=0,tab="today",data=null,menus=[],menuDate="",editing=false;
+var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false;
+function initialTab(){var h=typeof location!=="undefined"?location.hash:"";return h==="#posters"?"posters":h==="#menus"?"menus":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -28,7 +29,7 @@ function req(path,body,done){
   }catch(e){finish(false,{});}
 }
 function closeEditor(){editing=false;clear(el("editor"));show("editor",false);}
-function reset(){epoch++;busy=false;token="";admin=false;data=null;menus=[];menuDate="";tab="today";
+function reset(){epoch++;busy=false;token="";admin=false;data=null;menus=[];menuDate="";tab=initialTab();
   closeEditor();clear(el("content"));el("date").textContent="";el("token").value="";show("home",false);show("login",true);note("");}
 function load(){
   req(admin?"manage":"view",null,function(ok,v){
@@ -51,11 +52,9 @@ function displayForm(){
   var p=editor("保存轮播设置"),s=data.display_settings||{seconds:180,include_week:false,include_shopping:false,autoplay:false};
   var interval=field(p,"每页停留",String(s.seconds),"select",[["120","2分钟"],["180","3分钟"],["300","5分钟"]]);
   var yesNo=[["false","否"],["true","是"]];
-  var week=field(p,"本周菜单加入轮播",String(s.include_week),"select",yesNo);
-  var shopping=field(p,"购物清单加入轮播",String(s.include_shopping),"select",yesNo);
-  var auto=field(p,"连接展示页时自动开始轮播",String(s.autoplay),"select",yesNo);
+  var auto=field(p,"进入海报时自动开始轮播",String(s.autoplay),"select",yesNo);
   node(p,"p","保存在 NAS；展示页的临时调整不覆盖这里的默认设置。");
-  actions(p,function(){mutate("display/set",{seconds:Number(interval.value),include_week:week.value==="true",include_shopping:shopping.value==="true",autoplay:auto.value==="true"});});
+  actions(p,function(){mutate("display/set",{seconds:Number(interval.value),include_week:false,include_shopping:false,autoplay:auto.value==="true"});});
 }
 function taskForm(t){
   var p=editor(t?"编辑待办":"新增待办");
@@ -79,21 +78,13 @@ function menuForm(m){
   var meal=field(p,"餐次",m?m.meal:"dinner","select",[["breakfast","早餐"],["lunch","午餐"],["dinner","晚餐"]]);
   var dishes=field(p,"菜品（每行一个）",m?m.dishes.join("\n"):"","textarea");
   var ingredients=field(p,"食材（每行一个，数量写在文字中）",m?m.ingredients.join("\n"):"","textarea");
-  if(m)node(p,"p","可以调整日期和餐次；不会覆盖其他菜单。已导入的采购项保持原样，改期后重新导入前请核对购物清单。");
+  if(m)node(p,"p","可以调整日期和餐次；不会覆盖其他菜单。");
   actions(p,function(){
     if(!m&&!window.confirm("保存此日期及餐次的菜单？若已有菜单，将替换该餐次。"))return;
     var b={on:on.value,meal:meal.value,dishes:lines(dishes.value),ingredients:lines(ingredients.value)};
     if(m){b.old_on=m.day;b.old_meal=m.meal;}
     mutate(m?"menu/edit":"menu/set",b,function(){menuDate=b.on;});
   });
-}
-function shopForm(s){
-  var p=editor(s?"编辑采购项":"新增采购项"),label=field(p,"名称及数量",s?s.label:"","text",null,200);
-  actions(p,function(){var b={label:label.value};if(s)b.key=s.id;mutate(s?"shopping/edit":"shopping/add",b);});
-}
-function importForm(){
-  var p=editor("导入菜单食材"),first=field(p,"开始日期",data.date,"date"),last=field(p,"结束日期（最多七天）",data.date,"date");
-  actions(p,function(){if(window.confirm("确认把所选日期的菜单食材加入购物清单？"))mutate("shopping/import",{first:first.value,last:last.value});});
 }
 function row(parent){return node(parent,"div",undefined,"item");}
 function tasks(p,arr,manage){
@@ -118,31 +109,26 @@ function menuRows(p,arr,manage){
   arr.forEach(function(m){var n=row(p);node(n,"h3",m.day+" · "+mealNames[m.meal]);node(n,"p",m.dishes.join("、"));
     if(manage){node(n,"small","食材："+m.ingredients.join("、"));btn(n,"编辑",function(){menuForm(m);});btn(n,"删除",function(){remove("menu/delete",{on:m.day,meal:m.meal},"该餐次菜单");});}});
 }
-function shopping(p,arr,manage){
-  if(!arr.length)node(p,"p","暂无采购项");
-  arr.forEach(function(s){var n=row(p);node(n,"p",(s.completed?"☑ ":"□ ")+s.label);
-    if(manage){node(n,"small",s.source==="manual"?"手动添加":"菜单食材");btn(n,s.completed?"撤销采购":"已采购",function(){mutate("shopping/complete",{key:s.id,completed:!Boolean(s.completed)});});btn(n,"编辑",function(){shopForm(s);});btn(n,"删除",function(){remove("shopping/delete",{key:s.id},"采购项");});}});
-}
 function readMenus(p){
-  req("menu/list",{first:menuDate,last:menuDate},function(ok,v){if(ok){menus=v.result;menuRows(p,menus,true);}else{menus=[];node(p,"p","菜单读取失败");}});
+  var monday=new Date(menuDate+"T00:00:00Z");
+  if(isNaN(monday.getTime())){node(p,"p","请选择有效日期");return;}
+  monday.setUTCDate(monday.getUTCDate()-(monday.getUTCDay()+6)%7);
+  var sunday=new Date(monday.getTime()+6*86400000);
+  req("menu/list",{first:monday.toISOString().slice(0,10),last:sunday.toISOString().slice(0,10)},function(ok,v){if(ok){menus=v.result;menuRows(p,menus,true);}else{menus=[];node(p,"p","菜单读取失败");}});
 }
 function render(){
   var p=el("content");clear(p);if(!data)return;
-  if(tab==="today"){
-    node(p,"h2","今日生活");
-    if(admin)btn(p,"保存轮播设置",displayForm);
-    if(admin){var box=node(p,"div");req("view",null,function(ok,v){if(ok){node(box,"h3","待办");tasks(box,v.tasks,false);node(box,"h3","提醒");posters(box,v.posters,false);node(box,"h3","今日菜单");menuRows(box,v.today_menu,false);}else node(box,"p","今日信息读取失败");});}
-    else{node(p,"h3","待办");tasks(p,data.tasks,false);node(p,"h3","提醒");posters(p,data.posters,false);node(p,"h3","今日菜单");menuRows(p,data.today_menu,false);}
-  }else if(tab==="tasks"){node(p,"h2","待办");if(admin)btn(p,"新增待办",function(){taskForm(null);});tasks(p,data.tasks,admin);}
-  else if(tab==="posters"){node(p,"h2","提醒海报");if(admin)btn(p,"新增海报",function(){posterForm(null);});posters(p,data.posters,admin);}
-  else if(tab==="menus"){node(p,"h2",admin?"菜单管理":"本周菜单");if(admin){
-      var d=field(p,"查询日期",menuDate,"date");btn(p,"查询",function(){menuDate=d.value;render();});btn(p,"新增菜单",function(){menuDate=d.value;menuForm(null);});
+  ["tasks","posters","menus"].forEach(function(t){el(t).className=t===tab?"primary":"";});
+  if(tab==="tasks"){node(p,"h2","待办清单");if(admin)btn(p,"新增待办",function(){taskForm(null);});tasks(p,data.tasks,admin);}
+  else if(tab==="posters"){node(p,"h2","海报");if(admin){btn(p,"新增海报",function(){posterForm(null);});btn(p,"保存轮播设置",displayForm);}posters(p,data.posters,admin);}
+  else if(tab==="menus"){node(p,"h2","本周菜单");if(admin){
+      var d=field(p,"查询所在周",menuDate,"date");btn(p,"查询",function(){menuDate=d.value;render();});btn(p,"新增菜单",function(){menuDate=d.value;menuForm(null);});
       readMenus(node(p,"div"));
     }else menuRows(p,data.week_menu,false);}
-  else{node(p,"h2","购物清单");if(admin){btn(p,"新增采购项",function(){shopForm(null);});btn(p,"导入菜单食材",importForm);}shopping(p,data.shopping,admin);}
 }
 function canLeave(){return !editing||window.confirm("放弃未保存的编辑？");}
-["today","tasks","posters","menus","shopping"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;render();}};});
+["tasks","posters","menus"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;render();}};});
+el("busTab").onclick=function(){return !busy&&canLeave();};
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";admin=el("mode").value==="admin";if(direct&&!token)token="local-direct";if(direct&&admin&&!openAdmin&&token==="local-direct"){note("请输入管理凭证。");return;}load();};
 el("refresh").onclick=function(){if(!busy&&canLeave()){closeEditor();load();}};
 el("logout").onclick=function(){if(canLeave())reset();};

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>家庭生活</title>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>看板 · 内容管理</title>
 <style>
 body{max-width:680px;margin:0 auto;padding:16px;color:#111;background:#fff;font:17px/1.5 sans-serif}
 h1{font-size:26px}h2{font-size:22px}h3{font-size:18px}p{margin:8px 0;white-space:pre-wrap;overflow-wrap:break-word}
@@ -9,13 +9,13 @@ button{min-height:44px;margin:4px 6px 4px 0}button:disabled{color:#777}
 input,select,textarea{display:block;width:100%;margin:4px 0 12px}label{display:block}
 textarea{min-height:90px}.panel{border-top:2px solid #333;padding:12px 0}.item{border-bottom:1px solid #aaa;padding:8px 0}
 .primary{background:#222;color:#fff}.hidden{display:none}.poster{font-size:28px;font-weight:bold;white-space:pre-wrap;overflow-wrap:break-word}
-small{color:#555}a{color:#222}
+small{color:#555}a{color:#222}.tablink{display:inline-block;border:1px solid #444;border-radius:4px;padding:9px;text-decoration:none;margin:4px 6px 4px 0}
 </style></head>
-<body><h1>家庭生活</h1><p><small>本地看板 · <a href="/display">家庭展示</a> · <a href="/">公交页面</a></small></p>
+<body><h1>看板管理</h1><p><small>本地看板 · <a href="/display">展示页面</a></small></p>
 <div id="login" class="panel"><label for="token">访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off">
 <label for="mode">访问方式</label><select id="mode"><option value="read">仅查看</option><option value="admin">内容管理</option></select><button id="connect" type="button" class="primary">连接</button></div>
 <p id="message" role="status" aria-live="polite"></p>
 <div id="home" class="hidden"><p id="date"></p><button id="refresh" type="button">刷新</button><button id="logout" type="button">退出</button>
-<div id="tabs"><button id="today" type="button">今日生活</button><button id="tasks" type="button">待办</button><button id="posters" type="button">海报</button><button id="menus" type="button">菜单</button><button id="shopping" type="button">采购</button></div>
+<div id="tabs"><a id="busTab" class="tablink" href="/">公交</a><button id="tasks" type="button">待办清单</button><button id="posters" type="button">海报</button><button id="menus" type="button">本周菜单</button></div>
 <div id="editor" class="hidden"></div><div id="content" class="panel"></div>
 </div><script src="/access-mode.js"></script><script src="/home.js"></script></body></html>
