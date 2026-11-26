@@ -77,7 +77,7 @@ def main():
                        (function(label){return function(x){return x.textContent===label;};})(arguments[1]));
                        if(!b)throw Error('Button missing');b.click();""", [root,label])
                 def text_in(id, value):
-                    return js("return document.getElementById(arguments[0]).textContent.indexOf(arguments[1])>=0",[id,value])
+                    return js("var n=document.getElementById(arguments[0]);return !!n&&n.textContent.indexOf(arguments[1])>=0",[id,value])
                 go("/home")
                 js("document.getElementById('token').value=arguments[0];document.getElementById('mode').value='admin';",[admin])
                 click("connect")
@@ -196,9 +196,10 @@ def main():
                 assert text_in("modeStatus","自动分时")
                 click("settings")
                 click("manageLink")
-                wait(lambda:js("return document.getElementById(\'dashboard\').className!==\'hidden\'"))
+                wait(lambda:js("var n=document.getElementById(\'dashboard\');return !!n&&n.className!==\'hidden\'"))
                 assert js("return document.getElementById(\'returnLink\').getAttribute(\'href\')===\'/auto\'")
                 click("returnLink")
+                wait(lambda:js("return location.pathname===\'/auto\'"))
                 wait(lambda:text_in("heading","待办清单"))
                 assert text_in("modeStatus","自动分时")
                 # Exercise actual HTML select elements with a fictional upstream.

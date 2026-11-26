@@ -40,6 +40,8 @@ class XHR {
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/bus.js","utf8"),{document:doc,XMLHttpRequest:XHR,Date:FakeDate,setTimeout:(fn,delay)=>{if(delay===5000)ageTick=fn;return 1;},clearTimeout:()=>{}});
 const el=id=>doc.getElementById(id);
+// The static shell uses "panel hidden"; it must not be mistaken for an open editor.
+el("scheduleConfig").className="panel hidden";assert.equal(el("returnLink").onclick(),true);
 el("token").value="example-ui-token";el("mode").value="admin";el("connect").onclick();
 assert.equal(el("token").value,"");
 assert.equal(el("vehicles").children.length,2);

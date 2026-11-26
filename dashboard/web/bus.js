@@ -286,6 +286,7 @@ el("save").onclick=function(){
 var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/^#return-(bus|tasks|posters|menus|auto)$/):null;
 var returnMode=returnMatch?returnMatch[1]:"bus";
 el("returnLink").href=returnMode==="auto"?"/auto":"/display#"+returnMode;
-el("returnLink").onclick=function(){return !busy&&(!(configuring||el("scheduleConfig").className!=="hidden")||window.confirm("放弃未保存的公交设置？"));};
+// Only an active editor can have unsaved changes. A read-only cache poll does not prevent navigation.
+el("returnLink").onclick=function(){return !configuring||(!busy&&window.confirm("放弃未保存的公交设置？"));};
 if(direct){el("mode").value=openAdmin?"admin":"read";el("connect").onclick();}
 }());
