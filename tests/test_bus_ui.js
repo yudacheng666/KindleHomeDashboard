@@ -43,8 +43,8 @@ const el=id=>doc.getElementById(id);
 el("token").value="example-ui-token";el("mode").value="admin";el("connect").onclick();
 assert.equal(el("token").value,"");
 assert.equal(el("vehicles").children.length,2);
-assert.equal(el("vehicles").children[0].children[1].textContent,"4 分钟");
-assert.equal(el("updated").textContent,"5 秒前刷新");const reads=calls.length;clock+=5000;ageTick();assert.equal(el("updated").textContent,"10 秒前刷新");assert.equal(calls.length,reads);
+assert.equal(el("vehicles").children[0].children[1].textContent,"约 4 分钟");
+assert.equal(el("updated").textContent,"5 秒前刷新");const reads=calls.length;clock+=5000;ageTick();assert.equal(el("updated").textContent,"10 秒前刷新");assert.equal(calls.length,reads);clock+=55000;ageTick();assert.equal(el("vehicles").children[0].children[1].textContent,"约 3 分钟");assert.equal(calls.length,reads);clock-=60000;
 el("settings").onclick();el("keyword").value="Example";
 for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
 searchError="";el("search").onclick();
