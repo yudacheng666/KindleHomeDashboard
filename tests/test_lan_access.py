@@ -58,7 +58,11 @@ class DirectTests(unittest.TestCase):
         self.assertEqual(len(json.loads(self.request(server,"/api/home/view")[1])["tasks"]),1)
         self.assertEqual(self.request(server,"/api/bus/view")[0],200)
         self.assertEqual(self.request(server,"/api/devices/list")[0],404)
-        self.assertIn(b'"openAdmin": true',self.request(server,"/access-mode.js")[1])
+        flags=self.request(server,"/access-mode.js")[1]
+        self.assertIn(b'"openAdmin": true',flags)
+        from dashboard.http_api import VERSION
+        self.assertIsNotNone(VERSION)
+        self.assertIn(json.dumps(VERSION).encode(),flags)
 
     def test_auto_uses_server_clock_and_never_collects(self):
         now = datetime(2026, 1, 5, 0, 59, tzinfo=timezone.utc)

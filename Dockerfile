@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && mkdir -p /var/lib/khd && chown 10001:10001 /var/lib/khd
 WORKDIR /app
 COPY dashboard/ /app/dashboard/
+COPY VERSION /app/VERSION
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 USER 10001:10001
 STOPSIGNAL SIGTERM

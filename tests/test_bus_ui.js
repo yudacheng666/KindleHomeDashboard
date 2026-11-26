@@ -40,13 +40,23 @@ class XHR {
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/bus.js","utf8"),{document:doc,XMLHttpRequest:XHR,Date:FakeDate,setTimeout:(fn,delay)=>{if(delay===5000)ageTick=fn;return 1;},clearTimeout:()=>{}});
 const el=id=>doc.getElementById(id);
+// The static shell uses "panel hidden"; it must not be mistaken for an open editor.
+el("scheduleConfig").className="panel hidden";assert.equal(el("returnLink").onclick(),true);
 el("token").value="example-ui-token";el("mode").value="admin";el("connect").onclick();
 assert.equal(el("token").value,"");
 assert.equal(el("vehicles").children.length,2);
-assert.equal(el("vehicles").children[0].children[1].textContent,"约 4 分钟");
-assert.equal(el("updated").textContent,"5 秒前刷新");const reads=calls.length;clock+=5000;ageTick();assert.equal(el("updated").textContent,"10 秒前刷新");assert.equal(calls.length,reads);clock+=55000;ageTick();assert.equal(el("vehicles").children[0].children[1].textContent,"约 3 分钟");assert.equal(calls.length,reads);clock+=30000;ageTick();assert.equal(el("vehicles").children[0].children[1].textContent,"等待数据更新");assert.ok(el("status").textContent.includes("已过期"));clock-=90000;
-const etaNode=el("vehicles").children[0].children[1];view.snapshot.vehicles[0].distance_m=250;view.snapshot.vehicles[0].eta_min=5;el("refresh").onclick();assert.equal(el("vehicles").children[0].children[1],etaNode);assert.equal(etaNode.textContent,"约 5 分钟");assert.ok(el("vehicles").children[0].children[3].textContent.includes("250 米"));view.snapshot.vehicles[0].eta_min=4;
-const savedSnapshot=view.snapshot;view.snapshot={...savedSnapshot,status:"no_live_data",vehicles:[],scheduled_departures:1,departure_plans:[{time:"00:01",imminent:false}]};el("refresh").onclick();assert.ok(el("status").textContent.includes("等待首站发车"));assert.ok(el("schedule").textContent.includes("计划即将发车"));assert.ok(el("updated").textContent.endsWith("秒前刷新"));view.snapshot={...savedSnapshot,vehicles:[savedSnapshot.vehicles[0]],scheduled_departures:1,departure_plans:[{time:"00:15",imminent:false}]};el("refresh").onclick();assert.equal(el("vehicles").children.length,1);assert.ok(el("schedule").textContent.includes("计划发车 00:15"));assert.ok(el("status").textContent.includes("实时预计到站"));view.snapshot=savedSnapshot;el("refresh").onclick();
+assert.equal(el("vehicles").children[0].children[1].children[0].textContent,"约 4 分钟");
+assert.equal(el("updated").textContent,"5 秒前刷新");const reads=calls.length;clock+=5000;ageTick();assert.equal(el("updated").textContent,"10 秒前刷新");assert.equal(calls.length,reads);clock+=55000;ageTick();assert.equal(el("vehicles").children[0].children[1].children[0].textContent,"约 3 分钟");assert.equal(calls.length,reads);clock+=30000;ageTick();assert.equal(el("vehicles").children[0].children[1].children[0].textContent,"等待数据更新");assert.ok(el("status").textContent.includes("已过期"));clock-=90000;
+const etaNode=el("vehicles").children[0].children[1].children[0];view.snapshot.vehicles[0].distance_m=250;view.snapshot.vehicles[0].eta_min=5;el("refresh").onclick();assert.equal(el("vehicles").children[0].children[1].children[0],etaNode);assert.equal(etaNode.textContent,"约 5 分钟");assert.ok(el("vehicles").children[0].children[2].children[1].textContent.includes("250 米"));view.snapshot.vehicles[0].eta_min=4;
+const savedSnapshot=view.snapshot;
+const slot=(i)=>el("vehicles").children[i], eta=(i)=>slot(i).children[1].children[0], time=(i)=>slot(i).children[1].children[1];
+view.snapshot={...savedSnapshot,status:"no_live_data",vehicles:[],scheduled_departures:1,departure_plans:[{time:"00:01",imminent:false}]};el("refresh").onclick();
+assert.ok(el("status").textContent.includes("等待首站发车"));assert.equal(eta(0).textContent,"计划即将发车");assert.ok(time(0).textContent.includes("首站计划发车"));assert.ok(el("updated").textContent.endsWith("秒前刷新"));
+view.snapshot={...savedSnapshot,vehicles:[savedSnapshot.vehicles[0]],scheduled_departures:1,departure_plans:[{time:"00:15",imminent:false}]};el("refresh").onclick();assert.equal(el("vehicles").children.length,2);assert.equal(eta(1).textContent,"等待首站发车");assert.ok(time(1).textContent.includes("00:15"));assert.ok(el("status").textContent.includes("实时预计到站"));
+assert.equal(slot(0).className,"bus-slot bus-first");assert.equal(slot(1).className,"bus-slot bus-next");
+const firstSlot=slot(0);view.snapshot={...savedSnapshot,vehicles:[{position:1,eta_min:0,distance_m:0,stops_remaining:0},savedSnapshot.vehicles[1]]};el("refresh").onclick();assert.equal(slot(0),firstSlot);assert.equal(eta(0).textContent,"车辆已到站附近");
+view.snapshot={...savedSnapshot,status:"stale"};el("refresh").onclick();assert.equal(eta(0).textContent,"约 4 分钟");assert.ok(el("status").textContent.includes("旧数据"));
+view.snapshot=savedSnapshot;el("refresh").onclick();
 el("settings").onclick();el("keyword").value="Example";
 for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
 searchError="";el("search").onclick();

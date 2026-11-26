@@ -77,7 +77,7 @@ def main():
                        (function(label){return function(x){return x.textContent===label;};})(arguments[1]));
                        if(!b)throw Error('Button missing');b.click();""", [root,label])
                 def text_in(id, value):
-                    return js("return document.getElementById(arguments[0]).textContent.indexOf(arguments[1])>=0",[id,value])
+                    return js("var n=document.getElementById(arguments[0]);return !!n&&n.textContent.indexOf(arguments[1])>=0",[id,value])
                 go("/home")
                 js("document.getElementById('token').value=arguments[0];document.getElementById('mode').value='admin';",[admin])
                 click("connect")
@@ -118,11 +118,17 @@ def main():
                 assert all(m["meal"]!="breakfast" for m in home.menus_between("2026-01-05","2026-01-05"))
                 click("logout")
                 wait(lambda:js("return document.getElementById('home').className==='hidden'"))
-                go("/display")
+                go("/")
                 js("document.getElementById('token').value=arguments[0]",[reader])
                 click("connect")
                 wait(lambda:text_in("heading","待办清单"))
                 assert text_in("body","Fictional browser task")
+                assert js("return getComputedStyle(document.getElementById(\'settingsPanel\')).display===\'none\'")
+                click("settings")
+                assert js("return getComputedStyle(document.getElementById(\'displayContent\')).display===\'none\' && getComputedStyle(document.getElementById(\'settingsPanel\')).display!==\'none\'")
+                assert js("return document.getElementById(\'manageLink\').getAttribute(\'href\')===\'/bus#return-tasks\'")
+                click("returnDisplay")
+                assert text_in("heading","待办清单")
                 click("postersMode");assert text_in("heading","Fictional reminder")
                 assert text_in("pause","暂停轮播")
                 click("menusMode");assert text_in("body","Fictional dish")
@@ -143,7 +149,21 @@ def main():
                 wait(lambda:text_in("heading","待办清单"))
                 click("postersMode")
                 wait(lambda:text_in("heading","Fictional reminder"))
+                click("settings")
+                click("tasksManage")
+                wait(lambda:text_in("content","新增待办"))
+                wait(lambda:js("return document.getElementById(\'returnLink\').getAttribute(\'href\')===\'/display#posters\'"))
+                click("returnLink")
+                wait(lambda:text_in("heading","Fictional reminder"))
+                click("settings")
+                click("displayManage")
+                wait(lambda:text_in("content","保存轮播设置"))
+                assert text_in("content","显示设置")
+                click("returnLink")
+                wait(lambda:text_in("heading","Fictional reminder"))
+                click("settings")
                 click("pause")
+                click("returnDisplay")
                 assert text_in("pause","开始轮播")
                 js("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
                 js("Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'))")
@@ -161,7 +181,7 @@ def main():
                 js("document.querySelector('#editor input').value='Fictional direct task'")
                 button("editor","保存")
                 wait(lambda:len(home.view("2026-01-05")["tasks"])==2)
-                go("/")
+                go("/bus")
                 wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
                 assert js("return document.getElementById('settings').className!=='hidden'")
                 go("/auto")
@@ -170,7 +190,16 @@ def main():
                 click("busMode")
                 wait(lambda:text_in("body","公交采集未启用"))
                 assert text_in("modeStatus","手动显示")
+                click("settings")
                 click("autoMode")
+                wait(lambda:text_in("heading","待办清单"))
+                assert text_in("modeStatus","自动分时")
+                click("settings")
+                click("manageLink")
+                wait(lambda:js("var n=document.getElementById(\'dashboard\');return !!n&&n.className!==\'hidden\'"))
+                assert js("return document.getElementById(\'returnLink\').getAttribute(\'href\')===\'/auto\'")
+                click("returnLink")
+                wait(lambda:js("return location.pathname===\'/auto\'"))
                 wait(lambda:text_in("heading","待办清单"))
                 assert text_in("modeStatus","自动分时")
                 # Exercise actual HTML select elements with a fictional upstream.
@@ -195,7 +224,7 @@ def main():
                             {"stopId":n,"stopName":n,"upDown":1} for n in "CBA"]}}}
                     return {"errCode":0,"data":{"stopArriveInfo":{"currentBusArriveTime":"4","nextBusArriveTime":"9"}}}
                 bus.gate.request=provider
-                go("/")
+                go("/bus")
                 wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
                 click("settings")
                 js("document.getElementById('keyword').value='Example bus'")
@@ -220,11 +249,33 @@ def main():
                 wait(lambda:text_in("vehicles","4 分钟"))
                 wait(lambda:text_in("updated","秒前刷新"))
                 assert len(calls)==3
+                # Real geometry: both slots share the same columns and the first is larger.
+                layout = """return (function(){
+                  var slots=document.querySelectorAll('.bus-slot');
+                  if(slots.length!==2)return false;
+                  var a=slots[0].querySelector('.eta'),b=slots[1].querySelector('.eta');
+                  var x=slots[0].querySelector('.bus-time'),y=slots[1].querySelector('.bus-time');
+                  return Math.abs(a.getBoundingClientRect().left-b.getBoundingClientRect().left)<2
+                    && Math.abs(x.getBoundingClientRect().left-y.getBoundingClientRect().left)<2
+                    && x.getBoundingClientRect().left>a.getBoundingClientRect().left+50
+                    && parseFloat(getComputedStyle(a).fontSize)>parseFloat(getComputedStyle(b).fontSize)
+                    && document.documentElement.scrollWidth<=window.innerWidth;
+                })()"""
+                assert js(layout)
                 go("/display")
                 wait(lambda:text_in("heading","待办清单"))
                 click("busMode")
                 wait(lambda:text_in("body","4 分钟"))
                 wait(lambda:text_in("body","数据更新于"))
+                assert len(calls)==3
+                assert js(layout)
+                # Use the existing cache, not a new upstream request.
+                from dataclasses import replace
+                bus.poller.last=replace(bus.poller.last, vehicles=bus.poller.last.vehicles[:1],
+                                        scheduled_departures=1, departure_plans=({"time":"23:59","imminent":False},))
+                go("/bus")
+                wait(lambda:text_in("vehicles","首站计划发车"))
+                assert js(layout)
                 assert len(calls)==3
                 print("Real Chromium bus selection PASS: one route, explicit direction, verified stations, relative age, local reads.")
                 print("Real Chromium automatic entry PASS: direct startup, manual override, resume automatic")

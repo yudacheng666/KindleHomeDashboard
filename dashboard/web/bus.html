@@ -14,10 +14,27 @@ input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} but
 .panel{border-top:2px solid #222;margin-top:18px;padding-top:14px}
 .vehicle{padding:12px 0;border-bottom:1px solid #777}.eta{font-size:52px;font-weight:bold;line-height:1.1}
 .muted{color:#555}.hidden{display:none}.notice{border:2px solid #444;padding:10px}
+
+/* Identical two-column geometry for both slots; only hierarchy changes. */
+.bus-slot{padding:12px 0;border-bottom:1px solid #777}
+.bus-slot-label{font-size:16px;color:#444;margin-bottom:5px}
+.bus-pair{display:table;table-layout:fixed;width:100%}
+.bus-left,.bus-right{display:table-cell;width:50%;vertical-align:middle;word-wrap:break-word;white-space:normal}
+.bus-left{padding-right:5px;text-align:left}
+.bus-right{padding-left:5px;text-align:right}
+.bus-first .eta{font-size:48px;font-weight:bold;line-height:1.15}
+.bus-first .eta.bus-state{font-size:29px}
+.bus-next .eta{font-size:25px;font-weight:bold;line-height:1.2}
+.bus-next .eta.bus-state{font-size:21px}
+.bus-time{font-size:22px;font-weight:bold;line-height:1.35;white-space:pre-line}
+.bus-next .bus-time{font-size:17px}
+.bus-details{font-size:17px;color:#444;margin-top:8px}
+.bus-next .bus-details,.bus-next .bus-slot-label{font-size:14px}
+@media(max-width:360px){.bus-first .eta{font-size:36px}.bus-first .eta.bus-state{font-size:24px}.bus-next .eta{font-size:21px}.bus-next .eta.bus-state{font-size:18px}.bus-time{font-size:18px}.bus-next .bus-time{font-size:15px}.bus-details{font-size:15px}}
 </style>
 </head>
 <body>
-<h1>家庭看板</h1><p><strong>公交</strong> · <a href="/home#tasks">待办清单</a> · <a href="/home#posters">海报</a> · <a href="/home#menus">本周菜单</a></p><p class="small"><a href="/display">展示页面</a></p>
+<h1>设置 · 公交</h1><p><a id="returnLink" href="/display#bus">返回看板</a></p>
 <div id="login" class="panel">
 <label for="token">访问令牌（由本机管理员提供）</label>
 <input type="password" id="token" autocomplete="off" maxlength="128">
@@ -32,7 +49,7 @@ input,select{width:100%} button{min-height:44px;margin:4px 0;cursor:pointer} but
 <p id="clock" class="small"></p><h2 id="line">尚未配置公交</h2><p id="trip"></p>
 <p id="status" class="notice">正在读取</p>
 <div id="vehicles"></div>
-<p id="schedule" class="small"></p><p id="updated" class="small"></p>
+<p id="updated" class="small"></p>
 </div>
 <div id="scheduleConfig" class="panel hidden">
 <h2>公交采集设置</h2>
