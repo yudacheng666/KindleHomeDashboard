@@ -164,48 +164,94 @@ el("connect").onclick=function(){
 };
 el("logout").onclick=exit;el("refresh").onclick=read;
 if(document.addEventListener)document.addEventListener("visibilitychange",function(){if(document.hidden){stopAge();}else if(token&&!configuring){hideData("正在重新读取");read();}},false);
-function scheduleTime(n){return ("0"+Math.floor(n/60)).slice(-2)+":"+("0"+n%60).slice(-2);}
-function timeMinutes(s){var m=/^([0-9]{2}):([0-9]{2})$/.exec(s);if(!m||Number(m[2])>59)return -1;return Number(m[1])*60+Number(m[2]);}
+function twoDigits(n){return ("0"+n).slice(-2);}
+function timeMinutes(field){
+  var h=field.hour.value,m=field.minute.value;
+  if(!/^[0-9]{2}$/.test(h)||!/^[0-9]{2}$/.test(m)||Number(m)>59||Number(h)>24||Number(h)===24&&Number(m)!==0)return -1;
+  return Number(h)*60+Number(m);
+}
 function addScheduleRow(w){
   var root=document.createElement("div");root.className="schedule-row";el("scheduleRows").appendChild(root);
   var row={root:root,days:[]}, names=["周一","周二","周三","周四","周五","周六","周日"];
   for(var i=0;i<7;i++){var label=document.createElement("label"),box=document.createElement("input"),span=document.createElement("span");
     box.type="checkbox";box.checked=w.days.indexOf(i)>=0;box.disabled=!scheduleEditable;
     span.textContent=names[i];label.appendChild(box);label.appendChild(span);root.appendChild(label);row.days.push(box);}
-  function field(name,value){var l=document.createElement("label"),n=document.createElement("input"),sp=document.createElement("span");
-    sp.textContent=name;n.type="text";n.maxLength=5;n.placeholder="HH:MM";n.value=value;n.disabled=!scheduleEditable;l.appendChild(sp);l.appendChild(n);root.appendChild(l);return n;}
-  row.start=field("开始 ",w.start===null?"":scheduleTime(w.start));row.end=field("结束 ",w.end===null?"":scheduleTime(w.end));
+  function field(name,value,isEnd){
+    var l=document.createElement("span"),sp=document.createElement("span"),h=document.createElement("select"),m=document.createElement("select"),colon=document.createElement("span");
+    l.className="schedule-time";sp.textContent=name+" ";colon.textContent=" : ";
+    h.setAttribute("aria-label",name+"小时");m.setAttribute("aria-label",name+"分钟");
+    option(h,"","时");option(m,"","分");
+    for(var j=0;j<=(isEnd?24:23);j++)option(h,twoDigits(j),twoDigits(j));
+    for(var j=0;j<60;j++)option(m,twoDigits(j),twoDigits(j));
+    h.value=value===null?"":twoDigits(Math.floor(value/60));m.value=value===null?"":twoDigits(value%60);
+    h.disabled=m.disabled=!scheduleEditable;
+    if(isEnd)h.onchange=function(){if(h.value==="24")m.value="00";};
+    l.appendChild(sp);l.appendChild(h);l.appendChild(colon);l.appendChild(m);root.appendChild(l);
+    return {hour:h,minute:m};
+  }
+  row.start=field("开始",w.start,false);row.end=field("结束",w.end,true);
   var remove=document.createElement("button");remove.type="button";remove.textContent="删除时段";remove.disabled=!scheduleEditable;
   remove.onclick=function(){if(busy)return;el("scheduleRows").removeChild(root);scheduleRows.splice(scheduleRows.indexOf(row),1);};
   root.appendChild(remove);scheduleRows.push(row);
 }
-function closeSchedule(){configuring=false;show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];show("view",true);read();}
+function scheduleFeedback(message){txt("scheduleMessage",message);note(message);}
+function storedSchedule(data){
+  if(!data||typeof data.enabled!=="boolean"||!Array.isArray(data.windows))return false;
+  txt("scheduleStored","当前已保存："+(data.enabled?"开启（仅在指定时段采集）":"关闭"));
+  return true;
+}
+function sameSchedule(a,b){
+  if(!a||a.enabled!==b.enabled||!Array.isArray(a.windows)||a.windows.length!==b.windows.length)return false;
+  for(var i=0;i<b.windows.length;i++){
+    var x=a.windows[i],y=b.windows[i];
+    if(!x||x.start!==y.start||x.end!==y.end||!Array.isArray(x.days)||x.days.join(",")!==y.days.join(","))return false;
+  }
+  return true;
+}
+function closeSchedule(){configuring=false;show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];txt("scheduleMessage","");txt("scheduleStored","");show("view",true);read();}
 el("scheduleSettings").onclick=function(){
   if(busy||!admin)return;
   configuring=true;
   request("GET","/api/bus/schedule",null,function(ok,data){
     if(!ok){configuring=false;note(errorMessage(data.error));return;}
     stopAge();resetSelection();show("config",false);show("view",false);show("scheduleConfig",true);clear(el("scheduleRows"));scheduleRows=[];
-    scheduleEditable=data.editable===true;el("scheduleEnabled").value=data.enabled?"1":"0";
+    scheduleEditable=data.editable===true&&storedSchedule(data);el("scheduleEnabled").value=data.enabled===true?"1":"0";txt("scheduleMessage","");
     txt("scheduleZone","时区："+data.timezone+(scheduleEditable?"":" · 请先修正 Docker 中的请求上限设置"));
     el("scheduleEnabled").disabled=!scheduleEditable;el("scheduleAdd").disabled=!scheduleEditable;el("scheduleSave").disabled=!scheduleEditable;
     (data.windows||[]).forEach(addScheduleRow);
   });
 };
-el("scheduleAdd").onclick=function(){if(busy||!scheduleEditable)return;if(scheduleRows.length>=32){note("最多32个时段。");return;}addScheduleRow({days:[],start:null,end:null});};
+el("scheduleAdd").onclick=function(){if(busy||!scheduleEditable)return;if(scheduleRows.length>=32){scheduleFeedback("最多32个时段。");return;}addScheduleRow({days:[],start:null,end:null});};
 el("scheduleCancel").onclick=closeSchedule;
 el("scheduleSave").onclick=function(){
   if(busy||!scheduleEditable)return;
-  var enabled=el("scheduleEnabled").value==="1",windows=[];
+  var choice=el("scheduleEnabled").value,windows=[];
+  if(choice!=="0"&&choice!=="1"){scheduleFeedback("请选择开启或关闭。");return;}
+  var enabled=choice==="1";
   for(var i=0;i<scheduleRows.length;i++){var row=scheduleRows[i],days=[];
     for(var j=0;j<7;j++)if(row.days[j].checked)days.push(j);
-    var start=timeMinutes(row.start.value),end=timeMinutes(row.end.value);
-    if(!days.length||start<0||start>=1440||end<0||end>1440||start===end){note("请为每个时段选择星期和有效时间。");return;}
+    var start=timeMinutes(row.start),end=timeMinutes(row.end);
+    if(!days.length||start<0||start>=1440||end<0||end>1440||start===end){scheduleFeedback("保存失败：请为每个时段选择星期和有效时间。");return;}
     windows.push({days:days,start:start,end:end});
   }
-  if(enabled&&!windows.length){note("开启公交前请至少添加一个采集时段。");return;}
-  request("POST","/api/bus/schedule",{enabled:enabled,windows:windows},function(ok,data){
-    if(!ok){note(errorMessage(data.error));return;}closeSchedule();note("采集设置已保存。");
+  if(enabled&&!windows.length){scheduleFeedback("未保存：开启公交前请至少添加一个采集时段。");return;}
+  var expected={enabled:enabled,windows:windows};
+  txt("scheduleMessage","正在保存采集设置…");
+  request("POST","/api/bus/schedule",expected,function(ok,data){
+    if(!ok){scheduleFeedback("未能确认保存："+errorMessage(data.error)+" 请重新打开采集设置核对。");return;}
+    var acknowledged=sameSchedule(data,expected);
+    txt("scheduleMessage","正在核对已保存设置…");
+    request("GET","/api/bus/schedule",null,function(readOk,actual){
+      if(!readOk||!storedSchedule(actual)){
+        txt("scheduleStored","当前保存状态未确认");
+        scheduleFeedback("已提交，但未能读取确认结果。请重新打开采集设置核对。");return;
+      }
+      if(!acknowledged||!sameSchedule(actual,expected)){
+        scheduleFeedback("保存结果与所选设置不一致；请核对当前已保存状态后重试。");return;
+      }
+      el("scheduleEnabled").value=actual.enabled?"1":"0";
+      scheduleFeedback("采集设置已保存并确认："+(actual.enabled?"开启。仅在设定时段采集。":"关闭。"));
+    });
   });
 };
 el("settings").onclick=function(){if(busy)return;stopAge();searchedKeyword="";show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];configuring=true;resetSelection();show("view",false);show("config",true);};

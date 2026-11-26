@@ -211,7 +211,10 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.req("POST",path,self.admin,on)[0],200)
         self.assertTrue(self.bus.gate.enabled)
         self.assertTrue(self.runtime.active())
-        self.assertEqual(self.req("GET",path,self.admin)[1]["windows"],on["windows"])
+        saved = self.req("GET",path,self.admin)[1]
+        self.assertEqual(saved["windows"],on["windows"])
+        self.assertIs(saved["enabled"], True)
+        self.assertEqual(self.bus.gate.load_schedule(),on)
         self.assertEqual(self.calls,[])
         self.assertEqual(self.req("POST","/api/bus/search",self.admin,{"keyword":"Example"})[0],200)
         self.assertEqual(self.req("POST",path,self.admin,off)[0],200)

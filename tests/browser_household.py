@@ -306,6 +306,38 @@ def main():
                 go("/bus")
                 wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
                 assert js("return document.getElementById('settings').className!=='hidden'")
+                # Exercise the actual schedule select, POST, readback, re-entry
+                # and durable restore, with no scheduler or upstream traffic.
+                runtime.web_settings = True
+                click("scheduleSettings")
+                wait(lambda:text_in("scheduleStored","关闭"))
+                js("document.getElementById('scheduleEnabled').value='1'")
+                click("scheduleSave")
+                wait(lambda:text_in("scheduleMessage","至少"))
+                assert not bus.gate.enabled
+                click("scheduleAdd")
+                js("var r=document.querySelector('#scheduleRows .schedule-row');r.querySelector('input[type=checkbox]').checked=true;var t=r.querySelectorAll('select');t[0].value='23';t[1].value='07';t[2].value='24';t[2].dispatchEvent(new Event('change'))")
+                click("scheduleSave")
+                wait(lambda:text_in("scheduleMessage","已保存并确认"))
+                assert bus.gate.enabled and not runtime.active()
+                assert runtime.schedule_view()["windows"] == [{"days":[0],"start":1387,"end":1440}]
+                assert js("return document.getElementById('scheduleEnabled').value==='1' && document.getElementById('scheduleConfig').className!=='hidden'")
+                assert text_in("scheduleStored","开启")
+                restored=Runtime(BusService(directory,enabled=False),web_settings=True,clock=lambda:now)
+                assert restored.schedule_view()["enabled"] is True
+                go("/bus")
+                wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
+                click("scheduleSettings")
+                wait(lambda:text_in("scheduleStored","开启"))
+                assert js("return document.getElementById('scheduleEnabled').value==='1'")
+                assert js("var r=document.querySelector('#scheduleRows .schedule-row');return r.querySelectorAll('input[type=text]').length===0 && Array.from(r.querySelectorAll('select')).map(x=>x.value).join(':')==='23:07:24:00'")
+                js("document.getElementById('scheduleEnabled').value='0'")
+                click("scheduleSave")
+                wait(lambda:text_in("scheduleMessage","已保存并确认"))
+                assert not bus.gate.enabled
+                assert text_in("scheduleStored","关闭")
+                click("scheduleCancel")
+                print("Real Chromium schedule enable/save/readback/reopen/disable and durable restore PASS")
                 go("/auto")
                 wait(lambda:text_in("modeStatus","自动分时"))
                 wait(lambda:text_in("heading","待办清单"))
