@@ -305,7 +305,7 @@ function acceptBus(v){
 function weatherNum(v,suffix){return typeof v==="number"&&isFinite(v)?Math.round(v)+suffix:"—";}
 function weatherTime(v){return typeof v==="string"?v.slice(0,16).replace("T"," ")+(v.slice(-1)==="Z"?" UTC":/[+-]\d\d:\d\d$/.test(v)?" "+v.slice(-6):""):"时间未知";}
 function weatherSource(groups,attrs,s,label){
-  var source=s.source==="QWeather"?"和风天气":"Open-Meteo · 模型估算",time=weatherTime(s.fetched_at),key=source+" · "+time;
+  var time=weatherTime(s.fetched_at),key=(s.source==="Open-Meteo"?"模型估算 · ":"")+time;
   var group=null;
   groups.forEach(function(g){if(g.key===key)group=g;});
   if(!group){group={key:key,labels:[]};groups.push(group);}
@@ -618,7 +618,7 @@ function renderDrivingGroups(root,v,limit,summary){
       if(g.routes&&g.routes.length<3&&g.routes.length>0)note+=" · 仅返回"+g.routes.length+"条";
       if(note)append(group,"p",note,"driving-foot");
     });
-    append(root,"p","路线及地图：高德地图 · 预计耗时为采集时的估算","driving-foot");
+
 }
 function acceptDriving(v){
   data=null;pages=[];cursor=0;stopRotation();stopAge();
