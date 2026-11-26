@@ -199,6 +199,26 @@ def main():
                 button("editor","保存")
                 wait(lambda:home.view("2026-01-05")["menu_display"]["mode"]=="week")
                 wait(lambda:js("return document.getElementById('editor').className==='hidden'"))
+                # Existing dinner: save must explain conflict beside the button and preserve the draft.
+                click("menus")
+                wait(lambda:text_in("content","Fictional dish"))
+                button("content","新增菜单")
+                js("document.querySelector('#editor input').value='2026-01-05';document.querySelector('#editor textarea').value='Fictional added dish'")
+                button("editor","保存")
+                wait(lambda:text_in("menuSaveStatus","已有菜单"))
+                assert js("return document.querySelector('#editor textarea').value==='Fictional added dish'")
+                assert home.menus_between("2026-01-05","2026-01-05")[0]["dishes"]==["Fictional dish"]
+                button("editor","追加到已有菜单")
+                wait(lambda:js("return document.getElementById('editor').className==='hidden'"))
+                wait(lambda:text_in("content","Fictional added dish"))
+                meal=home.menus_between("2026-01-05","2026-01-05")[0]
+                assert meal["dishes"]==["Fictional dish","Fictional added dish"] and meal["ingredients"]==["Fictional ingredient"]
+                # An unused date saves directly, without a redundant confirmation dialog.
+                button("content","新增菜单")
+                js("document.querySelector('#editor input').value='2026-01-07';document.querySelector('#editor textarea').value='Fictional new meal'")
+                button("editor","保存")
+                wait(lambda:text_in("content","Fictional new meal"))
+                assert home.menus_between("2026-01-07","2026-01-07")[0]["dishes"]==["Fictional new meal"]
                 click("logout")
                 wait(lambda:js("return document.getElementById('home').className==='hidden'"))
                 go("/")

@@ -286,11 +286,56 @@ function menuForm(m){
   var ingredients=field(p,"食材（每行一个，数量写在文字中）",m?m.ingredients.join("\n"):"","textarea");
   dishPicker(p,dishes);
   if(m)node(p,"p","可以调整日期和餐次；不会覆盖其他菜单。");
+  var feedback=node(p,"p","","menu-save-feedback");feedback.id="menuSaveStatus";
+  if(feedback.setAttribute)feedback.setAttribute("role","status");
+  var conflict=node(p,"div");
+  function tell(message){feedback.textContent=message;note(message);}
+  function draft(){
+    return {on:on.value,meal:meal.value,dishes:uniqueLines(dishes.value),ingredients:lines(ingredients.value),expected:m?{dishes:m.dishes,ingredients:m.ingredients}:null};
+  }
+  function validate(b){
+    if(!validDate(b.on)||!mealNames[b.meal]){tell("请选择有效日期和餐次。");return false;}
+    if(!b.dishes.length){tell("请至少输入或选择一道菜。");return false;}
+    if(b.dishes.length>30||b.ingredients.length>80||b.dishes.concat(b.ingredients).some(function(s){return s.length>200;})){
+      tell("最多30道菜、80项食材，每项不超过200字。");return false;
+    }
+    return true;
+  }
+  function merge(a,b){var result=a.slice();b.forEach(function(s){if(result.indexOf(s)<0)result.push(s);});return result;}
+  function inspect(b){
+    tell("正在核对该餐次是否已有菜单…");
+    req("menu/list",{first:b.on,last:b.on},function(ok,v){
+      if(!ok||!Array.isArray(v.result)){tell("未确认保存结果，无法读取该餐次。输入已保留，请检查连接后重试。");return;}
+      var existing=v.result.filter(function(item){return item.day===b.on&&item.meal===b.meal;})[0];
+      if(!existing){tell("未保存：请核对填写内容后重试。输入已保留。");return;}
+      tell("该日期及餐次已有菜单，未覆盖原内容。可追加新菜，或修改日期/餐次后保存。");
+      node(conflict,"p","已有菜品："+existing.dishes.join("、"));
+      btn(conflict,"追加到已有菜单",function(){
+        var next=draft();
+        if(next.on!==b.on||next.meal!==b.meal){clear(conflict);tell("日期或餐次已改变，请点击保存重新核对。");return;}
+        if(!validate(next))return;
+        next.expected={dishes:existing.dishes,ingredients:existing.ingredients};
+        next.dishes=merge(existing.dishes,next.dishes);
+        next.ingredients=merge(existing.ingredients,next.ingredients);
+        if(validate(next))save(next);
+      });
+    });
+  }
+  function save(b){
+    clear(conflict);tell("正在保存…");
+    req(m?"menu/move":"menu/plan",b,function(ok,v){
+      if(ok){menuDate=b.on;closeEditor();note("菜单已保存。");load();return;}
+      if(v.error==="invalid_selection_or_request"){
+        if(!m){inspect(b);return;}
+        tell("未保存：原菜单已变化、目标餐次已有菜单或内容无效。输入已保留，请核对后重试。");
+      }else if(v.error==="unauthorized"){tell("未保存：没有管理权限。输入已保留。");}
+      else tell("保存结果未确认。输入已保留，请检查连接并核对菜单后重试。");
+    });
+  }
   actions(p,function(){
-    if(!m&&!window.confirm("保存此日期及餐次的新菜单？已有餐次不会被覆盖。"))return;
-    var b={on:on.value,meal:meal.value,dishes:uniqueLines(dishes.value),ingredients:lines(ingredients.value),expected:m?{dishes:m.dishes,ingredients:m.ingredients}:null};
+    clear(conflict);var b=draft();if(!validate(b))return;
     if(m){b.old_on=m.day;b.old_meal=m.meal;}
-    mutate(m?"menu/move":"menu/plan",b,function(){menuDate=b.on;});
+    save(b);
   });
 }
 function row(parent){return node(parent,"div",undefined,"item");}

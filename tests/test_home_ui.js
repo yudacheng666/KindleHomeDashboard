@@ -11,7 +11,7 @@ const el=id=>doc.getElementById(id);
 const date="2026-01-05",task={id:"synthetic-task",title:"Example task",start:date,repeat:"daily",occurrence:date,completed:false};
 const manage={date,tasks:[task],posters:[],shopping:[],history:[{...task,completed_at:null,restorable:true}],catalog:{categories:[{id:"cat",name:"Example category"},{id:"other",name:"其他"}],dishes:[{id:"dish",name:"Catalog dish",category:"cat"}]}};
 const view={date,tasks:[task],posters:[],shopping:[],today_menu:[],week_menu:[]};
-const calls=[];let fail=false,confirmed=true;
+const calls=[];let fail=false,confirmed=true,planConflict=false;
 const sampleMenu={day:date,meal:"lunch",dishes:["Example dish"],ingredients:["Example ingredient"]};
 let shared=[sampleMenu,{...sampleMenu,meal:"dinner",dishes:["Example dinner"]},{...sampleMenu,day:"2026-01-06"}],timers=new Map(),nextTimer=1;
 function setTimer(fn,ms){let id=nextTimer++;timers.set(id,{fn,ms});return id;}
@@ -31,7 +31,13 @@ class XHR {
       shared=shared.filter(x=>x.day!==b.on||x.meal!==b.meal);if(result)shared.push(result);response={result};
     }
     if(!fail&&this.path.endsWith("/dish/move-other")){const b=JSON.parse(body);manage.catalog.dishes.forEach(d=>{if(b.keys.includes(d.id))d.category=b.category;});}
-    this.status=fail?503:200;this.responseText=JSON.stringify(response);this.readyState=4;this.onreadystatechange();
+    let rejected=false;
+    if(!fail&&planConflict&&this.path.endsWith("/menu/plan")){
+      const b=JSON.parse(body),m=shared.find(x=>x.day===b.on&&x.meal===b.meal);
+      if(m&&JSON.stringify(b.expected)!==JSON.stringify({dishes:m.dishes,ingredients:m.ingredients})){rejected=true;response={error:"invalid_selection_or_request"};}
+      else{shared=shared.filter(x=>x.day!==b.on||x.meal!==b.meal);shared.push({day:b.on,meal:b.meal,dishes:b.dishes,ingredients:b.ingredients});}
+    }
+    this.status=fail?503:rejected?400:200;this.responseText=JSON.stringify(response);this.readyState=4;this.onreadystatechange();
   }
   abort(){}
 }
@@ -92,7 +98,14 @@ el("displaySettings").onclick();click(el("content"),"菜单展示范围");all(el
 assert.ok(calls.some(c=>c[0].endsWith("/menu/display")&&c[1].mode==="custom"&&c[1].days===14));
 el("menus").onclick();
 click(el("content"),"新增菜单");const ta=all(el("editor"),n=>n.tag==="textarea");ta[0].value="Dish A\nDish B";ta[1].value="Ingredient A";
-click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/menu/plan")&&c[1].expected===null&&c[1].dishes.length===2));
+planConflict=true;click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/menu/plan")&&c[1].expected===null&&c[1].dishes.length===2));
+let saveStatus=all(el("editor"),n=>n.id==="menuSaveStatus")[0];
+assert.ok(saveStatus.textContent.includes("已有菜单"));assert.equal(ta[0].value,"Dish A\nDish B");
+assert.ok(shared.find(m=>m.day===date&&m.meal==="dinner").dishes.includes("Example dinner"));
+click(el("editor"),"追加到已有菜单");
+assert.ok(calls.some(c=>c[0].endsWith("/menu/plan")&&c[1].expected&&c[1].dishes.includes("Example dinner")&&c[1].dishes.includes("Dish A")&&c[1].ingredients.includes("Example ingredient")));
+assert.equal(el("editor").className,"hidden");assert.ok(el("message").textContent.includes("已保存"));
+planConflict=false;
 click(el("content"),"编辑");
 const menuOn=all(el("editor"),n=>n.tag==="input")[0],menuMeal=all(el("editor"),n=>n.tag==="select")[0];
 assert.ok(!menuOn.disabled&&!menuMeal.disabled);
