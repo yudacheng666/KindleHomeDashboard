@@ -222,7 +222,7 @@ def map_parameters(origin,destination,routes):
         unique = [p for p in route.points if p not in others]
         if unique:
             labels.append(f"{i+1},0,1,16,0xFFFFFF,{route.color}:{unique[len(unique)//2]}")
-    params = {"size":"600*360","scale":"1","traffic":"0","paths":paths,
+    params = {"size":"600*200","scale":"1","traffic":"0","paths":paths,
               "markers":f"mid,0x000000,S:{point(origin)}|mid,0x000000,E:{point(destination)}"}
     if labels:
         params["labels"]="|".join(labels)
