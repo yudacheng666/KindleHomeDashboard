@@ -16,7 +16,7 @@ const stops=["A","B","C"].map(n=>({name:n,stop_id:n}));
 const view={trip:{line,boarding:stops[0],destination:stops[2],board_index:0,destination_index:2},
   snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:1,fetched_at:"2026-01-01T00:00:00+00:00"}};
 const calls=[];
-let failed=false;
+let failed=false, searchError="";
 class XHR {
   open(method,path){this.method=method;this.path=path;}
   setRequestHeader(name,value){if(name==="Authorization")assert.equal(value,"Bearer example-ui-token");}
@@ -27,7 +27,8 @@ class XHR {
     if(this.path==="/api/bus/search")data={lines:[line]};
     if(this.path==="/api/bus/route")data={selection:"example-handle",route:{line,stops}};
     if(this.path==="/api/bus/save")data=view;
-    this.status=failed?503:200;this.responseText=JSON.stringify(failed?{error:"service_error"}:data);
+    const error=this.path==="/api/bus/search"&&searchError?searchError:failed?"service_error":"";
+    this.status=error?503:200;this.responseText=JSON.stringify(error?{error}:data);
     this.readyState=4;this.onreadystatechange();
   }
   abort(){}
@@ -38,7 +39,9 @@ el("token").value="example-ui-token";el("mode").value="admin";el("connect").oncl
 assert.equal(el("token").value,"");
 assert.equal(el("vehicles").children.length,2);
 assert.equal(el("vehicles").children[0].children[1].textContent,"4 分钟");
-el("settings").onclick();el("keyword").value="Example";el("search").onclick();el("detail").onclick();
+el("settings").onclick();el("keyword").value="Example";
+for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
+searchError="";el("search").onclick();el("detail").onclick();
 assert.equal(el("board").children.length,2);
 el("board").value="1";el("board").onchange();
 assert.equal(el("destination").children.length,1);
