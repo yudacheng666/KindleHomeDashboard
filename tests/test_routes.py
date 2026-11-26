@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from dashboard.bus import BusError
-from dashboard.routes import Line, Station, Route, search, detail, select, revalidate
+from dashboard.routes import Line, Station, Route, search, detail, select, revalidate, search_keyword, DirectionUnavailable
 from dashboard.trip_store import TripStore, SOURCE
 
 
@@ -40,6 +40,14 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual([v.direction for v in lines], ["0", "1"])
         self.assertEqual(request.call_args.args[1]["keywords"], "Example")
 
+    def test_search_shorthand_and_explicit_broad(self):
+        self.assertEqual(search_keyword("示例８２Ｃ"), "示例82路C")
+        self.assertEqual(search_keyword("示例82路C"), "示例82路C")
+        request = Mock(return_value=response(trafficStop=[]))
+        search("示82C", request=request, broad=True)
+        self.assertEqual(request.call_count, 1)
+        self.assertEqual(request.call_args.args[1]["keywords"], "82")
+
     def test_empty_search(self):
         self.assertEqual(search("Example", request=Mock(return_value=response(trafficStop=[]))), ())
 
@@ -55,7 +63,7 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(route.line.direction, "1")
 
     def test_mismatched_direction(self):
-        with self.assertRaises(BusError):
+        with self.assertRaises(DirectionUnavailable):
             detail(LINE, "1", request=Mock(return_value=detail_response("0")))
 
     def test_mismatched_route(self):
