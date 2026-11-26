@@ -191,6 +191,33 @@ class HTTPTests(unittest.TestCase):
                                   {"selection": handle, "boarding": 2, "destination": 0})[0], 400)
         self.assertIsNone(self.bus.store.load())
 
+    def test_web_schedule_persistence_and_guard(self):
+        self.runtime.web_settings = True
+        path = "/api/bus/schedule"
+        off = {"enabled": False, "windows": []}
+        on = {"enabled": True, "windows": [{"days": [0], "start": 480, "end": 540}]}
+        self.assertEqual(self.req("GET",path,self.reader)[0],401)
+        self.assertEqual(self.req("POST",path,self.reader,on)[0],401)
+        self.assertEqual(self.req("POST",path,self.admin,{"enabled":True,"windows":[]})[0],400)
+        self.assertEqual(self.req("POST",path,self.admin,off)[0],200)
+        self.assertFalse(self.bus.gate.enabled)
+        self.assertEqual(self.req("POST","/api/bus/search",self.admin,{"keyword":"Example"})[0],503)
+        self.assertEqual(self.req("POST",path,self.admin,on)[0],200)
+        self.assertTrue(self.bus.gate.enabled)
+        self.assertTrue(self.runtime.active())
+        self.assertEqual(self.req("GET",path,self.admin)[1]["windows"],on["windows"])
+        self.assertEqual(self.calls,[])
+        self.assertEqual(self.req("POST","/api/bus/search",self.admin,{"keyword":"Example"})[0],200)
+        self.assertEqual(self.req("POST",path,self.admin,off)[0],200)
+        self.assertEqual(self.req("POST",path,self.admin,on)[0],200)
+        self.assertEqual(self.req("POST","/api/bus/search",self.admin,{"keyword":"Other"})[0],429)
+        restored = BusService(self.temp.name,enabled=False,clock=lambda:self.now,request=self.provider)
+        runtime = Runtime(restored,clock=lambda:self.now,web_settings=True)
+        self.assertTrue(restored.gate.enabled)
+        self.assertTrue(runtime.active())
+        self.assertEqual(runtime.schedule_view()["windows"],on["windows"])
+        self.assertEqual(len(self.calls),1)
+
     def test_budget_reasons(self):
         self.bus.gate.enabled = False
         self.assertEqual(self.req("POST", "/api/bus/search", self.admin, {"keyword": "A"}), (503, {"error": "bus_disabled"}, "no-store"))
