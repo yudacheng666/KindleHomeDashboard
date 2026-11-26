@@ -18,8 +18,8 @@ const stops=["A","B","C"].map(n=>({name:n,stop_id:n}));
 const view={trip:{line,boarding:stops[0],destination:stops[2],board_index:0,destination_index:2},
   snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:1,fetched_at:"2026-01-01T00:00:00+00:00"}};
 const calls=[];
-let clock=Date.parse(view.snapshot.fetched_at)+5000,ageTick=null;
-class FakeDate extends Date {static now(){return clock;}}
+let clock=Date.parse(view.snapshot.fetched_at)+5000,ageTick=null,deviceSkew=-3600000;
+class FakeDate extends Date {static now(){return clock+deviceSkew;}}
 let failed=false, searchError="";
 class XHR {
   open(method,path){this.method=method;this.path=path;}
@@ -33,7 +33,7 @@ class XHR {
     if(this.path==="/api/bus/route")data={selection:"example-handle",route:{line:JSON.parse(body).line,stops}};
     if(this.path==="/api/bus/save")data=view;
     const error=this.path==="/api/bus/search"&&searchError?searchError:failed?"service_error":"";
-    this.status=error?503:200;this.responseText=JSON.stringify(error?{error}:data);
+    this.status=error?503:200;if(data&&data.snapshot)data={...data,snapshot:{...data.snapshot,server_now_ms:clock,fetched_at_ms:Date.parse(data.snapshot.fetched_at),timezone_offset_min:0}};this.responseText=JSON.stringify(error?{error}:data);
     this.readyState=4;this.onreadystatechange();
   }
   abort(){}
@@ -46,6 +46,7 @@ assert.equal(el("vehicles").children.length,2);
 assert.equal(el("vehicles").children[0].children[1].textContent,"约 4 分钟");
 assert.equal(el("updated").textContent,"5 秒前刷新");const reads=calls.length;clock+=5000;ageTick();assert.equal(el("updated").textContent,"10 秒前刷新");assert.equal(calls.length,reads);clock+=55000;ageTick();assert.equal(el("vehicles").children[0].children[1].textContent,"约 3 分钟");assert.equal(calls.length,reads);clock+=30000;ageTick();assert.equal(el("vehicles").children[0].children[1].textContent,"等待数据更新");assert.ok(el("status").textContent.includes("已过期"));clock-=90000;
 const etaNode=el("vehicles").children[0].children[1];view.snapshot.vehicles[0].distance_m=250;view.snapshot.vehicles[0].eta_min=5;el("refresh").onclick();assert.equal(el("vehicles").children[0].children[1],etaNode);assert.equal(etaNode.textContent,"约 5 分钟");assert.ok(el("vehicles").children[0].children[3].textContent.includes("250 米"));view.snapshot.vehicles[0].eta_min=4;
+const savedSnapshot=view.snapshot;view.snapshot={...savedSnapshot,status:"no_live_data",vehicles:[],scheduled_departures:1,departure_plans:[{time:"00:01",imminent:false}]};el("refresh").onclick();assert.ok(el("status").textContent.includes("等待首站发车"));assert.ok(el("schedule").textContent.includes("计划即将发车"));assert.ok(el("updated").textContent.endsWith("秒前刷新"));view.snapshot=savedSnapshot;el("refresh").onclick();
 el("settings").onclick();el("keyword").value="Example";
 for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
 searchError="";el("search").onclick();

@@ -33,7 +33,7 @@ function advance(ms){
 class XHR {
   open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto"].includes(path));this.path=path;}
   setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;this.responseText=JSON.stringify(fail?{}:this.path==="/api/bus/view"?busData:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?busData:data}:data);this.readyState=4;this.onreadystatechange();}
+  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:0}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
@@ -78,6 +78,9 @@ busData={...bus,snapshot:{...bus.snapshot,fetched_at:new Date(FakeDate.now()).to
 assert.ok(el("body").children.some(n=>n.textContent==="预计即将到站"));
 advance(45000);assert.ok(el("body").children.some(n=>n.textContent==="等待到站确认"));assert.equal(el("body").children.filter(n=>n.className==="eta").length,2);
 advance(30000);assert.ok(el("body").children.some(n=>n.textContent==="等待数据更新"));
+busData={...bus,snapshot:{...bus.snapshot,status:"no_live_data",vehicles:[],scheduled_departures:1,departure_plans:[{time:"12:00",imminent:true}],fetched_at:new Date(FakeDate.now()).toISOString()}};advance(15000);
+assert.ok(el("body").children.some(n=>n.textContent.includes("等待首站发车")));assert.ok(el("body").children.some(n=>n.textContent.includes("计划即将发车")));
+advance(75000);assert.ok(!el("body").children.some(n=>n.textContent.includes("计划即将发车")));
 busData={...bus,snapshot:{...bus.snapshot,status:"expired",vehicles:[]}};advance(15000);
 assert.ok(!el("body").children.some(n=>n.className==="eta"));assert.ok(!el("body").children.some(n=>n.textContent.includes("数据更新于")));
 click("tasksMode");heading("待办清单");assert.equal(el("familyControls").className,"hidden");

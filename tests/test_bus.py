@@ -44,6 +44,19 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(snap.vehicles, ())
         self.assertEqual(snap.scheduled_departures, 1)
 
+    def test_departure_plans_are_not_arrival_predictions(self):
+        snap = parse(payload({}, [{"time": "08:01:00", "countdown": "1", "vehicle": "fake-plate"},
+                                  {"time": "bad", "countdown": "即将发车"}, "bad"]), T)
+        self.assertEqual(snap.status, "no_live_data")
+        self.assertEqual(snap.vehicles, ())
+        self.assertEqual(snap.scheduled_departures, 2)
+        self.assertEqual(snap.departure_plans, ({"time": "08:01", "imminent": False},
+                                                {"time": None, "imminent": True}))
+        self.assertNotIn("fake-plate", repr(snap))
+        mixed = parse(payload({"currentBusArriveTime": "4"}, [{"time": "08:02"}]), T)
+        self.assertEqual(len(mixed.vehicles), 1)
+        self.assertEqual(mixed.departure_plans[0]["time"], "08:02")
+
     def test_zero_eta_needs_evidence(self):
         self.assertEqual(parse(payload({"currentBusArriveTime": 0}), T).vehicles, ())
         snap = parse(payload({"currentBusArriveTime": 0, "currentBusDistance": 0}), T)
