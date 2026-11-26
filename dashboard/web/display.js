@@ -6,7 +6,7 @@ var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
 var seconds=180, includeWeek=false, includeShopping=false, editing=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
-var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null;
+var resumeKey="khd-display-resume-v1",ageNode=null,etaRows=[],etaSnapshot=null,busStatusNode=null;
 function el(id){return document.getElementById(id);}
 function txt(id,s){var n=el(id);if(n.textContent!==s)n.textContent=s;}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -132,11 +132,12 @@ function updateEta(rows,s,now){
   });
   return valid;
 }
-function stopAge(){ageNode=null;etaRows=[];etaSnapshot=null;}
+function stopAge(){ageNode=null;etaRows=[];etaSnapshot=null;busStatusNode=null;}
 function paintAge(){
   var now=Date.now();txt("date",clockTime(now,now));
   if(!ageNode||!etaSnapshot)return;
   var stamp=Date.parse(etaSnapshot.fetched_at),valid=updateEta(etaRows,etaSnapshot,now);
+  if(etaRows.length&&busStatusNode){var status=valid?(etaSnapshot.status==="stale"?"数据暂未更新 · 以下为旧数据":"实时预计到站"):"数据时间异常或已过期 · 以下为旧位置";if(busStatusNode.textContent!==status)busStatusNode.textContent=status;}
   var label=!isFinite(stamp)||stamp>now?"更新时间未知（请检查设备时间）":"数据更新于 "+clockTime(stamp,now)+(valid?"":" · 数据已失去时效");
   if(ageNode.textContent!==label)ageNode.textContent=label;
 }
@@ -150,7 +151,7 @@ function acceptBus(v){
     stopAge();lastRender=key;txt("date","");txt("heading",t?t.line.name:"实时公交");txt("index","");
     var root=el("body");clear(root);
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name);
-    append(root,"p",labels[s.status]||"状态未知","note");
+    busStatusNode=append(root,"p",labels[s.status]||"状态未知","note");
     vehicles.forEach(function(v){
       append(root,"p",v.position===1?"最近一辆":"下一辆","note");
       var eta=append(root,"p","","eta"),time=append(root,"p","","note");etaRows.push({minutes:v.eta_min,eta:eta,time:time});
