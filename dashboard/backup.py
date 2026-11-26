@@ -16,7 +16,7 @@ import stat
 
 from .trip_store import TripStore
 
-FILES = ("bus-trip.json", "bus-budget.sqlite3", "household.sqlite3", "weather-settings.json", "weather-budget.sqlite3")
+FILES = ("bus-trip.json", "bus-budget.sqlite3", "household.sqlite3", "weather-settings.json", "weather-budget.sqlite3", "driving-settings.json", "driving-budget.sqlite3")
 MANIFEST = "manifest.json"
 MAX_FILE = 64 * 1024 * 1024
 
@@ -94,7 +94,12 @@ def validate(root, names):
         if "weather-budget.sqlite3" not in names:
             raise ValueError("Missing weather budget")
         config(json.loads(read_file(root/"weather-settings.json",8192)))
-    for name in ("bus-budget.sqlite3", "household.sqlite3", "weather-budget.sqlite3"):
+    if "driving-settings.json" in names:
+        from .driving_service import config as driving_config
+        if "driving-budget.sqlite3" not in names:
+            raise ValueError("Missing driving budget")
+        driving_config(json.loads(read_file(root/"driving-settings.json",16384)))
+    for name in ("bus-budget.sqlite3", "household.sqlite3", "weather-budget.sqlite3", "driving-budget.sqlite3"):
         if name not in names:
             continue
         with closing(sqlite3.connect((root / name).as_uri() + "?mode=ro", uri=True)) as db:
@@ -110,6 +115,10 @@ def validate(root, names):
                     db.execute("SELECT * FROM " + table + " LIMIT 1").fetchone()
                 if db.execute("SELECT seconds,include_week,include_shopping,autoplay FROM display_settings WHERE id=1").fetchone() is None:
                     raise ValueError("Missing display settings")
+            elif name == "driving-budget.sqlite3":
+                if db.execute("SELECT last_day,blocked FROM state WHERE id=1").fetchone() is None:
+                    raise ValueError("Missing driving budget state")
+                db.execute("SELECT day,kind,used FROM request_days").fetchall()
             elif name == "weather-budget.sqlite3":
                 if db.execute("SELECT last_day,blocked,backup_blocked FROM state WHERE id=1").fetchone() is None:
                     raise ValueError("Missing weather budget state")
@@ -200,6 +209,18 @@ def restore(source, destination):
                 stream.flush()
                 os.fsync(stream.fileno())
 
+        from .driving import DrivingLedger
+        DrivingLedger(str(dest)).block()
+        if "driving-settings.json" in hashes:
+            from .driving_service import config as driving_config
+            driving_path=dest/"driving-settings.json"
+            settings=driving_config(json.loads(read_file(driving_path,16384)))
+            settings.update(enabled=False,consent=False,map_permission=False)
+            with driving_path.open("wb") as stream:
+                stream.write(json.dumps(settings,ensure_ascii=False).encode())
+                stream.flush()
+                os.fsync(stream.fileno())
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -213,7 +234,7 @@ def main():
         print("Backup/restore failed. Check private paths, stopped service, integrity and destination.")
         return 1
     print("Private backup complete." if args.operation == "backup" else
-          "New restored volume ready. Bus and QWeather access blocked pending review. Original volume unchanged.")
+          "New restored volume ready. Bus, QWeather and AMap access blocked pending review. Original volume unchanged.")
     return 0
 
 

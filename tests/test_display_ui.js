@@ -35,9 +35,9 @@ function advance(ms){
   clock=end;
 }
 class XHR {
-  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto","/api/weather/view"].includes(path));this.path=path;}
+  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto","/api/weather/view","/api/driving/view"].includes(path));this.path=path;}
   setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
+  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/driving/view"?{enabled:true,groups:["A","B","C"].map((name,i)=>({name,status:"ok",routes:[{seconds:600+i*60,meters:12000,congested_meters:1000,traffic_covered_meters:12000},{seconds:900,meters:15000,congested_meters:null,traffic_covered_meters:0}],image:"data:image/png;base64,c3ludGhldGlj",fetched_at:"2026-01-05T00:00:00+08:00"}))}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
@@ -57,6 +57,7 @@ doc.hidden=true;events.visibilitychange();const weatherHidden=requests;advance(2
 doc.hidden=false;events.visibilitychange();heading("Example");
 weatherData=weatherExample;advance(30000);heading("Example");assert.equal(el("index").textContent,"");advance(240000);heading("Example");
 click("tasksMode");heading("待办清单");
+click("drivingMode");heading("驾驶");assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,3);assert.equal(descendants(el("body")).filter(n=>n.tag==="img").length,3);assert.ok(descendants(el("body")).some(n=>n.textContent==="1  10分钟"));click("tasksMode");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");assert.equal(el("displayManage").href,"/home#display/return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);

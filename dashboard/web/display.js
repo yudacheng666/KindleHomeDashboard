@@ -49,13 +49,13 @@ function makePages(v){
 }
 function eligible(p){return section==="posters";}
 function tabs(){
-  var active=mode==="bus"||mode==="weather"?mode:section;
-  ["bus","tasks","posters","menus","weather"].forEach(function(t){el(t+"Mode").className=t===active?"selected":"";});
+  var active=mode==="bus"||mode==="weather"||mode==="driving"?mode:section;
+  ["bus","tasks","posters","menus","weather","driving"].forEach(function(t){el(t+"Mode").className=t===active?"selected":"";});
   updateManagementLinks();
   show("familyControls",mode==="family"&&section==="posters");
 }
 function updateManagementLinks(){
-  var target=automatic?"auto":mode==="bus"||mode==="weather"?mode:section;
+  var target=automatic?"auto":mode==="bus"||mode==="weather"||mode==="driving"?mode:section;
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
@@ -522,6 +522,151 @@ el("weatherSave").onclick=function(){
   weatherSettingsRequest({enabled:enabled,consent:consent,name:main.name,latitude:main.latitude,longitude:main.longitude,additional:places});
 };
 
+function acceptDriving(v){
+  data=null;pages=[];cursor=0;stopRotation();stopAge();
+  var key=JSON.stringify(v);
+  if(key!==lastRender){
+    lastRender=key;txt("date","");txt("heading","驾驶");txt("index","");
+    var root=el("body");clear(root);
+    if(!v.enabled||!v.groups.length)append(root,"p","驾驶未启用或未配置，请前往设置。","note");
+    var messages={disabled:"未启用",paused:"不在采集时段",waiting:"等待采集",not_configured:"请在NAS配置高德密钥",credential_error:"高德密钥配置有误",storage_error:"配置或额度存储异常",blocked:"已停止请求，请核查高德账号",stale:"旧数据",unavailable:"暂不可用",ok:""};
+    (v.groups||[]).forEach(function(g){
+      var group=append(root,"section","","driving-group");append(group,"h2",g.name);
+      var pair=append(group,"div","","driving-pair"),map=append(pair,"div","","driving-map"),list=append(pair,"div","","driving-routes");
+      if(typeof g.image==="string"&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(g.image)){
+        var image=append(map,"img","");image.alt=g.name+" 高德路线地图";image.src=g.image;
+      }else append(map,"p","地图暂不可用","note");
+      (g.routes||[]).forEach(function(r,i){
+        var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
+        append(list,"p",text,i===0?"driving-fast":"");
+        append(list,"p",(r.meters/1000).toFixed(1)+"km"+(r.congested_meters===null?" · 路况未知":" · 已知拥堵 "+(r.congested_meters/1000).toFixed(1)+"km"));
+        if(r.traffic_covered_meters<r.meters*0.9&&r.congested_meters!==null)append(list,"p","部分路况未知","driving-foot");
+      });
+      if(!g.routes||!g.routes.length)append(list,"p","暂无可用路线");
+      var note=(messages[g.status]||"")+(g.fetched_at?" · 采集 "+weatherTime(g.fetched_at):"");
+      if(g.routes&&g.routes.length<3&&g.routes.length>0)note+=" · 仅返回"+g.routes.length+"条";
+      if(note)append(group,"p",note,"driving-foot");
+    });
+    append(root,"p","路线及地图：高德地图 · 预计耗时为采集时的估算","driving-foot");
+  }
+  show("login",false);show("display",true);txt("status","");
+}
+var drivingEpoch=0,drivingBusy=false,drivingFields=[];
+function clearDrivingForm(){
+  drivingEpoch++;drivingBusy=false;drivingFields=[];clear(el("drivingGroups"));show("drivingForm",false);txt("drivingSettingStatus","");
+}
+function drivingRequest(path,body,callback){
+  if(!settingsOpen||!token||drivingBusy)return;
+  drivingBusy=true;
+  var g=++drivingEpoch,x=new XMLHttpRequest(),done=false,timer;
+  function finish(ok,v,code){
+    if(done)return;done=true;clearTimeout(timer);
+    if(g!==drivingEpoch||!settingsOpen)return;
+    drivingBusy=false;callback(ok,v,code);
+  }
+  try{
+    x.open(body?"POST":"GET",path,true);
+    if(token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+    if(body)x.setRequestHeader("Content-Type","application/json");
+    x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}finish(x.status===200,v,x.status);};
+    timer=setTimeout(function(){finish(false,null,0);try{x.abort();}catch(e){}},15000);
+    x.send(body?JSON.stringify(body):null);
+  }catch(e){finish(false,null,0);}
+}
+function drivingInput(root,label,value,limit){
+  var wrap=append(root,"label",label),input=append(wrap,"input","");
+  input.type="text";input.maxLength=limit;input.value=value||"";return input;
+}
+function drivingButton(root,label,action){
+  var b=append(root,"button",label);b.type="button";b.onclick=action;return b;
+}
+function drivingTime(min){return ("0"+Math.floor(min/60)).slice(-2)+":"+("0"+(min%60)).slice(-2);}
+function drivingMinutes(value){
+  if(!/^([01]\d|2[0-4]):[0-5]\d$/.test(value))return -1;
+  var parts=value.split(":"),n=Number(parts[0])*60+Number(parts[1]);return n<=1440?n:-1;
+}
+function drivingGroup(group){
+  var root=append(el("drivingGroups"),"section","","driving-fields"),f={root:root};
+  append(root,"h3","目的地设置");
+  var toggle=append(root,"label","启用此目的地"),check=append(toggle,"input","");check.type="checkbox";check.checked=group.enabled!==false;f.enabled=check;
+  f.name=drivingInput(root,"显示名称",group.name,40);
+  f.origin=drivingInput(root,"起点坐标",group.origin,40);
+  f.destination=drivingInput(root,"终点坐标",group.destination,40);
+  var keyword=drivingInput(root,"搜索地点名称","",80),region=drivingInput(root,"城市（可选）","",80),results=append(root,"div","","driving-result");
+  function search(target){
+    if(!el("drivingConsent").checked){txt("drivingSettingStatus","请先确认位置传输及账户额度。");return;}
+    clear(results);
+    if(!keyword.value.trim()){txt("drivingSettingStatus","请输入地点名称。");return;}
+    txt("drivingSettingStatus","搜索中…");
+    drivingRequest("/api/driving/search",{keyword:keyword.value,region:region.value,consent:true},function(ok,v){
+      if(!ok||!v||v.status!=="ok"){
+        txt("drivingSettingStatus","搜索暂不可用，可直接输入高德坐标；请检查账户权限和额度。");return;
+      }
+      txt("drivingSettingStatus",v.locations.length?"请选择地点。":"未找到地点。");
+      v.locations.forEach(function(p){
+        drivingButton(results,p.name+" · "+p.city+p.district+" "+p.address,function(){
+          target.value=p.location;clear(results);txt("drivingSettingStatus","已选地点，请保存设置。");
+        });
+      });
+    });
+  }
+  drivingButton(root,"搜索起点",function(){search(f.origin);});
+  drivingButton(root,"搜索终点",function(){search(f.destination);});
+  f.windows=[];var windows=append(root,"div","");
+  function addWindow(w){
+    var wr=append(windows,"div","","driving-fields"),days=append(wr,"div","","driving-days"),row={root:wr,days:[]};
+    ["一","二","三","四","五","六","日"].forEach(function(n,i){
+      var label=append(days,"label",n),cb=append(label,"input","");cb.type="checkbox";cb.checked=w.days.indexOf(i)>=0;row.days.push(cb);
+    });
+    row.start=drivingInput(wr,"开始（HH:MM）",drivingTime(w.start),5);
+    row.end=drivingInput(wr,"结束（HH:MM，可跨夜）",drivingTime(w.end),5);
+    drivingButton(wr,"删除时段",function(){if(drivingBusy)return;windows.removeChild(wr);f.windows.splice(f.windows.indexOf(row),1);});
+    f.windows.push(row);
+  }
+  (group.windows||[]).forEach(addWindow);
+  drivingButton(root,"添加采集时段",function(){if(!drivingBusy&&f.windows.length<32)addWindow({days:[0,1,2,3,4,5,6],start:420,end:540});});
+  drivingButton(root,"移除此目的地",function(){if(drivingBusy)return;el("drivingGroups").removeChild(root);drivingFields.splice(drivingFields.indexOf(f),1);el("drivingAdd").disabled=false;});
+  drivingFields.push(f);el("drivingAdd").disabled=drivingFields.length>=3;
+}
+function drivingForm(v){
+  clear(el("drivingGroups"));drivingFields=[];
+  el("drivingEnabled").checked=v.enabled;el("drivingConsent").checked=v.consent;el("drivingMapPermission").checked=v.map_permission;
+  el("drivingInterval").value=String(v.interval);
+  (v.groups||[]).forEach(drivingGroup);el("drivingAdd").disabled=drivingFields.length>=3;
+  var b=v.budget;
+  txt("drivingBudget",(v.configured?"高德密钥已配置":"高德密钥未配置")+(b?" · 32天路线/地图 "+b.lbs.used+"/"+b.lbs.limit+" · 搜索 "+b.search.used+"/"+b.search.limit+(b.blocked?" · 已阻断":""):" · 额度存储不可用"));
+  show("drivingForm",true);
+}
+el("drivingLoad").onclick=function(){
+  txt("drivingSettingStatus","读取中…");
+  drivingRequest("/api/driving/settings",null,function(ok,v,code){
+    if(ok&&v&&Array.isArray(v.groups)){drivingForm(v);txt("drivingSettingStatus","已读取");}
+    else txt("drivingSettingStatus",code===401?"需要管理权限。":"读取失败。");
+  });
+};
+el("drivingAdd").onclick=function(){if(!drivingBusy&&drivingFields.length<3)drivingGroup({enabled:true,windows:[{days:[0,1,2,3,4,5,6],start:420,end:540}]});};
+el("drivingSave").onclick=function(){
+  if(drivingBusy)return;
+  var groups=[],enabled=el("drivingEnabled").checked,consent=el("drivingConsent").checked,permission=el("drivingMapPermission").checked;
+  if(enabled&&(!consent||!permission||!drivingFields.length)){txt("drivingSettingStatus","请确认位置和地图使用授权，并添加目的地。");return;}
+  for(var i=0;i<drivingFields.length;i++){
+    var f=drivingFields[i],windows=[],name=f.name.value.trim();
+    if(!name||!f.origin.value.trim()||!f.destination.value.trim()){txt("drivingSettingStatus","请填写第"+(i+1)+"组名称与起终点。");return;}
+    for(var j=0;j<f.windows.length;j++){
+      var w=f.windows[j],start=drivingMinutes(w.start.value),end=drivingMinutes(w.end.value),days=[];
+      w.days.forEach(function(cb,d){if(cb.checked)days.push(d);});
+      if(start<0||start>=1440||end<0||start===end||!days.length){txt("drivingSettingStatus","请检查第"+(i+1)+"组采集时段。");return;}
+      windows.push({days:days,start:start,end:end});
+    }
+    if(f.enabled.checked&&!windows.length){txt("drivingSettingStatus","启用的目的地至少需要一个采集时段。");return;}
+    groups.push({name:name,origin:f.origin.value.trim(),destination:f.destination.value.trim(),enabled:f.enabled.checked,windows:windows});
+  }
+  txt("drivingSettingStatus","保存中…");
+  drivingRequest("/api/driving/settings",{enabled:enabled,consent:consent,map_permission:permission,interval:Number(el("drivingInterval").value),groups:groups},function(ok,v){
+    if(ok&&v&&Array.isArray(v.groups)){drivingForm(v);txt("drivingSettingStatus","已保存");}
+    else txt("drivingSettingStatus","保存失败，请检查坐标、时段和权限。");
+  });
+};
 function modeLabel(){
   txt("modeStatus",automatic?"自动分时 · 按 NAS 采集时段":"手动显示 · 不自动切换模块");updateManagementLinks();
 }
@@ -561,7 +706,7 @@ function refresh(){
         if(mode!==v.mode){resumePage="";forgetResume();mode=v.mode;editing=false;show("options",false);tabs();hide("");}
         v=v.view;
       }
-      if(mode==="bus")acceptBus(v);else if(mode==="weather")acceptWeather(v);else accept(v);
+      if(mode==="bus")acceptBus(v);else if(mode==="weather")acceptWeather(v);else if(mode==="driving")acceptDriving(v);else accept(v);
       modeLabel();
     }
     else if((status===404&&mode==="family")||status===503){show("login",false);show("display",true);hide(status===404?"家庭模块未启用，可切换至公交。":"当前模块暂不可用，可切换其他模块。");}
@@ -569,22 +714,23 @@ function refresh(){
       if(status===401){reset();txt("status","令牌无效，请重新连接。");return;}}
     clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,mode==="bus"?15000:30000);
   }
-  try{x.open("GET",automatic?"/api/display/auto":mode==="bus"?"/api/bus/view":mode==="weather"?"/api/weather/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+  try{x.open("GET",automatic?"/api/display/auto":mode==="bus"?"/api/bus/view":mode==="weather"?"/api/weather/view":mode==="driving"?"/api/driving/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
       var next=automatic&&v?v.mode:mode, payload=automatic&&v?v.view:v;
-      var valid=payload&&(next==="bus"?payload.snapshot&&Array.isArray(payload.snapshot.vehicles):next==="weather"?typeof payload.status==="string"&&payload.sections&&typeof payload.sections==="object":next==="family"&&Array.isArray(payload.tasks)&&Array.isArray(payload.posters)&&Array.isArray(payload.week_menu));
+      var valid=payload&&(next==="bus"?payload.snapshot&&Array.isArray(payload.snapshot.vehicles):next==="weather"?typeof payload.status==="string"&&payload.sections&&typeof payload.sections==="object":next==="driving"?typeof payload.enabled==="boolean"&&Array.isArray(payload.groups):next==="family"&&Array.isArray(payload.tasks)&&Array.isArray(payload.posters)&&Array.isArray(payload.week_menu));
       finish(x.status===200&&valid,v,x.status);};
     timeout=setTimeout(function(){finish(false,null,0);try{x.abort();}catch(e){}},12000);x.send(null);
   }catch(e){finish(false,null,0);}
 }
 function reset(keepResume){
+  clearDrivingForm();
   weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");
   if(keepResume!==true)forgetResume();resumePage="";
   epoch++;busy=false;token="";automatic=false;modeLabel();mode="family";section="tasks";savedKey="";tabs();running=false;editing=false;seconds=180;
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   panel(false);show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#bus"||hash==="#weather")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#bus"||hash==="#weather"||hash==="#driving")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("autoMode").onclick=function(){
   if(!token)return;
   panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";tabs();show("options",false);
@@ -595,11 +741,12 @@ el("postersMode").onclick=function(){switchSection("posters");};
 el("menusMode").onclick=function(){switchSection("menus");};
 el("busMode").onclick=function(){switchMode("bus");};
 el("weatherMode").onclick=function(){switchMode("weather");};
+el("drivingMode").onclick=function(){switchMode("driving");};
 el("previous").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(-1,false);};
 el("next").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(1,false);};
 el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(running)manual();running=!running;render();scheduleRotation();};
 el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
-function closeSettings(){weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
+function closeSettings(){clearDrivingForm();weatherSettingsEpoch++;weatherSettingsBusy=false;clearWeatherSearch();show("weatherForm",false);txt("weatherSettingStatus","");editing=false;panel(false);show("options",false);scheduleRotation();}
 el("returnDisplay").onclick=closeSettings;
 el("weatherNext").onclick=function(){if(mode!=="weather"||weatherPages.length<2||!settingsOpen)return;weatherCursor=(weatherCursor+1)%weatherPages.length;closeSettings();renderWeather();};
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;seconds=n;closeSettings();};

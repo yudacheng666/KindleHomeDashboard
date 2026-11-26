@@ -60,7 +60,13 @@ def main():
                 return {"code":"200","location":[{"name":"Fictional district","adm1":"Fictional province","lat":"1.23","lon":"2.34"},{"name":"Fictional district","adm1":"Other province","lat":"3.45","lon":"4.56"}]}
             return q_current(now)
         weather=WeatherService(directory,ENV,clock=lambda:now,q_transport=fake_weather,backup_transport=lambda u,h:meteo())
-        with LocalServer(API(runtime, reader, admin, household=home, weather=weather), 0) as server:
+        from dashboard.driving_service import DrivingService
+        from test_driving import reply
+        import base64
+        driving=DrivingService(directory,{"KHD_AMAP_KEY":"placeholder_test_credential"},
+            clock=lambda:now,transport=lambda u,h:reply(600,900,1200),
+            image_transport=lambda u:("image/png",base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9gAAAABJRU5ErkJggg==")))
+        with LocalServer(API(runtime, reader, admin, household=home, weather=weather, driving=driving), 0) as server:
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             proc = subprocess.Popen(
@@ -313,6 +319,25 @@ def main():
                 click("weatherRemove");click("weatherSave")
                 wait(lambda:text_in("weatherSettingStatus","已保存"))
                 assert weather.settings_view()["additional"]==[]
+                click("drivingLoad")
+                wait(lambda:text_in("drivingSettingStatus","已读取"))
+                js("document.getElementById('drivingEnabled').checked=true;document.getElementById('drivingConsent').checked=true;document.getElementById('drivingMapPermission').checked=true")
+                for i in range(3):
+                    click("drivingAdd")
+                    js("""var g=document.querySelectorAll('#drivingGroups > section')[arguments[0]], fields=g.querySelectorAll('input[type=text]');
+                        fields[0].value='Example '+arguments[0];fields[1].value='1,2';fields[2].value=(arguments[0]+2)+',3';
+                        fields[5].value='00:00';fields[6].value='24:00';""",[i])
+                click("drivingSave")
+                wait(lambda:text_in("drivingSettingStatus","已保存"))
+                assert len(driving.settings_view()["groups"])==3
+                for _ in range(3): driving.step()
+                click("returnDisplay");click("drivingMode")
+                wait(lambda:js("return document.querySelectorAll('#body .driving-group').length===3"))
+                wait(lambda:js("return Array.from(document.querySelectorAll('#body .driving-map img')).length===3 && Array.from(document.querySelectorAll('#body .driving-map img')).every(function(x){return x.complete&&x.naturalWidth>0;})"))
+                assert text_in("body","10分钟") and text_in("body","20分钟")
+                click("settings");click("drivingLoad")
+                wait(lambda:text_in("drivingSettingStatus","已读取"))
+                assert js("return document.querySelectorAll('#drivingGroups > section').length===3")
                 click("returnDisplay")
                 click("postersMode")
                 wait(lambda:text_in("heading","Fictional reminder"))
