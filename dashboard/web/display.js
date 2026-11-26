@@ -312,7 +312,7 @@ function acceptWeather(v){
   data=null;pages=[];cursor=0;stopRotation();stopAge();
   var key=JSON.stringify(v);
   if(key!==lastRender){
-    lastRender=key;txt("date","");txt("heading",v.name?v.name+" · 天气":"天气");txt("index","");
+    lastRender=key;txt("date","");txt("heading",v.name||"天气");txt("index","");
     var root=el("body"),s=v.sections||{},attrs=[];clear(root);
     if(v.status==="disabled")append(root,"p","天气未启用，请前往设置。","note");
     else if(v.status==="storage_error")append(root,"p","天气配置或限额记录异常，已暂停采集。","note");
@@ -336,7 +336,7 @@ function acceptWeather(v){
       });
       weatherPart(root,s,"rain","未来2小时降水",attrs,weatherRain);
       (v.additional||[]).forEach(function(place){weatherSecondary(root,place,attrs);});
-      if(v.additional&&v.additional.length)append(root,"h2",v.name+" · 主地点预报");
+      if(v.additional&&v.additional.length)append(root,"h2",v.name);
       weatherPart(root,s,"hourly","未来12小时",attrs,function(block,rows){
         var strip=append(block,"div","","weather-strip");
         rows.slice(0,12).forEach(function(h,i){

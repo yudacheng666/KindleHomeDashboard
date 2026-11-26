@@ -42,7 +42,7 @@ vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:
 function click(id){el(id).onclick();}
 function heading(expected){assert.equal(el("heading").textContent,expected);}
 el("token").value="example-display-token";click("connect");heading("待办清单");
-click("weatherMode");heading("Example · 天气");assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent==="暂不可用"));click("tasksMode");heading("待办清单");
+click("weatherMode");heading("Example");assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent==="暂不可用"));click("tasksMode");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");assert.equal(el("displayManage").href,"/home#display/return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);

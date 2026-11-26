@@ -294,6 +294,9 @@ def main():
                 for _ in range(9): weather.step()
                 click("returnDisplay");click("tasksMode");click("weatherMode")
                 wait(lambda:text_in("body","Fictional custom"))
+                assert js("return document.getElementById('heading').textContent==='Fictional district'")
+                assert js("return Array.from(document.querySelectorAll('#body h2')).some(h=>h.textContent==='Fictional district') && Array.from(document.querySelectorAll('#body h2')).some(h=>h.textContent==='Fictional custom')")
+                assert not text_in("body","主地点")
                 assert weather.read()["additional"][0]["sections"]["current"]["status"]=="available"
                 click("settings");click("weatherLoad")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))
