@@ -914,7 +914,7 @@ function refresh(){
     else if(mode==="overview"){show("login",false);show("display",true);txt("status","连接异常，保留上次看板内容；正在等待恢复。");}
     else if((status===404&&mode==="family")||status===503){show("login",false);show("display",true);hide(status===404?"家庭模块未启用，可返回综合看板。":"当前模块暂不可用，可返回综合看板。");}
     else hide(status===404?"家庭模块未启用。":"连接异常，旧内容已隐藏。");
-    clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,mode==="bus"?15000:30000);
+    clearTimeout(refreshTimer);refreshTimer=document.hidden?null:setTimeout(refresh,(mode==="bus"||mode==="overview")?15000:30000);
   }
   try{x.open("GET",automatic?"/api/display/auto":mode==="overview"?"/api/display/overview":mode==="bus"?"/api/bus/view":mode==="weather"?"/api/weather/view":mode==="driving"?"/api/driving/view":"/api/home/view",true);if(token&&token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
     x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}
