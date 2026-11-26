@@ -124,6 +124,19 @@ class ServiceTests(unittest.TestCase):
             restored.search_lines("Example")
         self.assertEqual(len(self.calls), count)
 
+    def test_abbreviations_share_cached_query_but_rank_independently(self):
+        s = self.service()
+        def provider(path, body, city):
+            self.calls.append((path, body))
+            return {"errCode":0,"data":{"trafficStop":[
+                {"lineInfo":{"lineId":"c","lineName":"示例82路C","upDown":0,"startStopName":"A","endStopName":"D"}},
+                {"lineInfo":{"lineId":"d","lineName":"示例82路D","upDown":0,"startStopName":"B","endStopName":"E"}}]}}
+        s.gate.request=provider
+        self.assertEqual(s.search_lines("示82C")[0].line_id,"c")
+        self.assertEqual(s.search_lines("示82D")[0].line_id,"d")
+        self.assertEqual(len(self.calls),1)
+        self.assertEqual(self.calls[0][1]["keywords"],"82")
+
     def test_reverse_uses_returned_opposite_id(self):
         s = self.service()
         def provider(path, body, city):
