@@ -312,11 +312,15 @@ function paintAge(){
     var label=overviewDate(day);
     txt("date",(label||"日期未知")+"\n"+(time||"时间未知"));
   }else txt("date",time);
-  if(!ageNode||!etaSnapshot)return;
+  // Overview has no normal timestamp row, but must still expire cached ETA locally.
+  if(!etaSnapshot||(!ageNode&&(mode!=="overview"||["live","stale","no_live_data"].indexOf(etaSnapshot.status)<0)))return;
   var stamp=etaSnapshot.fetched_at_ms,valid=updateEta(etaRows,etaSnapshot,now);
-  if(busStatusNode)slotSet(busStatusNode,slotStatus(etaSnapshot,valid,mode==="overview"));
-  var label=!isFinite(stamp)||!isFinite(now)||stamp>now?(mode==="overview"?"时间异常":"更新时间未知（请检查 NAS 时间）"):(mode==="overview"?"更新 ":"数据更新于 ")+clockTime(stamp,now)+(valid?"":" · 数据已失去时效");
-  if(ageNode.textContent!==label)ageNode.textContent=label;
+  var badTime=typeof stamp!=="number"||!isFinite(stamp)||!isFinite(now)||stamp>now;
+  if(busStatusNode)slotSet(busStatusNode,mode==="overview"&&badTime?"时间异常":slotStatus(etaSnapshot,valid,mode==="overview"));
+  if(ageNode){
+    var label=badTime?"更新时间未知（请检查 NAS 时间）":"数据更新于 "+clockTime(stamp,now)+(valid?"":" · 数据已失去时效");
+    slotSet(ageNode,label);
+  }
   // The local deadline does not wait for a slow or outstanding LAN read.
   if(valid)expiryTimer=setTimeout(paintAge,90000-(now-stamp));
 }
@@ -693,9 +697,8 @@ function renderDrivingGroups(root,v,limit,summary){
       if(!g.routes||!g.routes.length)append(list,"p","暂无可用路线");
       var note;
       if(summary){
-        var noteParts=[],updated=typeof g.fetched_at==="string"?g.fetched_at.slice(11,16):"";
+        var noteParts=[];
         if(messages[g.status])noteParts.push(messages[g.status]);
-        if(updated)noteParts.push("更新 "+updated);
         if(g.routes&&g.routes.length<3&&g.routes.length>0)noteParts.push("仅 "+g.routes.length+" 条");
         note=noteParts.join(" · ");
       }else{
@@ -875,16 +878,15 @@ function renderOverviewBus(v){
     overviewKeys.bus=key;stopAge();clear(root);
     overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name,"note");
-    var statusText=labels[s.status]||"状态未知";if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
-    busStatusNode=statusText?append(root,"p",statusText,"note"):null;
+    var statusText=Object.prototype.hasOwnProperty.call(labels,s.status)?labels[s.status]:"状态未知";
+    // Empty normal status is hidden by CSS; the same node can show expiry or errors.
+    busStatusNode=append(root,"p",statusText,"note overview-bus-status");
     if(items.length){
       var slots=append(root,"div","","overview-bus-slots");
       for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(slots,i));
     }
-    if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
   }
   items.forEach(function(item,i){etaRows[i].item=item;});
-  if(!items.length&&busStatusNode)slotSet(busStatusNode,labels[s.status]||"状态未知");
   etaSnapshot=s;syncClock(s);paintAge();
 }
 function renderOverviewWeather(){
