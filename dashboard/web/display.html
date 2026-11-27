@@ -151,6 +151,10 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-home-scroll::-webkit-scrollbar-thumb,.overview-driving::-webkit-scrollbar-thumb,#displayHeader.overview-header::-webkit-scrollbar-thumb{background:transparent}
 .overview-home-scroll[data-scrolling="true"],.overview-driving[data-scrolling="true"],#displayHeader.overview-header[data-scrolling="true"]{scrollbar-color:#777 transparent}
 .overview-home-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb,.overview-driving[data-scrolling="true"]::-webkit-scrollbar-thumb,#displayHeader.overview-header[data-scrolling="true"]::-webkit-scrollbar-thumb{background:#777}
+/* Upper regions may scroll on small screens, but must never lose width to
+   scrollbar gutters: their center line aligns with the two bottom columns. */
+.overview-driving,#displayHeader.overview-header{scrollbar-width:none}
+.overview-driving::-webkit-scrollbar,#displayHeader.overview-header::-webkit-scrollbar{display:none;width:0;height:0}
 .overview-task-marker{display:table-cell;width:30px;vertical-align:middle;text-align:left}
 .overview-page .overview-task-marker .overview-task-circle{border:0;background:white;font-size:22px;line-height:1;min-height:32px;width:30px;padding:0;text-align:left;color:#111}
 .overview-task-inactive{font-size:22px;color:#aaa}
