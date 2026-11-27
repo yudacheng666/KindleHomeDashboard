@@ -78,7 +78,7 @@ class DirectTests(unittest.TestCase):
                                  "SAMEORIGIN" if path.startswith("/preview") else "DENY")
                 csp = response.getheader("Content-Security-Policy")
                 self.assertIn("frame-ancestors 'self'" if path.startswith("/preview") else "frame-ancestors 'none'", csp)
-                self.assertEqual("frame-src 'self'" in csp, path == "/admin/display")
+                self.assertEqual("frame-src 'self'" in csp, path == "/admin" or path.startswith("/admin/"))
                 body = response.read()
                 if path.startswith("/admin/"):
                     self.assertIn(b'href="/admin.css"', body)

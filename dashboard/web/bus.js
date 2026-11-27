@@ -5,6 +5,9 @@ var access=typeof window!=="undefined"&&window.KHD_ACCESS||{}, direct=access.dir
 var token="", admin=false, busy=false, generation=0, configuring=false;
 var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false, searchedKeyword="", groups=[], choices=[], ageTimer=null, collectedAt=null, etaRows=[], etaSnapshot=null;
 function el(id){return document.getElementById(id);}
+function notifyPreviewAuth(){if(typeof window!=="undefined"&&window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}
+function notifyPreviewRefresh(){if(typeof window!=="undefined"&&window.KHD_ADMIN_PREVIEW_REFRESH)window.KHD_ADMIN_PREVIEW_REFRESH();}
+if(typeof window!=="undefined")window.KHD_ADMIN_GET_TOKEN=function(){return token;};
 function txt(id,value){var n=el(id);if(n.textContent!==value)n.textContent=value;}
 function show(id,visible){var n=el(id),c=visible?"":"hidden";if(n.className!==c)n.className=c;}
 function note(value){txt("message",typeof location!=="undefined"&&location.pathname==="/admin/bus"&&value==="已保存。"?"":value);}
@@ -146,7 +149,7 @@ function read(){
 }
 function cycle(){read();timer=setTimeout(cycle,15000);}
 function exit(){
-  generation++;token="";admin=false;configuring=false;disable(false);
+  generation++;token="";notifyPreviewAuth();admin=false;configuring=false;disable(false);
   clearTimeout(timer);timer=null;resetSelection();hideData("尚未连接");
   txt("line","尚未配置公交");txt("trip","");el("token").value="";el("keyword").value="";
   show("config",false);show("scheduleConfig",false);clear(el("scheduleRows"));scheduleRows=[];show("dashboard",false);show("login",true);note("");
@@ -157,8 +160,8 @@ el("connect").onclick=function(){
   if(direct&&!token)token="local-direct";
   if(direct&&admin&&!openAdmin&&token==="local-direct"){note("请输入管理凭证。");return;}
   request("GET",admin&&direct&&!openAdmin?"/api/access/admin":"/api/bus/view",null,function(ok,data){
-    if(!ok){token="";note(errorMessage(data.error));return;}
-    show("login",false);show("dashboard",true);show("settings",admin);show("scheduleSettings",admin);if(direct)txt("logout",openAdmin?"重新连接":"管理登录 / 退出");
+    if(!ok){token="";notifyPreviewAuth();note(errorMessage(data.error));return;}
+    notifyPreviewAuth();show("login",false);show("dashboard",true);show("settings",admin);show("scheduleSettings",admin);if(direct)txt("logout",openAdmin?"重新连接":"管理登录 / 退出");
     if(admin&&direct&&!openAdmin)read();else render(data);timer=setTimeout(cycle,15000);
   });
 };
@@ -250,7 +253,7 @@ el("scheduleSave").onclick=function(){
         scheduleFeedback("保存结果与所选设置不一致；请核对当前已保存状态后重试。");return;
       }
       el("scheduleEnabled").value=actual.enabled?"1":"0";
-      scheduleFeedback("设置已保存并确认："+(actual.enabled?"开启。仅在设定时段更新。":"关闭。"));
+      scheduleFeedback("设置已保存并确认："+(actual.enabled?"开启。仅在设定时段更新。":"关闭。"));notifyPreviewRefresh();
     });
   });
 };
@@ -326,7 +329,7 @@ el("save").onclick=function(){
   if(!handle||busy)return;
   request("POST","/api/bus/save",{selection:handle,boarding:Number(el("board").value),destination:Number(el("destination").value)},function(ok,data){
     if(!ok){note(errorMessage(data.error));return;}
-    configuring=false;resetSelection();show("config",false);show("view",true);render(data);note("已保存。");
+    configuring=false;resetSelection();show("config",false);show("view",true);render(data);note("已保存。");notifyPreviewRefresh();
   });
 };
 var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/^#return-(overview|bus|tasks|posters|menus|weather|driving|auto)$/):null;

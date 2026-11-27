@@ -4,10 +4,13 @@
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
 var path=typeof location!=="undefined"?location.pathname:"";
-var preview=path==="/preview"||path==="/preview/auto";
+var preview=path==="/preview"||path==="/preview/auto",adminPreview=false;
 var adminModule=path==="/admin/weather"?"weather":path==="/admin/driving"?"driving":"";
 var autoEntry=path==="/auto"||path==="/preview/auto", automatic=false;
 var seconds=180, editing=false, section="tasks", settingsOpen=false;
+function previewReadOnly(){return preview&&!adminPreview;}
+function notifyPreviewMode(){if(preview&&adminPreview&&window.parent&&window.parent!==window)window.parent.postMessage({type:"khd-preview-mode-change",mode:mode==="family"?section:mode},location.origin);}
+function refreshPreviewData(){epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;if(mode==="overview"){stopOverview();startOverview();}else refresh();}
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
 var weatherPages=[],weatherCursor=0,weatherOrder="",WEATHER_SECONDS=120;
 var overviewTimers={},overviewPending={},overviewRoots={},overviewKeys={},overviewDay="";
@@ -59,9 +62,10 @@ function tabs(){
   var active=mode==="family"?section:mode;
   ["overview","bus","tasks","posters","menus","weather","driving"].forEach(function(t){el(t+"Mode").className=t===active?"selected":"";});
   updateManagementLinks();
-  show("familyControls",mode==="family"&&section==="posters");
+  show("familyControls",mode==="family"&&section==="posters");notifyPreviewMode();
 }
 function updateManagementLinks(){
+  if(preview){["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage","desktopAdminLink"].forEach(function(id){var n=el(id);if(n)n.className="hidden";});return;}
   var target=automatic?"auto":mode==="family"?section:mode;
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
@@ -114,7 +118,7 @@ function render(){
   txt("pause",running?"暂停轮播":"开始轮播");
 }
 function completeTask(t,on,button){
-  if(preview)return;
+  if(previewReadOnly())return;
   if(!token||!data||data.date!==on||(t.occurrence&&t.occurrence>on)||data.can_complete!==true||!(mode==="overview"||(section==="tasks"&&mode==="family"))||settingsOpen)return;
   if(busy||(mode==="overview"&&overviewPending.home)){txt("status","正在同步，请稍后再试。");return;}
   if(!window.confirm("确认完成「"+t.title+"」？完成后保留历史记录。"))return;
@@ -424,7 +428,7 @@ function acceptWeather(v){
   if(next.length<2||settingsOpen||document.hidden)stopRotation();
   else if(rotationTimer===null)scheduleRotation();
 }
-var settingsDetail="",weatherSaved=null,drivingSaved=null;
+var settingsDetail="",weatherSaved=null,drivingSaved=null,adminSettingsAuthorized=false;
 var weatherSettingsEpoch=0,weatherSettingsBusy=false,weatherSearchEpoch=0,weatherSearchBusy=false;
 function settingStatus(k,message){
   txt(k+"SettingStatus",message);
@@ -520,8 +524,8 @@ function weatherSettingsRequest(body){
     if(done)return;done=true;clearTimeout(timer);
     if(g!==weatherSettingsEpoch||!settingsOpen)return;
     weatherSettingsBusy=false;lockForm("weather",false);
-    if(ok&&v&&typeof v.enabled==="boolean"){weatherForm(v);settingStatus("weather",body?"已保存":"已读取");}
-    else {settingStatus("weather",code===401?"需要管理权限，请使用管理令牌连接。":"操作未确认，请核对设置后再试。");show("weatherRetry",el("weatherForm").className==="hidden");}
+    if(ok&&v&&typeof v.enabled==="boolean"){if(adminModule){adminSettingsAuthorized=true;if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}weatherForm(v);settingStatus("weather",body?"已保存":"已读取");if(body){if(adminModule){if(window.KHD_ADMIN_PREVIEW_REFRESH)window.KHD_ADMIN_PREVIEW_REFRESH();}else refreshPreviewData();}}
+    else {if(adminModule){adminSettingsAuthorized=false;if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}settingStatus("weather",code===401?"需要管理权限，请使用管理令牌连接。":"操作未确认，请核对设置后再试。");show("weatherRetry",el("weatherForm").className==="hidden");}
   }
   try{
     x.open(body?"POST":"GET","/api/weather/settings",true);
@@ -732,8 +736,8 @@ function drivingForm(v){
 function loadDriving(){
   show("drivingRetry",false);settingStatus("driving","读取中…");
   drivingRequest("/api/driving/settings",null,function(ok,v,code){
-    if(ok&&v&&Array.isArray(v.groups)){drivingForm(v);settingStatus("driving","已读取");}
-    else {settingStatus("driving",code===401?"需要管理权限。":"读取失败。");show("drivingRetry",true);}
+    if(ok&&v&&Array.isArray(v.groups)){if(adminModule){adminSettingsAuthorized=true;if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}drivingForm(v);settingStatus("driving","已读取");}
+    else {if(adminModule){adminSettingsAuthorized=false;if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}settingStatus("driving",code===401?"需要管理权限。":"读取失败。");show("drivingRetry",true);}
   });
 }
 el("drivingLoad").onclick=function(){if(openDetail("driving"))loadDriving();};
@@ -757,7 +761,7 @@ el("drivingSave").onclick=function(){
   }
   settingStatus("driving","保存中…");
   drivingRequest("/api/driving/settings",{enabled:enabled,consent:consent,map_permission:permission,interval:Number(el("drivingInterval").value),groups:groups},function(ok,v){
-    if(ok&&v&&Array.isArray(v.groups)){drivingForm(v);settingStatus("driving","已保存");}
+    if(ok&&v&&Array.isArray(v.groups)){if(adminModule){adminSettingsAuthorized=true;if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();if(window.KHD_ADMIN_PREVIEW_REFRESH)window.KHD_ADMIN_PREVIEW_REFRESH();}drivingForm(v);settingStatus("driving","已保存");if(!adminModule)refreshPreviewData();}
     else settingStatus("driving","保存失败，请检查坐标、时段和权限。");
   });
 };
@@ -917,7 +921,7 @@ function manual(){
   refreshTimer=setTimeout(refresh,mode==="bus"?15000:30000);modeLabel();
 }
 function switchMode(next){
-  if(preview||adminModule||!token)return;
+  if(previewReadOnly()||adminModule||!token)return;
   if(settingsOpen&&!closeSettings())return;manual();
   if(next===mode)return;
   epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;editing=false;
@@ -925,7 +929,7 @@ function switchMode(next){
   tabs();hide("正在读取");refresh();
 }
 function switchSection(next){
-  if(preview||adminModule||!token)return;
+  if(previewReadOnly()||adminModule||!token)return;
   if(settingsOpen&&!closeSettings())return;manual();
   if(mode!=="family"){section=next;switchMode("family");return;}
   if(section===next)return;
@@ -965,6 +969,7 @@ function refresh(){
   }catch(e){finish(false,null,0);}
 }
 function reset(keepResume){
+  if(adminModule){adminSettingsAuthorized=false;if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}
   clearDrivingForm();clearWeatherForm();setSettingsDetail("");
   if(keepResume!==true)forgetResume();resumePage="";
   epoch++;busy=false;token="";automatic=false;modeLabel();mode="family";section="tasks";savedKey="";tabs();running=false;editing=false;seconds=180;
@@ -973,7 +978,7 @@ function reset(keepResume){
 }
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){if(adminModule){show("login",false);show("display",true);panel(true);el(adminModule+"Load").onclick();return;}automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#overview"||(!hash&&(path==="/"||preview)))){mode="overview";resumePage="";forgetResume();}else if(!automatic&&(hash==="#bus"||hash==="#weather"||hash==="#driving")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("autoMode").onclick=function(){
-  if(preview||adminModule||!token)return;
+  if(previewReadOnly()||adminModule||!token)return;
   if(settingsOpen&&!closeSettings())return;
   panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";if(mode==="overview"){mode="family";hide("");}tabs();show("options",false);
   clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
@@ -989,7 +994,7 @@ el("drivingMode").onclick=function(){switchMode("driving");};
 el("previous").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(-1,false);};
 el("next").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(1,false);};
 el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(running)manual();running=!running;render();scheduleRotation();};
-el("settings").onclick=function(){if(preview||adminModule||!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
+el("settings").onclick=function(){if(previewReadOnly()||adminModule||!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
 function closeSettings(){if(adminModule)return false;if(!leaveDetail())return false;editing=false;panel(false);show("options",false);scheduleRotation();return true;}
 el("returnDisplay").onclick=closeSettings;
 el("weatherNext").onclick=function(){if((mode!=="weather"&&mode!=="overview")||weatherPages.length<2||!settingsOpen)return;if(!closeSettings())return;weatherCursor=(weatherCursor+1)%weatherPages.length;if(mode==="overview")renderOverviewWeather();else renderWeather();};
@@ -1017,7 +1022,28 @@ if(document.addEventListener)document.addEventListener("visibilitychange",functi
     hide("正在重新读取");refresh();
   }
 },false);
-if(adminModule)window.KHD_ADMIN_CAN_LEAVE=canLeaveSettings;
+if(adminModule){window.KHD_ADMIN_CAN_LEAVE=canLeaveSettings;window.KHD_ADMIN_GET_TOKEN=function(){return adminSettingsAuthorized?token:"";};}
 panel(false);show("options",false);txt("version",access.version?"软件版本："+access.version:"软件版本：未知");
+if(preview&&window.parent&&window.parent!==window&&window.addEventListener){
+ window.addEventListener("message",function(event){
+  if(event.origin!==location.origin||event.source!==window.parent||!event.data)return;
+  if(event.data.type==="khd-admin-preview-auth"){
+   var next=typeof event.data.token==="string"&&event.data.token.length<=128?event.data.token:"";
+   if(next===token&&adminPreview===!!next)return;
+   epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;stopOverview();stopAge();stopRotation();
+   adminPreview=!!next;token=next;
+   if(!next){reset();return;}
+   var hash=location.hash||"",sectionMode=["#tasks","#posters","#menus"].indexOf(hash)>=0?hash.slice(1):"tasks";
+   if(hash==="#overview")mode="overview";else if(["#bus","#weather","#driving"].indexOf(hash)>=0)mode=hash.slice(1);else{mode="family";section=sectionMode;}
+   automatic=autoEntry;tabs();refresh();
+  }else if(event.data.type==="khd-admin-preview-mode"){
+   if(!adminPreview||!token)return;
+   var nextMode=event.data.mode;
+   if(["tasks","posters","menus"].indexOf(nextMode)>=0)switchSection(nextMode);
+   else if(["overview","bus","weather","driving"].indexOf(nextMode)>=0)switchMode(nextMode);
+  }else if(event.data.type==="khd-admin-preview-refresh"){refreshPreviewData();}
+ },false);
+ window.parent.postMessage({type:"khd-admin-preview-auth-request"},location.origin);
+}
 if(direct){el("connect").onclick();}
 }());

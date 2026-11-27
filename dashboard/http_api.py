@@ -180,7 +180,7 @@ class Handler(BaseHTTPRequestHandler):
         # Only the dedicated preview document can be framed by the same origin.
         styles = "'self' 'unsafe-inline'" if admin_page else "'unsafe-inline'"
         ancestors = "'self'" if preview_page else "'none'"
-        frames = "; frame-src 'self'" if admin_page and self.path == "/admin/display" else ""
+        frames = "; frame-src 'self'" if admin_page else ""
         self.send_header("Content-Security-Policy",
                          "default-src 'none'; script-src 'self'; style-src " + styles +
                          "; connect-src 'self'; img-src data:; frame-ancestors " + ancestors +
