@@ -86,10 +86,9 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .driving-routes{font-size:18px}
 .overview-page .driving-fast{font-size:26px}
 .overview-page .driving-foot{font-size:16px}
-.overview-page .menu-day,.overview-page .task-day{padding:3px 0;border-bottom:1px solid #555}
-.overview-page .menu-date,.overview-page .task-date{font-size:20px;margin:0 0 2px}
-.overview-page .menu-meal{padding:1px 0}
-.overview-page .menu-meal-label,.overview-page .menu-dishes,.overview-page .task-row{font-size:20px}
+.overview-page .task-day{padding:3px 0;border-bottom:1px solid #555}
+.overview-page .task-date{font-size:20px;margin:0 0 2px}
+.overview-page .task-row{font-size:20px}
 .overview-page .task-action{width:60px}
 .overview-page .task-complete{font-size:18px;padding:2px 4px}
 .module-choices span{display:inline-block;vertical-align:top}
@@ -140,9 +139,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .overview-driving-card .driving-foot{font-size:16px;line-height:1.2;margin:2px 0;word-wrap:break-word}
 .overview-driving-link{display:block;min-height:27px;font-size:16px;line-height:1.2;margin:1px 0}
 .overview-home{border-top:1px solid #555}
-.overview-menu{padding:0}
 .overview-todos{padding:3px 0 0;margin:0}
-.overview-menu:not(:empty)+.overview-todos{border-top:1px solid #555}
 .overview-todo-heading{line-height:1.25}
 .overview-todo-heading .overview-todo-link{display:inline-block;min-height:28px;font-size:19px;margin:0 0 0 8px;vertical-align:baseline;white-space:nowrap}
 .overview-todo-heading .task-date{display:inline-block;margin:0;vertical-align:baseline}
@@ -151,11 +148,10 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
    The final date group contains at least 44px of text/controls or natural space. */
 .overview-page .overview-todos .task-day:last-child,.overview-todos>.overview-todo-heading{box-sizing:border-box;min-height:44px;padding-right:48px;word-wrap:break-word}
 .overview-home>.note{min-height:44px;margin-right:48px}
-.overview-page .menu-day,.overview-page .task-day{padding:3px 0;border-bottom:1px solid #777}
-.overview-menu .menu-day:last-child,.overview-todos .task-day:last-child{border-bottom:0}
-.overview-page .menu-date,.overview-page .task-date{font-size:19px;line-height:1.2;margin:0 0 2px}
-.overview-page .menu-meal{padding:1px 0}
-.overview-page .menu-meal-label,.overview-page .menu-dishes,.overview-page .task-row{font-size:19px;line-height:1.25}
+.overview-page .task-day{padding:3px 0;border-bottom:1px solid #777}
+.overview-todos .task-day:last-child{border-bottom:0}
+.overview-page .task-date{font-size:19px;line-height:1.2;margin:0 0 2px}
+.overview-page .task-row{font-size:19px;line-height:1.25}
 .overview-page .task-action{width:56px}
 .overview-page .task-complete{font-size:16px;padding:1px 4px;min-height:36px}
 /* Overview header shares the date area; keep the dedicated weather page unchanged. */
@@ -184,7 +180,6 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 #overviewWeather .note{font-size:17px;margin:2px 0}
 .overview-bus{box-sizing:border-box;height:149px;border-top:1px solid #555;padding:2px 0}
 .overview-bus .overview-link{display:block;width:100%;height:26px;min-height:26px;padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.overview-menu:empty{display:none}
 /* Reserve height on the section, not on missing rows. Keep all visible text at the top. */
 .overview-page .overview-bus-direction,.overview-page .overview-bus-status{box-sizing:border-box;max-height:21px;line-height:21px;margin:0;overflow:auto}
 .overview-page .overview-bus-status{font-size:16px}

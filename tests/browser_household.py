@@ -397,7 +397,7 @@ def main():
                 readable = """return (function(){
                   var nav=document.getElementById('displayNav'), menu=document.getElementById('settingsMenu');
                   var visible=function(n){return n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0;};
-                  var rules=[['.overview-link',19],['.driving-route-row',18],['.driving-routes',18],['.driving-foot',16],['.menu-dishes',19],['.task-row',19]];
+                  var rules=[['.overview-link',19],['.driving-route-row',18],['.driving-routes',18],['.driving-foot',16],['.task-row',19]];
                   var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return (r[0]==='.driving-foot'||nodes.length>0)&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
                   return nav.querySelectorAll('button').length===1&&visible(document.getElementById('settings'))
                     &&menu.contains(document.getElementById('busMode'))&&!visible(document.getElementById('busMode'))
@@ -413,8 +413,8 @@ def main():
                   var border=function(n,side){return parseFloat(getComputedStyle(n)['border'+side+'Width']);};
                   return border(grid,'Top')===0&&border(grid,'Bottom')===0&&border(root.querySelector('.overview-driving'),'Top')===1&&border(home,'Top')===1
                     &&Array.from(cards).every(function(n){return border(n,'Bottom')===0;})
-                    &&(!menu.lastElementChild||border(menu.lastElementChild,'Bottom')===0)
-                    &&border(todo,'Top')===(menu.children.length?1:0)
+                    &&!menu&&home.children.length===1&&home.firstElementChild===todo&&border(todo,'Top')===0
+                    &&!root.querySelector('.menu-day,.menu-meal,.menu-dishes')&&root.textContent.indexOf('Fictional dish')<0&&root.textContent.indexOf('暂无菜单')<0
                     &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height===0;});
                 })()""")
                 assert js("""return (function(){

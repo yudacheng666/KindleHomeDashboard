@@ -932,24 +932,9 @@ function renderOverviewDriving(v){
 function renderOverviewHome(v){
   overviewDay=v.date;data=v;paintAge();
   var tasks=Array.isArray(v.upcoming_tasks)?v.upcoming_tasks:v.tasks;
-  var next=new Date(v.date+"T00:00:00Z");next.setUTCDate(next.getUTCDate()+1);
-  var tomorrow=isNaN(next.getTime())?"":next.toISOString().slice(0,10);
-  var menus=v.week_menu.filter(function(m){return m.day===v.date||m.day===tomorrow;});
-  var includeTomorrow=!!tomorrow&&(menus.some(function(m){return m.day===tomorrow;})||!!(v.menu_range&&v.menu_range.first<=tomorrow&&v.menu_range.last>=tomorrow));
-  var key=JSON.stringify([v.date,tasks,menus,includeTomorrow,v.can_complete]);if(key===overviewKeys.home)return;
+  var key=JSON.stringify([v.date,tasks,v.can_complete]);if(key===overviewKeys.home)return;
   overviewKeys.home=key;var root=overviewRoots.home;clear(root);
-  var menuRoot=append(root,"section","","overview-menu"),todoRoot=append(root,"section","","overview-todos");
-  var names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
-  (includeTomorrow?[v.date,tomorrow]:[v.date]).forEach(function(day){
-    var meals=menus.filter(function(m){return m.day===day;});
-    if(day===v.date&&!meals.length)return;
-    var group=append(menuRoot,"section","","menu-day");
-    overviewLink(group,day.slice(5).replace("-","/")+" "+(day===v.date?"今日":"明日"),function(){switchSection("menus");});
-    meals.sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
-      var row=append(group,"div","","menu-meal");append(row,"span",names[m.meal],"menu-meal-label");append(row,"span",m.dishes.join("、"),"menu-dishes");
-    });
-    if(!meals.length)append(group,"p","暂无菜单","note");
-  });
+  var todoRoot=append(root,"section","","overview-todos");
   function todoLink(heading){
     var label=tasks.length>3?"待办（"+tasks.length+"）":"待办";
     var link=overviewLink(heading,label,function(){switchSection("tasks");});link.className+=" overview-todo-link";
@@ -981,7 +966,7 @@ function overviewFailure(k,status){
   if(k==="weather"){weatherPages=[];weatherOrder="";weatherCursor=0;stopRotation();show("weatherDisplayControls",false);}
   if(k==="home"){data=null;overviewDay="";paintAge();}
   delete overviewKeys[k];var root=overviewRoots[k];clear(root);
-  var names={bus:"公交",weather:"天气",driving:"驾驶",home:"菜单与待办"};
+  var names={bus:"公交",weather:"天气",driving:"驾驶",home:"待办"};
   overviewLink(root,names[k],function(){if(k==="home")switchSection("tasks");else switchMode(k);});
   append(root,"p",status===404?"模块未启用":"暂不可用，旧内容已隐藏","note");
 }
