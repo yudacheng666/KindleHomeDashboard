@@ -1036,6 +1036,11 @@ if(preview&&window.parent&&window.parent!==window&&window.addEventListener){
    var hash=location.hash||"",sectionMode=["#tasks","#posters","#menus"].indexOf(hash)>=0?hash.slice(1):"tasks";
    if(hash==="#overview")mode="overview";else if(["#bus","#weather","#driving"].indexOf(hash)>=0)mode=hash.slice(1);else{mode="family";section=sectionMode;}
    automatic=autoEntry;tabs();refresh();
+  }else if(event.data.type==="khd-admin-preview-mode"){
+   if(!adminPreview||!token)return;
+   var nextMode=event.data.mode;
+   if(["tasks","posters","menus"].indexOf(nextMode)>=0)switchSection(nextMode);
+   else if(["overview","bus","weather","driving"].indexOf(nextMode)>=0)switchMode(nextMode);
   }else if(event.data.type==="khd-admin-preview-refresh"){refreshPreviewData();}
  },false);
  window.parent.postMessage({type:"khd-admin-preview-auth-request"},location.origin);

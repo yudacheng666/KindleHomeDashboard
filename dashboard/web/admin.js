@@ -85,7 +85,17 @@ function sendAuth(){
  if(!value&&access.direct===true&&lastPreviewAuth===null)return;
  frame.contentWindow.postMessage({type:"khd-admin-preview-auth",token:value},location.origin);lastPreviewAuth=value;
 }
-function loadFrame(next){var src=next==="auto"?"/preview/auto":"/preview#"+next;if(frame.getAttribute("src")===src){sendAuth();return;}frame.src=src;}
+var frameReady=false;
+function onFrameLoad(){frameReady=true;sendAuth();}
+function loadFrame(next){
+ var src=next==="auto"?"/preview/auto":"/preview#"+next,current=frame.getAttribute("src")||"",basePath=current.split("#")[0];
+ if(frameReady&&next!=="auto"&&(basePath==="/preview"||basePath===location.origin+"/preview")){
+  frame.contentWindow.postMessage({type:"khd-admin-preview-mode",mode:next},location.origin);
+  frame.setAttribute("src",src);sendAuth();return;
+ }
+ if(current===src){sendAuth();return;}
+ frameReady=false;frame.src=src;
+}
 function resize(){
  if(!frame)return;
  var edge=device?Math.round(Math.min(w,h)*0.055):0,bottom=device?Math.round(Math.min(w,h)*0.105):0,outerW=w+edge*2,outerH=h+edge+bottom;
@@ -101,11 +111,11 @@ mode.onchange=function(){follow=mode.value==="follow";loadFrame(follow?moduleMod
 window.KHD_ADMIN_PREVIEW_SET_MODE=function(next){if(follow)loadFrame(next);};
 window.KHD_ADMIN_PREVIEW_REFRESH=function(){if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type:"khd-admin-preview-refresh"},location.origin);};
 window.KHD_ADMIN_PREVIEW_AUTH=function(){sendAuth();};
-if(frame.addEventListener)frame.addEventListener("load",sendAuth);else frame.onload=sendAuth;
+if(frame.addEventListener)frame.addEventListener("load",onFrameLoad);else frame.onload=onFrameLoad;
 if(window.addEventListener)window.addEventListener("message",function(event){
  if(event.origin!==location.origin||event.source!==frame.contentWindow||!event.data)return;
  if(event.data.type==="khd-admin-preview-auth-request")sendAuth();
- else if(event.data.type==="khd-preview-mode-change"&&!follow&&["overview","bus","weather","driving","tasks","posters","menus"].indexOf(event.data.mode)>=0)mode.value=event.data.mode;
+ else if(event.data.type==="khd-preview-mode-change"&&!follow&&["overview","bus","weather","driving","tasks","posters","menus"].indexOf(event.data.mode)>=0){mode.value=event.data.mode;frame.setAttribute("src","/preview#"+event.data.mode);}
 },false);
 width.title=height.title="默认尺寸仅为示例，可按实际设备视口修改。";oneButton.title="网页 CSS 像素 1:1，非物理尺寸";appearance.title="通用外框与灰阶模拟，不对应特定实体型号";
 loadFrame(moduleMode());resize();window.addEventListener("resize",resize);
