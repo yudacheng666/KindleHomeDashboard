@@ -308,7 +308,7 @@ function paintAge(){
   if(mode==="overview"){
     var day=isFinite(now)?new Date(now+zoneOffset*60000).toISOString().slice(0,10):overviewDay;
     var label=overviewDate(day);
-    txt("date",(label||"日期未知")+"\n"+(time||"时间未知"));
+    slotSet(overviewRoots.clock,time||"时间未知");slotSet(overviewRoots.day,label||"日期未知");
   }else txt("date",time);
   // Overview has no normal timestamp row, but must still expire cached ETA locally.
   if(!etaSnapshot||(!ageNode&&(mode!=="overview"||["live","stale","no_live_data"].indexOf(etaSnapshot.status)<0)))return;
@@ -856,11 +856,15 @@ function overviewLink(root,label,action){
 }
 function stopOverview(){
   Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
+  if(overviewRoots.clock)clear(el("date"));
   overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
   clear(el("overviewWeather"));show("overviewWeather",false);el("displayHeader").className="";el("displayNav").setAttribute("data-overview","false");
 }
 function overviewLayout(){
   var root=el("body");clear(root);root.className="overview-page";
+  var dateRoot=el("date");txt("date","");clear(dateRoot);
+  overviewRoots.clock=append(dateRoot,"span","时间未知","overview-clock");
+  overviewRoots.day=append(dateRoot,"span","日期未知","overview-day");
   overviewRoots.bus=append(root,"section","","overview-bus");
   overviewRoots.weather=el("overviewWeather");clear(overviewRoots.weather);show("overviewWeather",true);el("displayHeader").className="overview-header";el("displayNav").setAttribute("data-overview","true");
   overviewRoots.driving=append(root,"div","","overview-driving");

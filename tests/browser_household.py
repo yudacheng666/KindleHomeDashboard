@@ -417,6 +417,14 @@ def main():
                     &&Math.abs(w.left+parseFloat(getComputedStyle(document.getElementById('overviewWeather')).borderLeftWidth)+parseFloat(getComputedStyle(document.getElementById('overviewWeather')).paddingLeft)-c[1].querySelector('h2').getBoundingClientRect().left)<=1
                     &&b.width>=document.getElementById('body').getBoundingClientRect().width-2&&c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2;
                 })()""")
+                wait(lambda:js("return !!document.querySelector('#overviewWeather .weather-main')"))
+                header_type = """return (function(){
+                  var clock=document.querySelector("#date .overview-clock"),day=document.querySelector("#date .overview-day"),temp=document.querySelector("#overviewWeather .weather-main"),summary=document.querySelector("#overviewWeather .weather-summary");
+                  if(!clock||!day||!temp||!summary)return false;
+                  var same=function(a,b){var x=getComputedStyle(a),y=getComputedStyle(b);return ["fontFamily","fontSize","fontWeight","lineHeight"].every(function(k){return x[k]===y[k];})&&Math.abs(a.getBoundingClientRect().top-b.getBoundingClientRect().top)<=1;};
+                  return clock.nextElementSibling===day&&same(clock,temp)&&same(day,summary)&&parseFloat(getComputedStyle(clock).fontSize)>parseFloat(getComputedStyle(day).fontSize)&&getComputedStyle(day).fontWeight==="400";
+                })()"""
+                assert js(header_type)
                 footer_layout = """return (function(){
                   var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),content=document.getElementById("displayContent").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
                   return Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(a.top-b.top)<=2
@@ -430,6 +438,7 @@ def main():
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
                 assert js(footer_layout)
+                assert js(header_type)
                 # At a narrow viewport, scrolling must not move or hide settings.
                 assert js("""var c=document.getElementById("displayContent");return c.scrollHeight>c.clientHeight""")
                 js("""var c=document.getElementById("displayContent");c.scrollTop=c.scrollHeight""")
