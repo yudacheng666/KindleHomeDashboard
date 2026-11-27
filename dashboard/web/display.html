@@ -83,9 +83,18 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .weather-alert{margin:2px 0;padding:2px}
 .overview-page .driving-group{padding:4px 0;border-top:0;border-bottom:1px solid #555}
 .overview-page .driving-group h2{font-size:22px;margin:0 0 2px}
-.overview-page .driving-routes{font-size:18px}
-.overview-page .driving-fast{font-size:26px}
+.overview-page .driving-map{width:50%}
+.overview-page .driving-map img{max-height:176px}
+.overview-page .driving-routes{font-size:20px}
+.overview-page .driving-fast{font-size:22px}
+.overview-page .driving-route{display:table;width:100%;table-layout:fixed;margin:4px 0;line-height:1.2}
+.overview-page .driving-route span{display:table-cell;vertical-align:middle;white-space:nowrap}
+.overview-page .driving-route-number{width:1.2em}
+.overview-page .driving-route-time{width:5em}
+.overview-page .driving-route-distance{text-align:right}
+.overview-page .driving-route.driving-fast{font-size:22px;font-weight:bold}
 .overview-page .driving-foot{font-size:16px}
+@media(max-width:420px){.overview-page .driving-pair{display:block}.overview-page .driving-map,.overview-page .driving-routes{display:block;width:100%;padding:0}.overview-page .driving-map img{max-width:100%;max-height:176px}}
 .overview-page .menu-day,.overview-page .task-day{padding:3px 0;border-bottom:1px solid #555}
 .overview-page .menu-date,.overview-page .task-date{font-size:20px;margin:0 0 2px}
 .overview-page .menu-meal{padding:1px 0}

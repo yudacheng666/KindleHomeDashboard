@@ -365,12 +365,26 @@ def main():
                 assert text_in("body","另 1 个目的地")
                 assert not text_in("body","已知拥堵") and not text_in("body","路况未知")
                 assert js("return Array.from(document.querySelectorAll('#body .driving-routes')).every(function(n){return /km/.test(n.textContent)&&/分钟/.test(n.textContent);})")
+                compact_layout = """return (function(){
+                  var pairs=Array.prototype.slice.call(document.querySelectorAll('#body .driving-pair'));
+                  return pairs.length===2&&pairs.every(function(pair){
+                    var image=pair.querySelector('.driving-map img');
+                    var rows=Array.prototype.slice.call(pair.querySelectorAll('.driving-route'));
+                    return image&&image.getBoundingClientRect().height<=176&&rows.length>=2&&rows.every(function(row){
+                      var cells=row.children;
+                      if(cells.length!==3)return false;
+                      var a=cells[0].getBoundingClientRect(),b=cells[1].getBoundingClientRect(),c=cells[2].getBoundingClientRect();
+                      return Math.abs(a.top-b.top)<1&&Math.abs(b.top-c.top)<1;
+                    });
+                  });
+                })()"""
+                assert js(compact_layout)
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
                 # Real rendered sizes, visible header geometry and reachable navigation.
                 readable = """return (function(){
                   var nav=document.getElementById('displayNav'), menu=document.getElementById('settingsMenu');
                   var visible=function(n){return n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0;};
-                  var rules=[['.overview-link',20],['.driving-fast',26],['.driving-routes',18],['.driving-foot',16],['.menu-dishes',20],['.task-row',20]];
+                  var rules=[['.overview-link',20],['.driving-fast',22],['.driving-routes',20],['.driving-foot',16],['.menu-dishes',20],['.task-row',20]];
                   var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return nodes.length>0&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
                   return nav.querySelectorAll('button').length===1&&visible(document.getElementById('settings'))
                     &&menu.contains(document.getElementById('busMode'))&&!visible(document.getElementById('busMode'))
