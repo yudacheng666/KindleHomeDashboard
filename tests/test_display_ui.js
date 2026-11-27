@@ -266,12 +266,23 @@ console.log("Household display simulation passed: automatic switching, override,
 // The embedded admin preview is interactive only after its same-origin parent
 // supplies the already-verified session token; credentials never enter the URL.
 {
-  const parent={messages:[],postMessage(message,origin){this.messages.push([message,origin]);}};
+  const previewNodes={},previewEvents={},parent={messages:[],postMessage(message,origin){this.messages.push([message,origin]);}};
+  const previewDoc={
+    getElementById(id){return previewNodes[id]||(previewNodes[id]=new Node(id));},
+    createElement(tag){return new Node(tag);},
+    addEventListener(n,f){previewEvents["doc:"+n]=f;}
+  };
+  const pEl=id=>previewDoc.getElementById(id);
+  const pDesc=n=>n.children.flatMap(c=>[c,...pDesc(c)]);
   let posted=0;
   const current={...sample,can_complete:true,upcoming_tasks:[task]};
   class PreviewXHR {
     open(method,path){this.method=method;this.path=path;}
-    setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer parent-admin-token");}
+    setRequestHeader(k,v){
+      if(k==="Authorization")assert.equal(v,"Bearer parent-admin-token");
+      else if(k==="Content-Type")assert.equal(v,"application/json");
+      else assert.fail("Unexpected request header "+k);
+    }
     send(body){
       if(this.method==="GET"){assert.equal(this.path,"/api/home/view");this.status=200;this.responseText=JSON.stringify(current);}
       else{
@@ -283,16 +294,16 @@ console.log("Household display simulation passed: automatic switching, override,
     }
     abort(){}
   }
-  const previewEvents={},previewWindow={parent,addEventListener(n,f){previewEvents[n]=f;},confirm:()=>true};
+  const previewWindow={parent,addEventListener(n,f){previewEvents[n]=f;},confirm:()=>true};
   vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{
-    document:doc,window:previewWindow,location:{pathname:"/preview",hash:"#tasks",origin:"http://127.0.0.1"},
+    document:previewDoc,window:previewWindow,location:{pathname:"/preview",hash:"#tasks",origin:"http://127.0.0.1"},
     XMLHttpRequest:PreviewXHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer
   });
   assert.ok(parent.messages.some(x=>x[0].type==="khd-admin-preview-auth-request"));
-  assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,0);
+  assert.equal(pDesc(pEl("body")).filter(n=>n.className==="task-complete").length,0);
   previewEvents.message({origin:"http://127.0.0.1",source:parent,data:{type:"khd-admin-preview-auth",token:"parent-admin-token"}});
-  assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,1);
-  const complete=descendants(el("body")).find(n=>n.className==="task-complete");
+  assert.equal(pDesc(pEl("body")).filter(n=>n.className==="task-complete").length,1);
+  const complete=pDesc(pEl("body")).find(n=>n.className==="task-complete");
   complete.onclick();assert.equal(posted,1);
-  assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,0);
+  assert.equal(pDesc(pEl("body")).filter(n=>n.className==="task-complete").length,0);
 }
