@@ -11,6 +11,7 @@ from .http_api import API, LocalServer, tls_context
 from .household import Household
 from .runtime import Runtime, Window
 from .service import BusService
+from .budget import BUS_DAILY_LIMIT
 from .trip_store import TripStore
 from .weather_service import WeatherService
 from .driving_service import DrivingService
@@ -44,12 +45,12 @@ def apply_private_settings(args, env):
     except (ValueError, ZoneInfoNotFoundError):
         raise ValueError("Invalid local timezone") from None
     if args.daily_limit is None:
-        value = env.get("KHD_BUS_DAILY_LIMIT", "1000")
+        value = env.get("KHD_BUS_DAILY_LIMIT", str(BUS_DAILY_LIMIT))
         if not re.fullmatch(r"[0-9]{1,4}", value):
-            raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
+            raise BusSettingsError(f"KHD_BUS_DAILY_LIMIT must be 1 to {BUS_DAILY_LIMIT}")
         args.daily_limit = int(value)
-    if not 1 <= args.daily_limit <= 1000:
-        raise BusSettingsError("KHD_BUS_DAILY_LIMIT must be 1 to 1000")
+    if not 1 <= args.daily_limit <= BUS_DAILY_LIMIT:
+        raise BusSettingsError(f"KHD_BUS_DAILY_LIMIT must be 1 to {BUS_DAILY_LIMIT}")
     enabled = env.get("KHD_BUS_ENABLED", "0")
     if enabled not in ("0", "1"):
         raise BusSettingsError("KHD_BUS_ENABLED must be 0 or 1")
@@ -79,8 +80,8 @@ def startup_settings(args, env):
             raise
         args.enable_bus = False
         args.window = []
-        if type(args.daily_limit) is not int or not 1 <= args.daily_limit <= 1000:
-            args.daily_limit = 1000
+        if type(args.daily_limit) is not int or not 1 <= args.daily_limit <= BUS_DAILY_LIMIT:
+            args.daily_limit = BUS_DAILY_LIMIT
         return str(exc)
     return ""
 

@@ -17,7 +17,7 @@ class PrivateSettingsTests(unittest.TestCase):
         self.assertFalse(a.enable_bus)
         self.assertEqual(a.window,[])
         self.assertEqual(a.timezone,"Asia/Shanghai")
-        self.assertEqual(a.daily_limit,1000)
+        self.assertEqual(a.daily_limit,3000)
 
     def test_explicit_environment(self):
         a=apply_private_settings(args(),{"KHD_BUS_ENABLED":"1",
@@ -28,11 +28,18 @@ class PrivateSettingsTests(unittest.TestCase):
         self.assertEqual(a.timezone,"UTC")
         self.assertEqual(a.daily_limit,42)
 
+    def test_raised_bus_limit_and_explicit_legacy_limit(self):
+        for limit in (1000, 1001, 3000):
+            with self.subTest(limit=limit):
+                a=apply_private_settings(args(), {"KHD_BUS_DAILY_LIMIT":str(limit)})
+                self.assertEqual(a.daily_limit,limit)
+        self.assertEqual(apply_private_settings(args(daily_limit=3000),{}).daily_limit,3000)
+
     def test_invalid_values_fail_closed(self):
         for env in ({"KHD_BUS_ENABLED":"yes"},{"KHD_BUS_ENABLED":"1"},
                     {"KHD_BUS_WINDOWS":"invalid"},{"KHD_BUS_WINDOWS":"1:12:00-13:00;"},
                     {"KHD_TIMEZONE":"not/a/zone"},{"KHD_BUS_DAILY_LIMIT":"0"},
-                    {"KHD_BUS_DAILY_LIMIT":"1001"},{"KHD_BUS_DAILY_LIMIT":"true"},
+                    {"KHD_BUS_DAILY_LIMIT":"3001"},{"KHD_BUS_DAILY_LIMIT":"true"},
                     {"KHD_BUS_WINDOWS":"x"*2049}):
             with self.subTest(keys=list(env)):
                 with self.assertRaises(ValueError):
@@ -48,7 +55,7 @@ class PrivateSettingsTests(unittest.TestCase):
             self.assertNotIn("invalid-private-value",error)
             self.assertFalse(a.enable_bus)
             self.assertEqual(a.window,[])
-            self.assertEqual(a.daily_limit,1000)
+            self.assertEqual(a.daily_limit,3000)
             with TemporaryDirectory() as directory:
                 bus=BusService(directory,enabled=a.enable_bus,config_error=True)
                 self.assertEqual(bus.read().snapshot.status,"config_error")

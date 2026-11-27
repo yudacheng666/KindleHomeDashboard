@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from threading import RLock
 
-from .budget import RequestGate
+from .budget import BUS_DAILY_LIMIT, RequestGate
 from .bus import BusError, Poller, Snapshot, parse, post
 from .routes import Line, Route, Trip, search, search_keyword, rank_lines, detail, revalidate
 from .trip_store import TripStore
@@ -21,7 +21,7 @@ class BusView:
 
 class BusService:
     def __init__(self, directory, *, enabled=False, clock=lambda: datetime.now(timezone.utc),
-                 request=post, daily_limit=1000, config_error=False):
+                 request=post, daily_limit=BUS_DAILY_LIMIT, config_error=False):
         self.clock = clock
         self.config_error = config_error
         if config_error:
