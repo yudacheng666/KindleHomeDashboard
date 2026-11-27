@@ -1,10 +1,10 @@
 # Kindle 单页综合看板（统一实现候选）
 
-## rc.44 关键数字字体分级（已合并，发布构建中）
+## rc.44 关键数字字体分级（已发布）
 
 PR #53 从 rc.43 基线修改总览展示层：数字与单位分层，宽视口（≥560×550 CSS px）时钟/天气数字40px、公交首车40px/次车32px（异常提示同时显示时分别32px/26px）、最快路线数字28px，单位16px，家庭正文24px；421px以下保留原字号，长天气文本回退原字号。只强调数字，不整体缩放。
 
-六区域边界、顶部与天气对齐、公交固定预算139px、驾驶起始位置、地图尺寸、底部双栏高度及滚动规则保持。真实 Chromium 使用同一 DOM/虚构数据/768×640 视口禁用和启用字体样式比较几何，地图高154px、底部100px、页面无溢出；另测320px窄屏、公交实时/计划/失效、小时分钟耗时、滚动与文本裁切。170项 Python、Node 离线界面、Chromium、Docker、公开树和 gitleaks 全通过（PR CI 46022758284、push CI 46022748985、合并后 main CI 46023261914）。PR #53 候选 1cbdb649e472722aa0d3da44a3d19c229e31f0ca，squash 合并 a2aec5da461251dc6551ffb5a013b2be0bec503f；VERSION 已更新为 v0.1.0-rc.44，发布工作流待核验。rc.43 保留回退。自动化浏览器不等于真实 Kindle 验收；未在 NAS 安装，旧 Kindle 浏览器的实际字形、尺寸与灰阶仍待现场确认。PR #51 的电脑端预览校准不属于本次范围，保持独立。
+六区域边界、顶部与天气对齐、公交固定预算139px、驾驶起始位置、地图尺寸、底部双栏高度及滚动规则保持。真实 Chromium 使用同一 DOM/虚构数据/768×640 视口禁用和启用字体样式比较几何，地图高154px、底部100px、页面无溢出；另测320px窄屏、公交实时/计划/失效、小时分钟耗时、滚动与文本裁切。170项 Python、Node 离线界面、Chromium、Docker、公开树和 gitleaks 全通过（PR CI 46022758284、push CI 46022748985、合并后 main CI 46023261914）。PR #53 候选 1cbdb649e472722aa0d3da44a3d19c229e31f0ca，squash 合并 a2aec5da461251dc6551ffb5a013b2be0bec503f；VERSION v0.1.0-rc.44，发布工作流 46023760648 全部成功；amd64/arm64 镜像构建、镜像测试及匿名拉取成功，镜像与 preview 摘要 sha256:07d720b7dbb52bfa119a499047e86dc38e89ccd8ae589fd83f12ed452bc8afc5；[Release rc.44](https://github.com/yudacheng666/KindleHomeDashboard/releases/tag/v0.1.0-rc.44) 和 [compose.release.yaml](https://github.com/yudacheng666/KindleHomeDashboard/releases/download/v0.1.0-rc.44/compose.release.yaml) 已核对。rc.43 保留回退。自动化浏览器不等于真实 Kindle 验收；未在 NAS 安装，旧 Kindle 浏览器的实际字形、尺寸与灰阶仍待现场确认。PR #51 的电脑端预览校准不属于本次范围，保持独立。
 
 状态：PR #41 已合并；候选 d2703065e78e2fcac1420c118fcef29297ce3653，push/PR CI 45989349450/45989367850 全部通过（离线界面、公交独立失效定时、480×640 分隔线/空行、Chromium、Docker、隐私检查）；合并 8252c97c664bfec98e8e7d760b80c416c7530546，与已测候选树一致。VERSION v0.1.0-rc.34，发布提交 ac4e71d55dab2d32cf44506e9d228f725c1aa736；合并/版本 CI 45989511459/45989550675 成功，[发布工作流 45989551005](https://github.com/yudacheng666/KindleHomeDashboard/actions/runs/45989551005) 四任务全部成功，amd64/arm64、匿名拉取及 preview 更新已验证；版本及 preview 摘要 sha256:f5778f68260aee2129400767ae0381fbe8c0cdd3f79812842bca79081c8c89b7。[Release rc.34](https://github.com/yudacheng666/KindleHomeDashboard/releases/tag/v0.1.0-rc.34) 及 compose.release.yaml 已核对。GHCR 自动可见性设置警告不影响下载。真实 NAS/Kindle 未验收，rc.33 保留回退。
 
