@@ -26,7 +26,22 @@ ASSETS = {"/": ("display.html", "text/html; charset=utf-8"),
           "/home.js": ("home.js", "application/javascript; charset=utf-8"),
           "/display": ("display.html", "text/html; charset=utf-8"),
           "/auto": ("display.html", "text/html; charset=utf-8"),
-          "/display.js": ("display.js", "application/javascript; charset=utf-8")}
+          "/display.js": ("display.js", "application/javascript; charset=utf-8"),
+          "/admin": ("admin.html", "text/html; charset=utf-8"),
+          "/admin/system": ("admin.html", "text/html; charset=utf-8"),
+          "/admin/display": ("home.html", "text/html; charset=utf-8"),
+          "/admin/family": ("home.html", "text/html; charset=utf-8"),
+          "/admin/bus": ("bus.html", "text/html; charset=utf-8"),
+          "/admin/weather": ("display.html", "text/html; charset=utf-8"),
+          "/admin/driving": ("display.html", "text/html; charset=utf-8"),
+          "/admin.css": ("admin.css", "text/css; charset=utf-8"),
+          "/admin.js": ("admin.js", "application/javascript; charset=utf-8"),
+          "/preview": ("display.html", "text/html; charset=utf-8"),
+          "/preview/auto": ("display.html", "text/html; charset=utf-8")}
+
+ADMIN_PAGES = frozenset(("/admin", "/admin/system", "/admin/display", "/admin/family",
+                        "/admin/bus", "/admin/weather", "/admin/driving"))
+PREVIEW_PAGES = frozenset(("/preview", "/preview/auto"))
 
 
 def _public_version():
@@ -154,15 +169,22 @@ class Handler(BaseHTTPRequestHandler):
         raw = json.dumps(payload, ensure_ascii=False, default=_default).encode()
         self.send_content(status, raw, "application/json; charset=utf-8")
 
-    def send_content(self, status, raw, content_type):
+    def send_content(self, status, raw, content_type, *, admin_page=False, preview_page=False):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("X-Frame-Options", "SAMEORIGIN" if preview_page else "DENY")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        # Only the dedicated preview document can be framed by the same origin.
+        styles = "'self' 'unsafe-inline'" if admin_page else "'unsafe-inline'"
+        ancestors = "'self'" if preview_page else "'none'"
+        frames = "; frame-src 'self'" if admin_page and self.path == "/admin/display" else ""
+        self.send_header("Content-Security-Policy",
+                         "default-src 'none'; script-src 'self'; style-src " + styles +
+                         "; connect-src 'self'; img-src data:; frame-ancestors " + ancestors +
+                         "; base-uri 'none'; form-action 'none'" + frames)
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(raw)
@@ -203,7 +225,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(503, {"error": "service_error"})
                 return
             # Static shell only; no secrets, configuration or live data.
-            self.send_content(200, raw, content_type)
+            admin_page = self.path in ADMIN_PAGES
+            if admin_page:
+                raw = raw.replace(b"</head>", b'<link rel="stylesheet" href="/admin.css"></head>', 1)
+                raw = raw.replace(b"<body>", b'<body class="desktop-admin">', 1)
+                raw = raw.replace(b"</body>", b'<script src="/admin.js"></script></body>', 1)
+            self.send_content(200, raw, content_type, admin_page=admin_page,
+                              preview_page=self.path in PREVIEW_PAGES)
             return
         if self.path == "/api/access/admin":
             if self.guard(True):

@@ -334,5 +334,6 @@ var returnMode=returnMatch?returnMatch[1]:"bus";
 el("returnLink").href=returnMode==="auto"?"/auto":"/display#"+returnMode;
 // Only an active editor can have unsaved changes. A read-only cache poll does not prevent navigation.
 el("returnLink").onclick=function(){return !configuring||(!busy&&window.confirm("放弃未保存的公交设置？"));};
+if(typeof location!=="undefined"&&location.pathname==="/admin/bus")window.KHD_ADMIN_CAN_LEAVE=el("returnLink").onclick;
 if(direct){el("mode").value=openAdmin?"admin":"read";el("connect").onclick();}
 }());

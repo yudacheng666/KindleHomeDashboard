@@ -148,6 +148,8 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 #settingsPanel button,#settingsPanel input,#settingsPanel select,#settingsPanel .driving-fields label,#settingsPanel #weatherResults small{font-size:20px}
 #settingsPanel .status{font-size:18px}
 @media(max-width:360px){.bus-first .eta{font-size:38px}.bus-first .eta.bus-state{font-size:24px}.bus-next .eta{font-size:28px}.bus-time,.bus-next .bus-time{font-size:18px}}
+
+#desktopAdminLink{display:none}@media(min-width:900px){#desktopAdminLink{display:block;margin:8px 0;color:#1d4ed8;font-weight:bold}}
 </style></head>
 <body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button></div>
 <p id="status" class="status" role="status"></p>
@@ -155,7 +157,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 <div id="displayNav"><button id="settings" type="button" aria-label="设置" title="设置">设置</button></div>
 <div id="displayContent"><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
 <div id="settingsPanel" class="hidden"><button id="returnDisplay" type="button">返回看板</button><h1>设置</h1>
-<div id="settingsMenu"><h2>显示设置</h2><div id="detailLinks" class="module-choices"><span><button id="overviewMode" type="button">总览</button></span><span><button id="busMode" type="button">公交</button></span><span><button id="tasksMode" type="button">待办</button></span><span><button id="postersMode" type="button">海报</button></span><span><button id="menusMode" type="button">菜单</button></span><span><button id="drivingMode" type="button">驾驶</button></span><span><button id="weatherMode" type="button">天气</button></span></div><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
+<div id="settingsMenu"><a id="desktopAdminLink" href="/admin">电脑管理后台</a><h2>显示设置</h2><div id="detailLinks" class="module-choices"><span><button id="overviewMode" type="button">总览</button></span><span><button id="busMode" type="button">公交</button></span><span><button id="tasksMode" type="button">待办</button></span><span><button id="postersMode" type="button">海报</button></span><span><button id="menusMode" type="button">菜单</button></span><span><button id="drivingMode" type="button">驾驶</button></span><span><button id="weatherMode" type="button">天气</button></span></div><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
 <div id="weatherDisplayControls" class="hidden"><p class="status">天气地点轮播 · 每2分钟</p><button id="weatherNext" type="button">下一地点并返回看板</button></div>
 <div id="familyControls" class="hidden"><button id="previous" type="button">上一页</button><button id="next" type="button">下一页</button><button id="pause" type="button">开始轮播</button></div>
 <div id="options" class="hidden"><label for="seconds">本次海报停留时间</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select><p class="status">本次调整不修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>
