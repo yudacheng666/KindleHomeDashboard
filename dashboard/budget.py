@@ -11,6 +11,9 @@ from threading import RLock
 from .bus import AccessBlocked, BusError, post
 
 
+BUS_DAILY_LIMIT = 3000
+
+
 class BudgetWait(BusError):
     def __init__(self, message, code="local_budget_wait"):
         super().__init__(message)
@@ -18,9 +21,9 @@ class BudgetWait(BusError):
 
 
 class RequestGate:
-    def __init__(self, store, *, enabled=False, daily_limit=1000, min_gap=2,
+    def __init__(self, store, *, enabled=False, daily_limit=BUS_DAILY_LIMIT, min_gap=2,
                  request=post, clock=lambda: datetime.now(timezone.utc), disabled_code="bus_disabled"):
-        if (type(daily_limit) is not int or not 1 <= daily_limit <= 1000
+        if (type(daily_limit) is not int or not 1 <= daily_limit <= BUS_DAILY_LIMIT
                 or type(min_gap) is not int or not 2 <= min_gap <= 3600):
             raise ValueError("Invalid local request budget")
         self.enabled, self.daily_limit, self.min_gap = enabled, daily_limit, min_gap

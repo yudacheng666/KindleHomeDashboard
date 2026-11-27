@@ -38,7 +38,7 @@ class ServiceTests(unittest.TestCase):
             data = {"stopArriveInfo": {"currentBusArriveTime": eta}}
         return {"errCode": 0, "data": data}
 
-    def service(self, enabled=True, daily_limit=1000):
+    def service(self, enabled=True, daily_limit=3000):
         return BusService(self.temp.name, enabled=enabled, clock=lambda: self.now,
                           request=self.request, daily_limit=daily_limit)
 
@@ -187,6 +187,41 @@ class ServiceTests(unittest.TestCase):
         self.advance(86400)
         restored.search_lines("Other")
         self.assertEqual(len(self.calls), 2)
+
+    def test_upgrade_preserves_used_budget_and_block(self):
+        old = self.service(daily_limit=1000)
+        with old.gate._db() as db:
+            db.execute("UPDATE budget SET day=?, used=1000 WHERE id=1",
+                       (self.now.date().isoformat(),))
+        with self.assertRaises(BudgetWait) as caught:
+            old.search_lines("Example")
+        self.assertEqual(caught.exception.code, "local_daily_limit")
+        new = self.service()
+        new.search_lines("Example")
+        self.assertEqual(len(self.calls), 1)
+        with new.gate._db() as db:
+            self.assertEqual(db.execute("SELECT used FROM budget").fetchone()[0], 1001)
+            db.execute("UPDATE budget SET used=2999 WHERE id=1")
+        self.advance(2)
+        new.gate("/traffic/v1/querybusline", {}, "310100")
+        self.advance(2)
+        with self.assertRaises(BudgetWait) as caught:
+            self.service().search_lines("Other")
+        self.assertEqual(caught.exception.code, "local_daily_limit")
+        self.assertEqual(len(self.calls), 2)
+        with new.gate._db() as db:
+            db.execute("UPDATE budget SET blocked=1 WHERE id=1")
+        self.advance(86400)
+        with self.assertRaises(AccessBlocked):
+            self.service().search_lines("Other")
+        self.assertEqual(len(self.calls), 2)
+
+    def test_default_budget_and_hard_ceiling(self):
+        store = TripStore(self.temp.name)
+        self.assertEqual(RequestGate(store).daily_limit, 3000)
+        self.assertEqual(BusService(self.temp.name).gate.daily_limit, 3000)
+        with self.assertRaises(ValueError):
+            RequestGate(store, daily_limit=3001)
 
     def test_failed_request_counts(self):
         s = self.service(daily_limit=1)
