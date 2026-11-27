@@ -71,3 +71,43 @@ body.desktop-admin{margin:0;max-width:none;padding:0;background:#f5f7fb;color:#1
 .desktop-admin.admin-weather #weatherDetail>h2,.desktop-admin.admin-driving #drivingDetail>h2{display:none}
 
 .desktop-admin #view .bus-next{padding:4px 0}.desktop-admin #view .bus-next .bus-details{margin-top:2px}
+
+
+/* Fixed three-column desktop workbench: settings scroll independently, preview stays visible. */
+.desktop-admin .admin-main{height:100vh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.desktop-admin .admin-content{flex:1;min-height:0;height:auto;max-width:none;margin:0;padding:16px 18px 18px;overflow:hidden}
+.desktop-admin .admin-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(390px,min(36vw,520px));gap:18px;height:100%;min-height:0;align-items:stretch}
+.desktop-admin .admin-work-main{min-width:0;min-height:0;overflow:auto;padding:0 7px 18px 0}
+.desktop-admin .admin-work-main>.admin-banner{margin:0 0 14px;padding:0}
+.desktop-admin .admin-work-main>.admin-banner h1{font-size:25px;margin:0 0 12px}
+.desktop-admin .admin-preview-panel{position:sticky;top:0;align-self:start;min-width:0;height:100%;max-height:100%;overflow:auto;background:#fff;border:1px solid #e0e6ef;border-radius:11px;padding:14px;box-shadow:0 2px 8px rgba(26,48,80,.035)}
+.desktop-admin .admin-preview-panel>h2{font-size:18px;margin:0 0 10px}
+.desktop-admin .admin-preview-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
+.desktop-admin .admin-preview-controls label{min-width:0;font-size:12px;color:#57657b}
+.desktop-admin .admin-preview-controls input,.desktop-admin .admin-preview-controls select{width:100%;font-size:13px;min-height:34px;padding:5px 7px}
+.desktop-admin .admin-preview-actions{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 10px}
+.desktop-admin .admin-preview-actions button{font-size:12px;min-height:34px;padding:5px 9px;margin:0}
+.desktop-admin .admin-preview-stage{height:calc(100vh - 238px);max-height:none;min-height:240px;padding:10px;overflow:auto}
+.desktop-admin .admin-preview-wrap{position:relative}
+.desktop-admin .admin-preview-screen iframe{max-width:none}
+.desktop-admin .admin-preview-error{margin:3px 0;color:#a12626;font-size:12px}
+.desktop-admin .admin-module-setting-summary{padding:9px 12px;background:#f7f9fc;border:1px solid #e5eaf1;border-radius:7px;color:#526078}
+.desktop-admin.admin-family #home>#date,.desktop-admin.admin-family #home>#logout{display:none!important}
+.desktop-admin.admin-family #home>#tabs{margin-top:4px}
+.desktop-admin.admin-family .admin-family-content{grid-template-columns:minmax(0,1fr)}
+.desktop-admin.admin-family .admin-family-content:has(#editor:not(.hidden)):has(#content:not(.hidden)){grid-template-columns:minmax(0,1.35fr) minmax(260px,1fr)}
+.desktop-admin.admin-family #editor{grid-column:2;grid-row:1}
+.desktop-admin.admin-family #content{grid-column:1;grid-row:1}
+@media(max-width:1120px){
+ .desktop-admin .admin-workspace{grid-template-columns:minmax(0,1fr) minmax(350px,39vw);gap:12px}
+ .desktop-admin .admin-content{padding:12px}
+ .desktop-admin .admin-preview-panel{padding:10px}
+}
+@media(max-width:860px){
+ .desktop-admin .admin-main{height:auto;min-height:100vh;overflow:visible}
+ .desktop-admin .admin-content{height:auto;overflow:visible}
+ .desktop-admin .admin-workspace{grid-template-columns:minmax(0,1fr);height:auto}
+ .desktop-admin .admin-work-main{overflow:visible}
+ .desktop-admin .admin-preview-panel{position:static;height:auto;max-height:none}
+ .desktop-admin .admin-preview-stage{height:auto;max-height:620px}
+}
