@@ -19,7 +19,7 @@ const shopping={id:"test-item",label:"Example ingredient",completed:0};
 const sample={date,tasks:[task],posters:[poster],today_menu:[meal],week_menu:[meal],shopping:[shopping]};
 const bus={trip:{line:{name:"Example line"},boarding:{name:"A"},destination:{name:"B"}},snapshot:{status:"live",vehicles:[{position:1,eta_min:4,distance_m:300,stops_remaining:1},{position:2,eta_min:9,distance_m:null,stops_remaining:null}],scheduled_departures:0,fetched_at:"2026-01-05T00:00:00+00:00"}};
 let data=sample,fail=0,requests=0,clock=0,nextId=1,busRequests=0,busData=bus, autoMode="family", autoRequests=0;
-const weatherExample={status:"ready",name:"Example",sections:{current:{status:"available",source:"QWeather",fetched_at:"2026-01-05T00:00:00Z",attributions:[],data:{temp:20,text:"晴",time:"2026-01-05T00:00:00Z"}}}};
+const weatherExample={status:"ready",name:"Example",sections:{current:{status:"available",source:"QWeather",fetched_at:"2026-01-05T00:00:00Z",attributions:["Example data provider"],data:{temp:20,text:"晴",time:"2026-01-05T00:00:00Z"}}}};
 let weatherData=weatherExample;
 const timers=new Map();
 class FakeDate extends Date {static now(){return Date.parse(bus.snapshot.fetched_at)+clock;}}
@@ -37,7 +37,7 @@ function advance(ms){
 class XHR {
   open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto","/api/weather/view","/api/driving/view"].includes(path));this.path=path;}
   setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/driving/view"?{enabled:true,groups:["A","B","C"].map((name,i)=>({name,status:"ok",routes:[{seconds:600+i*60,meters:12000,congested_meters:1000,traffic_covered_meters:12000},{seconds:900,meters:15000,congested_meters:null,traffic_covered_meters:0}],image:"data:image/png;base64,c3ludGhldGlj",fetched_at:"2026-01-05T00:00:00+08:00"}))}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
+  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/driving/view"?{enabled:true,groups:["A","B","C"].map((name,i)=>({name,status:"ok",routes:[{seconds:600+i*60,meters:12000,congested_meters:i===0?0:1000,traffic_covered_meters:i===1?6000:12000},{seconds:900,meters:15000,congested_meters:null,traffic_covered_meters:0}],image:"data:image/png;base64,c3ludGhldGlj",fetched_at:"2026-01-05T00:00:00+08:00"}))}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
@@ -61,13 +61,18 @@ doc.hidden=false;events.visibilitychange();
 assert.equal(el("body").className,"overview-page");
 assert.equal(el("displayNav").className,"");
 assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,2);
+assert.ok(descendants(el("body")).some(n=>n.textContent==="12.0km"));
+assert.ok(descendants(el("body")).some(n=>n.textContent==="15.0km"));
+assert.ok(!descendants(el("body")).some(n=>/已知拥堵|路况未知|路线及地图：高德地图/.test(n.textContent)));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="另 1 个目的地 · 全部路线"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example dish"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example task"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="20°　晴"));
+assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data provider/.test(n.textContent)||/qweather\.com|open-meteo\.com/.test(n.href||"")));
+assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));
 click("settings");assert.equal(el("manageLink").href,"/bus#return-overview");click("returnDisplay");
 data=sample;weatherData=weatherExample;
-click("weatherMode");heading("Example");assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
+click("weatherMode");heading("Example");assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data provider/.test(n.textContent)||/qweather\.com|open-meteo\.com/.test(n.href||"")));assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
 advance(240000);heading("Example");assert.equal(el("index").textContent,"");
 weatherData={...weatherExample,additional:[{...weatherExample,name:"Example second",sections:{current:{...weatherExample.sections.current,data:{...weatherExample.sections.current.data,temp:25}}}}]};
 advance(30000);heading("Example");assert.equal(el("index").textContent,"1 / 2");
@@ -89,7 +94,7 @@ assert.ok(descendants(el("body")).some(n=>n.textContent==="明日"));
 assert.ok(descendants(el("body")).some(n=>n.textContent.indexOf("2030/01/01")===0));
 assert.ok(!descendants(el("body")).some(n=>n.className==="task-complete"));
 data=sample;
-click("drivingMode");heading("驾驶");assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,3);assert.equal(descendants(el("body")).filter(n=>n.tag==="img").length,3);assert.ok(descendants(el("body")).some(n=>n.textContent==="1  10分钟"));click("tasksMode");heading("待办清单");
+click("drivingMode");heading("驾驶");assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,3);assert.equal(descendants(el("body")).filter(n=>n.tag==="img").length,3);assert.ok(descendants(el("body")).some(n=>n.textContent==="1  10分钟"));assert.ok(descendants(el("body")).some(n=>n.textContent==="12.0km · 已知拥堵 0.0km"));assert.ok(descendants(el("body")).some(n=>n.textContent==="12.0km · 已知拥堵 1.0km"));assert.ok(descendants(el("body")).some(n=>n.textContent==="15.0km · 路况未知"));assert.ok(descendants(el("body")).some(n=>n.textContent==="部分路况未知"));click("tasksMode");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");assert.equal(el("displayManage").href,"/home#display/return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);
