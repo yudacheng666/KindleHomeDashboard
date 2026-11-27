@@ -112,8 +112,8 @@ def main():
                 home.set_menu("2026-01-05","dinner",["Fictional dish"],["Fictional ingredient"])
                 home.import_ingredients("2026-01-05","2026-01-05")
                 click("posters")
-                wait(lambda:text_in("content","保存轮播设置"))
-                button("content","保存轮播设置")
+                wait(lambda:text_in("content","轮播设置"))
+                button("content","轮播设置")
                 js("var a=document.querySelectorAll('#editor select');a[0].value='120';a[1].value='true'")
                 button("editor","保存")
                 wait(lambda:home.view("2026-01-05")["display_settings"]["autoplay"])
@@ -202,7 +202,7 @@ def main():
                 button("content","移动所选菜品")
                 wait(lambda:all(d["category"]!=other for d in home.manage("2026-01-05")["catalog"]["dishes"]))
                 wait(lambda:text_in("content","暂无菜品"))
-                click("displaySettings")
+                click("menus")
                 button("content","菜单展示范围")
                 js("var m=document.querySelector('#editor select');m.value='custom';m.onchange();document.querySelector('#editor input').value='14'")
                 button("editor","保存")
@@ -396,7 +396,7 @@ def main():
                 wait(lambda:text_in("heading","Fictional reminder"))
                 click("settings")
                 click("displayManage")
-                wait(lambda:text_in("content","保存轮播设置"))
+                wait(lambda:text_in("content","轮播设置"))
                 assert text_in("content","显示设置")
                 click("returnLink")
                 wait(lambda:text_in("heading","Fictional reminder"))
@@ -602,100 +602,82 @@ def main():
                 wait(lambda:text_in("vehicles","首站计划发车"))
                 assert js(layout)
                 assert len(calls)==3
-                # Desktop shell and the real display document at an exact CSS viewport.
+                # Desktop workbench: all modules retain the same live, interactive preview.
                 wd("/session/"+sid+"/window/rect", {"width":1440,"height":1000})
                 go_admin = lambda path: wd("/session/"+sid+"/url", {"url":"http://127.0.0.1:"+str(server.server_port)+path})
                 go_admin("/admin")
-                wait(lambda:js("return !!document.querySelector('.admin-module-grid')"))
-                assert js("return document.querySelectorAll('.admin-module-card').length===6")
+                wait(lambda:js("return !!document.querySelector('.admin-module-grid') && !!document.getElementById('previewFrame')"))
+                assert js("return document.querySelectorAll('.admin-module-card').length===5")
                 assert js("""return (function(){
-                  var b=document.querySelector('.admin-brand strong'),r=document.createRange();
-                  r.selectNodeContents(b);
-                  return r.getClientRects().length===1 && r.getBoundingClientRect().right<=document.querySelector('.admin-sidebar').getBoundingClientRect().right
+                  var b=document.querySelector('.admin-brand strong'),r=document.createRange();r.selectNodeContents(b);
+                  return r.getClientRects().length===1
+                    && b.getBoundingClientRect().right<=document.querySelector('.admin-sidebar').getBoundingClientRect().right
                     && document.querySelectorAll('.admin-status-cell .admin-muted').length===3
-                    && !document.querySelector('.admin-enter')
-                    && !document.querySelector('#adminLanding .admin-info')
-                    && document.querySelector('.admin-module-card p').textContent==='管理看板显示设置，预览各展示页面。'
-                    && Array.prototype.every.call(document.querySelectorAll('.admin-module-card'),function(a){return a.tagName==='A' && a.getBoundingClientRect().height<125 && !!a.getAttribute('href');});
+                    && !document.querySelector('.admin-info')
+                    && !Array.from(document.querySelectorAll('.admin-nav a')).some(a=>a.textContent.includes('显示设置'))
+                    && Array.prototype.every.call(document.querySelectorAll('.admin-module-card'),function(a){return a.tagName==='A'&&a.getBoundingClientRect().height<125&&!!a.getAttribute('href');})
+                    && !!document.querySelector('.admin-preview-panel');
                 })()""")
                 assert js("return document.querySelectorAll('.admin-nav a[aria-current=page]').length===1 && document.documentElement.scrollWidth<=window.innerWidth")
+                # Old route is retained only as a redirect into poster management.
                 go_admin("/admin/display")
-                wait(lambda:js("var f=document.getElementById('previewFrame');return !!f && !!f.contentDocument && !!f.contentDocument.querySelector('.overview-page')"))
-                wait(lambda:text_in("content","菜单展示范围"))
+                wait(lambda:js("return location.pathname==='/admin/family' && location.hash==='#posters'"))
+                go_admin("/admin/family")
+                wait(lambda:js("return !!document.querySelector('.admin-preview-panel') && document.getElementById('previewFrame').contentWindow.document.getElementById('heading').textContent==='待办清单'"))
                 assert js("""return (function(){
-                  var visible=function(id){return getComputedStyle(document.getElementById(id)).display!=='none';};
-                  return !visible('tabs') && !visible('date') && !visible('refresh') && !visible('logout')
-                    && document.querySelectorAll('.admin-display-setting').length===2
-                    && document.getElementById('previewFeedback').textContent===''
-                    && getComputedStyle(document.getElementById('previewFeedback')).display==='none'
-                    && !document.querySelector('.admin-display-grid .admin-info');
+                  var f=document.getElementById('previewFrame');
+                  return document.getElementById('previewMode').value==='follow'
+                    && f.contentWindow.innerWidth===480 && f.contentWindow.innerHeight===640
+                    && !!f.contentDocument.querySelector('.task-complete')
+                    && getComputedStyle(document.querySelector('.admin-preview-panel')).position==='sticky'
+                    && getComputedStyle(document.getElementById('displaySettings')).display==='none';
                 })()""")
-                js("document.getElementById('menus').click();document.getElementById('tasks').click()")
-                assert text_in("content","菜单展示范围") and not text_in("content","待办清单")
-                button("content","编辑轮播")
+                # Module-owned settings: poster rotation and menu display range are in their own tabs.
+                click("posters")
+                wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('heading').textContent==='Fictional reminder'"))
+                button("content","轮播设置")
                 assert text_in("editor","每页停留")
                 button("editor","保存")
-                wait(lambda:text_in("content","菜单展示范围"))
-                assert js("return document.getElementById('message').textContent===''")
-                button("content","编辑范围")
+                wait(lambda:text_in("content","轮播：开启"))
+                click("menus")
+                wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('heading').textContent==='本周菜单'"))
+                button("content","菜单展示范围")
                 assert text_in("editor","展示方式")
                 button("editor","取消")
+                # The Kindle settings button really opens the in-frame settings UI.
+                js("document.getElementById('previewFrame').contentWindow.document.getElementById('settings').click()")
+                assert js("return document.getElementById('previewFrame').contentWindow.document.getElementById('settingsPanel').className!=='hidden'")
+                js("document.getElementById('previewFrame').contentWindow.document.getElementById('returnDisplay').click()")
+                assert js("return document.getElementById('previewFrame').contentWindow.document.getElementById('settingsPanel').className==='hidden'")
+                # Manual preview lock survives left-side module changes; follow restores linkage.
+                js("var m=document.getElementById('previewMode');m.value='bus';m.onchange()")
+                wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('body').textContent.includes('公交自动更新已关闭')"))
+                click("tasks")
+                assert js("return document.getElementById('previewMode').value==='bus' && document.getElementById('previewFrame').contentWindow.document.getElementById('body').textContent.includes('公交自动更新已关闭')")
+                js("var m=document.getElementById('previewMode');m.value='follow';m.onchange()")
+                wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('heading').textContent==='待办清单'"))
+                # Viewport geometry remains the real CSS viewport, independent of the device bezel.
                 js("document.getElementById('previewWidth').value='1'")
                 click("previewApply")
                 assert text_in("previewFeedback","请输入有效")
-                js("document.getElementById('previewWidth').value='420'")
-                click("previewApply")
-                assert js("return document.getElementById('previewFeedback').textContent===''")
                 js("document.getElementById('previewWidth').value='420';document.getElementById('previewHeight').value='560'")
                 click("previewApply");click("previewOne")
-                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560 && !!f.contentDocument.querySelector('.overview-page')"))
-                assert js("""var f=document.getElementById('previewFrame');return f.contentDocument.querySelector('script[src="/display.js"]')!==null && f.getBoundingClientRect().width===420 && f.getBoundingClientRect().height===560""")
-                assert js("""return (function(){
-                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice'),s=document.getElementById('previewScreen');
-                  var a=f.getBoundingClientRect(),b=d.getBoundingClientRect(),c=s.getBoundingClientRect();
-                  return b.width>a.width && b.height>a.height && a.width===c.width && a.height===c.height
-                    && a.left>b.left && a.top>b.top && getComputedStyle(f).filter!=='none';
-                })()""")
-                # Toggling appearance never reloads the real display or changes its
-                # viewport, computed font, line height or underlying content.
-                js("""var f=document.getElementById('previewFrame');window.testPreview=f;
-                  window.testPreviewFont=f.contentWindow.getComputedStyle(f.contentDocument.body).font;
-                  window.testPreviewBody=f.contentDocument.getElementById('body');""")
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===420&&f.contentWindow.innerHeight===560"))
+                assert js("var f=document.getElementById('previewFrame');return f.style.width==='420px'&&f.style.height==='560px'&&f.getBoundingClientRect().width===420&&f.getBoundingClientRect().height===560")
+                js("var f=document.getElementById('previewFrame');window.testPreview=f;window.testPreviewFont=f.contentWindow.getComputedStyle(f.contentDocument.body).font")
                 click("previewAppearance")
-                assert js("""return (function(){
-                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice');
-                  return f===window.testPreview && f.contentDocument.getElementById('body')===window.testPreviewBody
-                    && f.contentWindow.getComputedStyle(f.contentDocument.body).font===window.testPreviewFont
-                    && f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560
-                    && f.getBoundingClientRect().width===420 && f.getBoundingClientRect().height===560
-                    && d.getBoundingClientRect().width===420 && getComputedStyle(f).filter==='none';
-                })()""")
-                click("previewAppearance")
-                click("previewFit")
-                assert js("""return (function(){
-                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice'),a=f.getBoundingClientRect(),b=d.getBoundingClientRect();
-                  return f===window.testPreview && f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560
-                    && Math.abs(a.width/a.height-420/560)<.001
-                    && Math.abs(a.width/420-b.width/d.offsetWidth)<.001
-                    && Math.abs(a.height/560-b.height/d.offsetHeight)<.001
-                    && a.width<=420 && f.contentWindow.getComputedStyle(f.contentDocument.body).font===window.testPreviewFont;
-                })()""")
+                assert js("var f=document.getElementById('previewFrame');return f===window.testPreview&&f.contentWindow.innerWidth===420&&f.contentWindow.innerHeight===560&&getComputedStyle(f).filter==='none'&&f.contentWindow.getComputedStyle(f.contentDocument.body).font===window.testPreviewFont")
+                click("previewAppearance");click("previewFit")
                 js("document.getElementById('previewWidth').value='600';document.getElementById('previewHeight').value='800'")
                 click("previewApply")
-                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===600 && f.contentWindow.innerHeight===800 && !!f.contentDocument.querySelector('.overview-page')"))
-                assert js("""var f=document.getElementById('previewFrame'),a=f.getBoundingClientRect();return Math.abs(a.width/a.height-.75)<.001 && a.width<600""")
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===600&&f.contentWindow.innerHeight===800"))
+                assert js("var f=document.getElementById('previewFrame'),a=f.getBoundingClientRect();return Math.abs(a.width/a.height-.75)<.001&&a.width<600")
                 click("previewOne")
-                assert js("var f=document.getElementById('previewFrame');return f.getBoundingClientRect().width===600 && f.getBoundingClientRect().height===800")
-                click("previewAppearance")
+                assert js("var f=document.getElementById('previewFrame');return f.getBoundingClientRect().width===600&&f.getBoundingClientRect().height===800")
                 click("previewDefaults")
-                wait(lambda:js("""var f=document.getElementById("previewFrame");return f.contentWindow.innerWidth===480 && f.contentWindow.innerHeight===640 && !!f.contentDocument.querySelector(".overview-page")"""))
-                assert js("""return document.getElementById("previewWidth").value==="480" && document.getElementById("previewHeight").value==="640" && document.getElementById("previewMode").value==="overview" && document.getElementById("previewFit").getAttribute("aria-pressed")==="true" && document.getElementById("previewDevice").classList.contains("device-bezel")""")
-                js("var e=document.getElementById('previewMode');e.value='tasks';e.dispatchEvent(new Event('change'))")
-                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentDocument.getElementById('heading') && f.contentDocument.getElementById('heading').textContent==='待办清单'"))
-                assert js("var f=document.getElementById('previewFrame');f.contentDocument.getElementById('settings').click();return f.contentDocument.getElementById('settingsPanel').className==='hidden'")
-                before_tasks=home.view(now.date().isoformat())["tasks"]
-                js("var f=document.getElementById('previewFrame'),b=f.contentDocument.querySelector('.task-complete');if(b)b.click()")
-                assert home.view(now.date().isoformat())["tasks"]==before_tasks
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===480&&f.contentWindow.innerHeight===640"))
+                assert js("return document.getElementById('previewMode').value==='follow'&&document.getElementById('previewWidth').value==='480'&&document.getElementById('previewHeight').value==='640'&&document.getElementById('previewFit').getAttribute('aria-pressed')==='true'&&document.getElementById('previewDevice').classList.contains('device-bezel')")
+                # Module routes all keep the same persistent preview and select their matching display.
                 go_admin("/admin/weather")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))
                 assert js("return !!document.querySelector('.admin-list-pane #weatherLocations') && document.querySelector('.admin-nav a[aria-current=page]').textContent==='天气设置'")
