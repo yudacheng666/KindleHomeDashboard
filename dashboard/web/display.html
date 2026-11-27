@@ -144,9 +144,13 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-todos{padding:3px 0 0;margin:0}
 .overview-menu:not(:empty)+.overview-todos{border-top:1px solid #555}
 .overview-todo-heading{line-height:1.25}
-.overview-todo-heading .overview-todo-link{display:inline-block;min-height:28px;font-size:19px;margin:0 8px 0 0;vertical-align:baseline}
+.overview-todo-heading .overview-todo-link{display:inline-block;min-height:28px;font-size:19px;margin:0 0 0 8px;vertical-align:baseline;white-space:nowrap}
 .overview-todo-heading .task-date{display:inline-block;margin:0;vertical-align:baseline}
 .overview-todo-heading .note{display:inline;margin:0}
+/* Reserve only the lower-right corner, never an entire footer row.
+   The final date group contains at least 44px of text/controls or natural space. */
+.overview-page .overview-todos .task-day:last-child,.overview-todos>.overview-todo-heading{box-sizing:border-box;min-height:44px;padding-right:48px;word-wrap:break-word}
+.overview-home>.note{min-height:44px;margin-right:48px}
 .overview-page .menu-day,.overview-page .task-day{padding:3px 0;border-bottom:1px solid #777}
 .overview-menu .menu-day:last-child,.overview-todos .task-day:last-child{border-bottom:0}
 .overview-page .menu-date,.overview-page .task-date{font-size:19px;line-height:1.2;margin:0 0 2px}
@@ -162,8 +166,9 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 #displayNav[data-overview="true"] #settings{display:block;width:44px;height:44px;padding:8px;border:0;background:#fff}
 #displayNav[data-overview="true"] .settings-text{display:none}
 #displayNav[data-overview="true"] .settings-icon{display:block;width:26px;height:26px;margin:0 auto}
-/* Disjoint viewport regions: no vh/calc dependency on older Kindle WebKit. */
-#displayNav[data-overview="true"] + #displayContent{position:fixed;top:4px;right:4px;bottom:52px;left:4px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;padding-bottom:4px}
+/* Use the entire viewport, including the row beside the floating gear.
+   Fixed edges avoid vh/calc dependency on older Kindle WebKit. */
+#displayNav[data-overview="true"] + #displayContent{position:fixed;top:4px;right:4px;bottom:4px;left:4px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;padding-bottom:4px}
 #displayHeader.overview-header #headerRow{display:table;width:100%;table-layout:fixed}
 #displayHeader.overview-header #date{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 6px 2px 0;min-height:0;line-height:1.2;text-align:left;white-space:pre-line;word-wrap:break-word}
 #displayHeader.overview-header #overviewWeather{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 0 2px 6px;border-left:1px solid #aaa;text-align:left;word-wrap:break-word}

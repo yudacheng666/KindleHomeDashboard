@@ -366,6 +366,8 @@ def main():
                 # The last location save invalidates weather caches; populate the fictional current view again.
                 for _ in range(6): weather.step()
                 assert weather.read()["sections"]["current"]["status"]=="available"
+                # A second date makes the alignment regression meaningful.
+                footer_task=home.add_task("Fictional future footer task "+"long text "*8,"2026-01-06")
                 click("returnDisplay")
                 click("overviewMode")
                 wait(lambda:js("return document.querySelectorAll('#body .overview-driving-card').length===2 && document.querySelectorAll('#body .overview-driving-map img').length===2 && document.querySelector('#body .overview-bus')!==null"))
@@ -428,18 +430,21 @@ def main():
                   return clock.nextElementSibling===day&&same(clock,temp)&&same(day,summary)&&parseFloat(getComputedStyle(clock).fontSize)>parseFloat(getComputedStyle(day).fontSize)&&getComputedStyle(day).fontWeight==="400";
                 })()"""
                 assert js(header_type)
-                assert js("""return (function(){
-                  var h=document.querySelector('.overview-todo-heading'),b=h&&h.querySelector('.overview-todo-link'),d=h&&h.querySelector('.task-date');
-                  if(!b||!d)return false;
-                  var a=b.getBoundingClientRect(),c=d.getBoundingClientRect();return c.left>=a.right&&Math.abs(c.top-a.top)<12;
-                })()""")
+                wait(lambda:text_in("body","Fictional future footer task"))
+                todo_alignment = """return (function(){
+                  var h=document.querySelector('.overview-todo-heading'),b=h&&h.querySelector('.overview-todo-link'),dates=Array.from(document.querySelectorAll('.overview-todos .task-date'));
+                  if(!b||dates.length<2)return false;
+                  var a=b.getBoundingClientRect(),c=dates[0].getBoundingClientRect();
+                  return a.left>=c.right&&Math.abs(c.top-a.top)<12&&dates.every(d=>Math.abs(d.getBoundingClientRect().left-c.left)<=1);
+                })()"""
+                assert js(todo_alignment)
                 footer_layout = """return (function(){
                   var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),content=document.getElementById("displayContent").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
                   return Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(a.top-b.top)<=2
                     &&getComputedStyle(d).textAlign==="left"&&getComputedStyle(w).textAlign==="left"
                     &&parseFloat(getComputedStyle(d).paddingLeft)===0&&parseFloat(getComputedStyle(w).paddingLeft)===6
                     &&getComputedStyle(s.querySelector(".settings-text")).display==="none"&&s.querySelector(".settings-icon").getBoundingClientRect().width>=24
-                    &&getComputedStyle(document.getElementById("displayContent")).position==="fixed"&&Math.abs(content.top-4)<=1&&Math.abs(content.bottom-(window.innerHeight-52))<=1&&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top>=content.bottom-1&&Math.abs(r.right-(window.innerWidth-4))<=1&&Math.abs(r.bottom-(window.innerHeight-4))<=1
+                    &&getComputedStyle(document.getElementById("displayContent")).position==="fixed"&&Math.abs(content.top-4)<=1&&Math.abs(content.bottom-(window.innerHeight-4))<=1&&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top<content.bottom&&Math.abs(r.right-(window.innerWidth-4))<=1&&Math.abs(r.bottom-(window.innerHeight-4))<=1
                     &&s.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));
                 })()"""
                 assert js(footer_layout)
@@ -447,6 +452,7 @@ def main():
                 assert js(readable)
                 assert js(footer_layout)
                 assert js(header_type)
+                assert js(todo_alignment)
                 # At a narrow viewport, scrolling must not move or hide settings.
                 assert js("""var c=document.getElementById("displayContent");return c.scrollHeight>c.clientHeight""")
                 js("""var c=document.getElementById("displayContent");c.scrollTop=c.scrollHeight""")
@@ -456,7 +462,7 @@ def main():
                   var c=document.getElementById("displayContent").getBoundingClientRect(),last=document.querySelector('.overview-todos .task-day:last-child .task-row:last-child'),s=document.getElementById("settings").getBoundingClientRect();
                   if(!last)return false;
                   var r=last.getBoundingClientRect(),x=r.left+r.width/2,y=r.bottom-2;
-                  return r.top>=c.top&&r.bottom<=c.bottom-1&&r.bottom<s.top&&last.contains(document.elementFromPoint(x,y));
+                  return r.top>=c.top&&r.bottom<=c.bottom-1&&r.bottom>s.top&&r.right<=s.left-1&&last.contains(document.elementFromPoint(x,y));
                 })()""")
                 js("""document.getElementById("displayContent").scrollTop=0""")
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
@@ -465,6 +471,7 @@ def main():
                 click("settings")
                 assert js("return document.getElementById('busMode').getBoundingClientRect().height>=44 && document.getElementById('weatherMode').getBoundingClientRect().height>=44")
                 click("returnDisplay")
+                home.delete_task(footer_task)
                 button("body","另 1 个目的地")
                 wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===3"))
                 assert js("return getComputedStyle(document.querySelector('#settings .settings-text')).display!=='none'&&getComputedStyle(document.querySelector('#settings .settings-icon')).display==='none'")

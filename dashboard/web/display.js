@@ -950,18 +950,20 @@ function renderOverviewHome(v){
     });
     if(!meals.length)append(group,"p","暂无菜单","note");
   });
-  function todoHeading(parent){
-    var heading=append(parent,"div","","overview-todo-heading");
-    var link=overviewLink(heading,tasks.length>3?"全部待办（"+tasks.length+"）":"待办",function(){switchSection("tasks");});link.className+=" overview-todo-link";
-    return heading;
+  function todoLink(heading){
+    var label=tasks.length>3?"待办（"+tasks.length+"）":"待办";
+    var link=overviewLink(heading,label,function(){switchSection("tasks");});link.className+=" overview-todo-link";
+    link.title=tasks.length>3?"全部待办（"+tasks.length+"）":"待办清单";
+    return link;
   }
   var last="",dayGroup;
   tasks.slice(0,3).forEach(function(t){
     var day=t.occurrence||v.date;
     if(day!==last){
       var first=!last;last=day;dayGroup=append(todoRoot,"section","","task-day");
-      var header=first?todoHeading(dayGroup):dayGroup,l=taskDateLabel(day,v.date),h=append(header,"h3",l.label,"task-date");
+      var header=first?append(dayGroup,"div","","overview-todo-heading"):dayGroup,l=taskDateLabel(day,v.date),h=append(header,"h3",l.label,"task-date");
       if(day<v.date)append(h,"span","逾期","task-date-tag");else if(l.tag)append(h,"span",l.tag,"task-date-tag");
+      if(first)todoLink(header);
     }
     var row=append(dayGroup,"div","","task-row");append(row,"span",t.title,"task-text");
     if(v.can_complete===true&&day<=v.date){
@@ -969,7 +971,10 @@ function renderOverviewHome(v){
       button.type="button";button.onclick=function(){completeTask(t,v.date,button);};
     }
   });
-  if(!tasks.length)append(todoHeading(todoRoot),"span","暂无待办","note");
+  if(!tasks.length){
+    var emptyHeading=append(todoRoot,"div","","overview-todo-heading");
+    append(emptyHeading,"span","暂无待办","note");todoLink(emptyHeading);
+  }
 }
 function overviewFailure(k,status){
   if(k==="bus"){stopAge();serverBase=NaN;paintAge();delete overviewKeys.bus;overviewBusShell(null,status===404?"模块未启用":"暂不可用，旧内容已隐藏");return;}
