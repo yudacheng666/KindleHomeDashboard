@@ -135,9 +135,12 @@ def main():
                 wait(lambda:text_in("content","Fictional breakfast"))
                 assert home.menus_between("2026-01-06","2026-01-06")[0]["meal"]=="lunch"
                 assert all(m["meal"]!="breakfast" for m in home.menus_between("2026-01-05","2026-01-05"))
+                # The save closes the editor and starts an asynchronous reload.
+                # Tab clicks are deliberately ignored while that request is busy.
+                wait(lambda:js("return document.getElementById('editor').className==='hidden'"))
+                # Retry the idempotent navigation until the reload has finished.
+                wait(lambda:js("document.getElementById('catalog').click();return document.getElementById('content').textContent.indexOf('家庭菜单维护')>=0"))
                 # Catalog management and mixed point-select/manual weekly entry.
-                click("catalog")
-                wait(lambda:text_in("content","家庭菜单维护"))
                 button("content","新增菜品")
                 js("document.querySelector('#editor input').value='Fictional catalog dish'")
                 button("editor","保存")
