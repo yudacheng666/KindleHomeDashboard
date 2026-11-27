@@ -138,9 +138,23 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .overview-driving-card .driving-fast{font-size:18px;font-weight:bold}
 .overview-page .overview-driving-card .driving-foot{font-size:16px;line-height:1.2;margin:2px 0;word-wrap:break-word}
 .overview-driving-link{display:block;min-height:27px;font-size:16px;line-height:1.2;margin:1px 0}
-.overview-home{border-top:1px solid #555;display:table;width:100%;table-layout:fixed}
-.overview-todos,.overview-menu{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;margin:0;padding:3px 6px 0 0;word-wrap:break-word}
-.overview-menu{border-left:1px solid #555;padding:3px 0 0 6px}
+.overview-home{position:relative;box-sizing:border-box;border-top:1px solid #555;width:100%;overflow:hidden}
+.overview-todos,.overview-menu{position:absolute;top:0;bottom:0;width:50%;box-sizing:border-box;margin:0;padding:3px 6px 0 0;word-wrap:break-word;overflow:hidden}
+.overview-todos{left:0}
+.overview-menu{left:50%;border-left:1px solid #555;padding:3px 0 0 6px}
+.overview-home-scroll{position:absolute;top:29px;bottom:0;left:0;right:6px;overflow-y:auto;overflow-x:hidden;outline:none;overscroll-behavior:contain}
+.overview-menu .overview-home-scroll{left:6px;right:0}
+.overview-driving{box-sizing:border-box;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+#displayHeader.overview-header{max-height:96px;overflow-y:auto;overflow-x:hidden}
+.overview-home-scroll,.overview-driving,#displayHeader.overview-header{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.overview-home-scroll::-webkit-scrollbar,.overview-driving::-webkit-scrollbar,#displayHeader.overview-header::-webkit-scrollbar{width:4px}
+.overview-home-scroll::-webkit-scrollbar-thumb,.overview-driving::-webkit-scrollbar-thumb,#displayHeader.overview-header::-webkit-scrollbar-thumb{background:transparent}
+.overview-home-scroll[data-scrolling="true"],.overview-driving[data-scrolling="true"],#displayHeader.overview-header[data-scrolling="true"]{scrollbar-color:#777 transparent}
+.overview-home-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb,.overview-driving[data-scrolling="true"]::-webkit-scrollbar-thumb,#displayHeader.overview-header[data-scrolling="true"]::-webkit-scrollbar-thumb{background:#777}
+.overview-task-marker{display:table-cell;width:30px;vertical-align:middle;text-align:left}
+.overview-page .overview-task-marker .overview-task-circle{border:0;background:white;font-size:22px;line-height:1;min-height:32px;width:30px;padding:0;text-align:left;color:#111}
+.overview-task-inactive{font-size:22px;color:#aaa}
+.overview-page .overview-todos .task-text{padding-right:0}
 .overview-page .overview-home-title{display:block;min-height:26px;padding:0;margin:0;font-size:19px;text-align:left}
 .overview-page .overview-menu .menu-day{padding:3px 0;border-bottom:1px solid #777}
 .overview-page .overview-menu .menu-date{font-size:19px;line-height:1.2;margin:0 0 2px}
@@ -156,7 +170,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .task-action{width:56px}
 .overview-page .task-complete{font-size:16px;padding:1px 4px;min-height:36px}
 /* Overview header shares the date area; keep the dedicated weather page unchanged. */
-#displayHeader.overview-header{overflow:hidden}
+/* Header remains scrollable for unusually long weather alerts. */
 #display{position:relative}
 #displayNav .settings-icon{display:none}
 #displayNav[data-overview="true"]{position:fixed;right:4px;bottom:4px;float:none;margin:0;z-index:2}
@@ -165,7 +179,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 #displayNav[data-overview="true"] .settings-icon{display:block;width:26px;height:26px;margin:0 auto}
 /* Use the entire viewport, including the row beside the floating gear.
    Fixed edges avoid vh/calc dependency on older Kindle WebKit. */
-#displayNav[data-overview="true"] + #displayContent{position:fixed;top:4px;right:4px;bottom:4px;left:4px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;padding-bottom:4px}
+#displayNav[data-overview="true"] + #displayContent{position:fixed;top:4px;right:4px;bottom:4px;left:4px;box-sizing:border-box;overflow:hidden;padding-bottom:4px}
 #displayHeader.overview-header #headerRow{display:table;width:100%;table-layout:fixed}
 #displayHeader.overview-header #date{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 6px 2px 0;min-height:0;line-height:1.2;text-align:left;white-space:pre-line;word-wrap:break-word}
 #displayHeader.overview-header #overviewWeather{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 0 2px 6px;border-left:1px solid #aaa;text-align:left;word-wrap:break-word}

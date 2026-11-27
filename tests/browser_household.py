@@ -439,6 +439,7 @@ def main():
                   return dates.length>=2&&Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(b.left-mid)<=2&&Math.abs(t.top-m.top)<=1&&Math.abs(t.left-a.left)<=1&&Math.abs(m.left-b.left-7)<=1&&todo.firstElementChild.textContent==='待办'&&menu.firstElementChild.textContent==='菜单'&&dates.every(d=>Math.abs(d.getBoundingClientRect().left-t.left)<=1);
                 })()"""
                 assert js(todo_alignment)
+                assert js("""var row=document.querySelector('.overview-todos .task-row'),circle=row&&row.querySelector('.overview-task-circle');return !!circle&&circle.textContent==='○'&&circle.getAttribute('aria-label')==='完成待办'&&row.firstElementChild.contains(circle)&&circle.getBoundingClientRect().right<=row.querySelector('.task-text').getBoundingClientRect().left+1""")
                 footer_layout = """return (function(){
                   var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),content=document.getElementById("displayContent").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
                   return Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(a.top-b.top)<=2
@@ -454,18 +455,20 @@ def main():
                 assert js(footer_layout)
                 assert js(header_type)
                 assert js(todo_alignment)
-                # At a narrow viewport, scrolling must not move or hide settings.
-                assert js("""var c=document.getElementById("displayContent");return c.scrollHeight>c.clientHeight""")
-                js("""var c=document.getElementById("displayContent");c.scrollTop=c.scrollHeight""")
+                # No whole-page scrolling: each household list scrolls independently.
+                fixed_home = """return (function(){
+                  var c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),a=document.querySelector('.overview-todos'),b=document.querySelector('.overview-menu'),d=document.querySelector('.overview-driving'),x=a.querySelector('.overview-home-scroll'),y=b.querySelector('.overview-home-scroll');
+                  return getComputedStyle(c).overflowY==='hidden'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom&&h.getBoundingClientRect().top>=d.getBoundingClientRect().bottom-1&&Math.abs(a.clientHeight-b.clientHeight)<=1&&x.clientHeight>0&&x.clientHeight===y.clientHeight;
+                })()"""
+                assert js(fixed_home)
+                assert js("""var x=document.querySelector('.overview-todos .overview-home-scroll');return x.scrollHeight>x.clientHeight&&x.getAttribute('data-scrolling')==='false'""")
+                js("""var x=document.querySelector('.overview-todos .overview-home-scroll');x.scrollTop=x.scrollHeight;x.dispatchEvent(new Event('scroll'));""")
+                assert js("""var x=document.querySelector('.overview-todos .overview-home-scroll'),y=document.querySelector('.overview-menu .overview-home-scroll');return x.scrollTop>0&&x.getAttribute('data-scrolling')==='true'&&y.scrollTop===0&&y.getAttribute('data-scrolling')==='false'""")
+                wait(lambda:js("return document.querySelector('.overview-todos .overview-home-scroll').getAttribute('data-scrolling')==='false'"))
                 assert js(footer_layout)
-                assert js("""var c=document.getElementById("displayContent");return c.scrollTop>0&&Math.abs(c.scrollHeight-c.clientHeight-c.scrollTop)<=2""")
-                assert js("""return (function(){
-                  var c=document.getElementById("displayContent").getBoundingClientRect(),last=document.querySelector('.overview-todos .task-day:last-child .task-row:last-child'),menu=document.querySelector('.overview-menu-last'),s=document.getElementById("settings").getBoundingClientRect();
-                  if(!last||!menu)return false;
-                  var r=last.getBoundingClientRect(),m=menu.getBoundingClientRect(),x=r.left+r.width/2,y=r.bottom-2;
-                  return r.top>=c.top&&r.bottom<=c.bottom-1&&r.right<=s.left-1&&last.contains(document.elementFromPoint(x,y))&&m.bottom<=c.bottom-1&&parseFloat(getComputedStyle(menu).paddingRight)>=48;
-                })()""")
-                js("""document.getElementById("displayContent").scrollTop=0""")
+                assert js(fixed_home)
+                assert js("""var x=document.querySelector('.overview-todos .overview-home-scroll'),last=x.querySelector('.task-row:last-child'),s=document.getElementById('settings').getBoundingClientRect();return x.getBoundingClientRect().right<=s.left&&Math.abs(x.scrollHeight-x.clientHeight-x.scrollTop)<=2&&document.querySelector('.overview-menu-last')&&parseFloat(getComputedStyle(document.querySelector('.overview-menu-last')).paddingRight)>=48""")
+                js("""document.querySelector('.overview-todos .overview-home-scroll').scrollTop=0""")
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2""")
