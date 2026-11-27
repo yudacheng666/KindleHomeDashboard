@@ -87,6 +87,24 @@ class HouseholdHTTPTests(unittest.TestCase):
         finally:
             conn.close()
 
+    def test_driving_reverse_requires_admin_and_saved_group(self):
+        from dashboard.driving_service import DrivingService, DEFAULT
+        self.api.driving=DrivingService(self.temp.name,{"KHD_AMAP_KEY":"placeholder_test_credential"},clock=lambda:self.now)
+        group={"name":"Example","origin":"1,2","destination":"2,3","enabled":True,
+               "windows":[{"days":list(range(7)),"start":0,"end":1440}]}
+        self.api.driving.configure({**DEFAULT,"groups":[group],"enabled":True,"consent":True,"map_permission":True})
+        code,view=self.req("GET","driving/view",self.read_token)
+        self.assertEqual(code,200)
+        self.assertFalse(view["can_reverse"])
+        body={"group":0,"revision":view["groups"][0]["direction_revision"]}
+        self.assertEqual(self.req("POST","driving/reverse",self.read_token,body)[0],401)
+        self.assertTrue(self.req("GET","driving/view",self.admin_token)[1]["can_reverse"])
+        self.assertEqual(self.req("POST","driving/reverse",self.admin_token,body),(200,{"status":"ok"}))
+        self.assertTrue(self.req("GET","driving/view",self.read_token)[1]["groups"][0]["reversed"])
+        self.assertEqual(self.req("POST","driving/reverse",self.admin_token,body),(200,{"status":"stale"}))
+        self.assertEqual(self.req("POST","driving/reverse",self.admin_token,{**body,"origin":"1,2"})[0],400)
+        self.assertEqual(self.api.driving.ledger.usage()["lbs"]["used"],0)
+
     def test_saved_display_preferences(self):
         defaults = {"seconds":180,"include_week":False,"include_shopping":False,"autoplay":False}
         self.assertEqual(self.view()["display_settings"], defaults)
