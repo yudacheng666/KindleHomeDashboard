@@ -144,17 +144,15 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-menu{left:50%;border-left:1px solid #555;padding:3px 0 0 6px}
 .overview-home-scroll{position:absolute;top:29px;bottom:0;left:0;right:6px;overflow-y:auto;overflow-x:hidden;outline:none;overscroll-behavior:contain}
 .overview-menu .overview-home-scroll{left:6px;right:0}
-.overview-driving{box-sizing:border-box;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+.overview-driving{box-sizing:border-box;overflow:visible}
 #displayHeader.overview-header{max-height:96px;overflow-y:auto;overflow-x:hidden}
-.overview-home-scroll,.overview-driving,#displayHeader.overview-header{scrollbar-width:thin;scrollbar-color:transparent transparent}
-.overview-home-scroll::-webkit-scrollbar,.overview-driving::-webkit-scrollbar,#displayHeader.overview-header::-webkit-scrollbar{width:4px}
-.overview-home-scroll::-webkit-scrollbar-thumb,.overview-driving::-webkit-scrollbar-thumb,#displayHeader.overview-header::-webkit-scrollbar-thumb{background:transparent}
-.overview-home-scroll[data-scrolling="true"],.overview-driving[data-scrolling="true"],#displayHeader.overview-header[data-scrolling="true"]{scrollbar-color:#777 transparent}
-.overview-home-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb,.overview-driving[data-scrolling="true"]::-webkit-scrollbar-thumb,#displayHeader.overview-header[data-scrolling="true"]::-webkit-scrollbar-thumb{background:#777}
-/* Upper regions may scroll on small screens, but must never lose width to
-   scrollbar gutters: their center line aligns with the two bottom columns. */
-.overview-driving,#displayHeader.overview-header{scrollbar-width:none}
-.overview-driving::-webkit-scrollbar,#displayHeader.overview-header::-webkit-scrollbar{display:none;width:0;height:0}
+.overview-home-scroll{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.overview-home-scroll::-webkit-scrollbar{width:4px}
+.overview-home-scroll::-webkit-scrollbar-thumb{background:transparent}
+.overview-home-scroll[data-scrolling="true"]{scrollbar-color:#777 transparent}
+.overview-home-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb{background:#777}
+#displayHeader.overview-header{scrollbar-width:none}
+#displayHeader.overview-header::-webkit-scrollbar{display:none;width:0;height:0}
 .overview-task-marker{display:table-cell;width:30px;vertical-align:middle;text-align:left}
 .overview-page .overview-task-marker .overview-task-circle{border:0;background:white;font-size:22px;line-height:1;min-height:32px;width:30px;padding:0;text-align:left;color:#111}
 .overview-task-inactive{font-size:22px;color:#aaa}
@@ -224,8 +222,15 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
   .overview-page .overview-driving-card{display:block;width:100%;padding:3px 0;border:0}
   .overview-page .overview-driving-card+.overview-driving-card{padding:3px 0;border-left:0;border-top:1px solid #aaa}
   .overview-page .overview-driving-card h2{min-height:0}
-  .overview-driving-map{height:150px}
-  .overview-driving-map img{max-height:150px}
+  /* Short narrow previews: stack destination cards, but keep their maps
+     next to route text so both destinations remain visible without scrolling. */
+  .overview-driving-pair{display:table;width:100%;table-layout:fixed}
+  .overview-driving-map{display:table-cell;width:33%;height:90px;vertical-align:middle}
+  .overview-driving-map img{max-height:90px}
+  .overview-driving-routes{display:table-cell;width:67%;vertical-align:middle;padding-left:4px}
+  .overview-driving-card .driving-route-number{width:1.1em}
+  .overview-driving-card .driving-route-time{width:5em}
+  .overview-driving-card .driving-route-distance{white-space:normal}
 }
 
 #settingsPanel{max-width:960px;margin:0 auto;padding:12px;color:#1f2937;font:16px/1.5 sans-serif;background:#f5f6f8}

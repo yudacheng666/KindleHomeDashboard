@@ -458,9 +458,9 @@ def main():
                 # No whole-page scrolling: each household list scrolls independently.
                 fixed_home = """return (function(){
                   var c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),a=document.querySelector('.overview-todos'),b=document.querySelector('.overview-menu'),d=document.querySelector('.overview-driving'),x=a.querySelector('.overview-home-scroll'),y=b.querySelector('.overview-home-scroll');
-                  return getComputedStyle(c).overflowY==='hidden'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom&&h.getBoundingClientRect().top>=d.getBoundingClientRect().bottom-1&&Math.abs(a.clientHeight-b.clientHeight)<=1&&x.clientHeight>0&&x.clientHeight===y.clientHeight;
+                  return getComputedStyle(c).overflowY==='hidden'&&getComputedStyle(d).overflowY==='visible'&&d.scrollHeight<=d.clientHeight+1&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom&&h.getBoundingClientRect().top>=d.getBoundingClientRect().bottom-1&&Math.abs(a.clientHeight-b.clientHeight)<=1&&x.clientHeight>0&&x.clientHeight===y.clientHeight;
                 })()"""
-                assert js(fixed_home)
+                assert js(fixed_home), js("""return {viewport:[innerWidth,innerHeight],driving:document.querySelector('.overview-driving').getBoundingClientRect().toJSON(),home:document.querySelector('.overview-home').getBoundingClientRect().toJSON(),content:[document.getElementById('displayContent').clientHeight,document.getElementById('displayContent').scrollHeight]}""")
                 assert js("""var x=document.querySelector('.overview-todos .overview-home-scroll');return x.scrollHeight>x.clientHeight&&x.getAttribute('data-scrolling')==='false'""")
                 js("""var x=document.querySelector('.overview-todos .overview-home-scroll');x.scrollTop=x.scrollHeight;x.dispatchEvent(new Event('scroll'));""")
                 assert js("""var x=document.querySelector('.overview-todos .overview-home-scroll'),y=document.querySelector('.overview-menu .overview-home-scroll');return x.scrollTop>0&&x.getAttribute('data-scrolling')==='true'&&y.scrollTop===0&&y.getAttribute('data-scrolling')==='false'""")

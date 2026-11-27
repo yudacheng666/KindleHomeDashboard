@@ -856,7 +856,7 @@ function overviewLink(root,label,action){
 }
 function stopOverview(){
   Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
-  if(overviewRoots.clock){clear(el("date"));[overviewRoots.todoScroll,overviewRoots.menuScroll,overviewRoots.driving,el("displayHeader")].forEach(stopOverviewScroll);}
+  if(overviewRoots.clock){clear(el("date"));[overviewRoots.todoScroll,overviewRoots.menuScroll].forEach(stopOverviewScroll);}
   overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
   clear(el("overviewWeather"));show("overviewWeather",false);el("displayHeader").className="";el("displayNav").setAttribute("data-overview","false");
 }
@@ -871,7 +871,7 @@ function overviewLayout(){
   overviewRoots.home=append(root,"div","","overview-home");
   stopAge();overviewBusShell(null,"正在读取");
   ["weather","driving"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
-  overviewHomeColumns("正在读取");bindOverviewScroll(overviewRoots.driving);bindOverviewScroll(el("displayHeader"));
+  overviewHomeColumns("正在读取");
   txt("heading","");txt("index","");
 }
 // Measure rendered text rather than character count: mixed CJK/Latin station names
@@ -892,13 +892,10 @@ function fitOverviewViewport(){
   fitOverviewBusHeading();
   var c=el("displayContent"),d=overviewRoots.driving,h=overviewRoots.home;
   if(!d||!h||!d.style||!h.style||!c.clientHeight||!c.getBoundingClientRect)return;
-  // Fixed budgets depend on viewport/header geometry, never household content.
-  // Keep a usable bottom row even on a narrow/short preview; excess driving
-  // content can scroll inside its own region without changing the start position.
-  var available=Math.max(0,Math.floor(c.getBoundingClientRect().bottom-8-d.getBoundingClientRect().top));
-  var homeMin=Math.min(120,Math.floor(available*.45));
-  var drivingHeight=Math.min(c.clientWidth>420?270:500,Math.max(0,available-homeMin));
-  d.style.height=drivingHeight+"px";h.style.height=(available-drivingHeight)+"px";
+  // Driving stays in the ordinary document flow: no inner scroll, no forced
+  // height and no clipping. Only the household lists use the remaining space.
+  // The bus budget and hence the driving start are unchanged.
+  h.style.height=Math.max(0,Math.floor(c.getBoundingClientRect().bottom-8-d.getBoundingClientRect().bottom))+"px";
 }
 function fitOverviewBusHeading(){
   var h=overviewRoots.busHeader,n=overviewRoots.busName,d=overviewRoots.busDirection;
