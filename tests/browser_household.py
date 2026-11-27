@@ -241,7 +241,7 @@ def main():
                 click("connect")
                 wait(lambda:text_in("body","Fictional browser task"))
                 assert js("return document.getElementById('body').className==='overview-page' && !document.querySelector('.task-complete')")
-                assert js("return document.querySelectorAll('#body .overview-pair .overview-half').length===2")
+                assert js("return !!document.querySelector('#body .overview-bus') && document.getElementById('overviewWeather').className!=='hidden' && !document.querySelector('#body .weather-main')")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
                 click("settings");click("returnDisplay")
                 js("document.getElementById('tasksMode').click()")
@@ -362,8 +362,8 @@ def main():
                 assert js("return document.getElementById('drivingSave').parentNode.nextElementSibling.id==='drivingSettingStatus'")
                 click("returnDisplay")
                 click("overviewMode")
-                wait(lambda:js("return document.querySelectorAll('#body .overview-driving-card').length===2 && document.querySelectorAll('#body .overview-driving-map img').length===2 && document.querySelector('#body .overview-pair')!==null"))
-                assert text_in("body","另 1 个目的地")
+                wait(lambda:js("return document.querySelectorAll('#body .overview-driving-card').length===2 && document.querySelectorAll('#body .overview-driving-map img').length===2 && document.querySelector('#body .overview-bus')!==null"))
+                assert text_in("body","另 1 个目的地") and not text_in("body","全部路线")
                 assert not text_in("body","已知拥堵") and not text_in("body","路况未知")
                 assert js("return Array.from(document.querySelectorAll('#body .overview-driving-routes')).every(function(n){return /km/.test(n.textContent)&&/分钟/.test(n.textContent);})")
                 assert js("""return (function(){
@@ -371,7 +371,7 @@ def main():
                   if(cards.length!==2||maps.length!==2||rows.length!==6)return false;
                   var a=cards[0].getBoundingClientRect(),c=cards[1].getBoundingClientRect();
                   return a.left<c.left&&Math.abs(a.top-c.top)<2&&a.right<=c.left+2
-                    &&Array.prototype.every.call(maps,function(n){return Math.abs(n.getBoundingClientRect().height-140)<2;})
+                    &&Array.prototype.every.call(maps,function(n){var h=n.parentNode.parentNode.querySelector('h2').getBoundingClientRect();return Math.abs(n.getBoundingClientRect().height-140)<2&&n.getBoundingClientRect().top-h.bottom<=4;})
                     &&Array.prototype.every.call(rows,function(n){return n.scrollHeight<=n.clientHeight+2&&parseFloat(getComputedStyle(n).fontSize)>=18;});
                 })()""")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
@@ -387,15 +387,23 @@ def main():
                 })()"""
                 assert js(readable)
                 original_rect=wd("/session/"+sid+"/window/rect")
+                wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
+                assert js(readable)
+                assert js("""return (function(){
+                  var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
+                  return w.width>0&&d.width>0&&Math.abs(w.top-d.top)<=2&&d.right<=w.left+1&&w.right<=s.left+1&&Math.max(d.bottom,w.bottom,s.bottom)<=b.top+1
+                    &&b.width>=document.getElementById('body').getBoundingClientRect().width-2&&c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2;
+                })()""")
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
+                assert js("""var d=document.getElementById('date').getBoundingClientRect(),w=document.getElementById('overviewWeather').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect();return w.width>0&&Math.abs(d.top-w.top)<=2&&d.right<=w.left+1&&w.right<=s.left+1""")
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2""")
                 click("settings")
                 assert js("return document.getElementById('busMode').getBoundingClientRect().height>=44 && document.getElementById('weatherMode').getBoundingClientRect().height>=44")
                 click("returnDisplay")
-                button("body","另 1 个目的地 · 全部路线")
+                button("body","另 1 个目的地")
                 wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===3"))
                 click("postersMode")
                 wait(lambda:text_in("heading","Fictional reminder"))

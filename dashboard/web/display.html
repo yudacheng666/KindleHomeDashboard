@@ -125,7 +125,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-driving-grid{display:table;width:100%;table-layout:fixed;border-top:1px solid #555;border-bottom:1px solid #555}
 .overview-driving-card{display:table-cell;width:50%;vertical-align:top;box-sizing:border-box;padding:4px 6px 5px 0;border:0}
 .overview-driving-card+.overview-driving-card{border-left:1px solid #555;padding:4px 0 5px 6px}
-.overview-page .overview-driving-card h2{font-size:20px;line-height:1.2;min-height:2.4em;margin:0 0 3px;word-wrap:break-word}
+.overview-page .overview-driving-card h2{font-size:20px;line-height:1.2;margin:0 0 2px;word-wrap:break-word}
 .overview-driving-pair{display:block;width:100%}
 .overview-driving-map{display:block;width:100%;height:140px;padding:0;text-align:center;overflow:hidden}
 .overview-driving-map img{display:block;max-width:100%;max-height:140px;width:auto;height:auto;margin:0 auto}
@@ -147,11 +147,36 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .menu-meal-label,.overview-page .menu-dishes,.overview-page .task-row{font-size:19px;line-height:1.25}
 .overview-page .task-action{width:56px}
 .overview-page .task-complete{font-size:16px;padding:1px 4px;min-height:36px}
-@media(max-width:520px){
-  .overview-bus-line{display:block}
-  .overview-bus-eta,.overview-bus-time{display:block;text-align:left}
-  .overview-bus-time{margin-top:1px}
+/* Overview header shares the date area; keep the dedicated weather page unchanged. */
+#displayHeader.overview-header{overflow:hidden}
+#displayHeader.overview-header #headerRow{display:table;width:100%;table-layout:fixed}
+#displayHeader.overview-header #date{display:table-cell;width:45%;box-sizing:border-box;vertical-align:top;padding:2px 5px 2px 0;min-height:0;line-height:1.2;white-space:pre-line;word-wrap:break-word}
+#displayHeader.overview-header #overviewWeather{display:table-cell;width:55%;box-sizing:border-box;vertical-align:top;padding:0 4px 2px 6px;border-left:1px solid #aaa;word-wrap:break-word}
+#overviewWeather{font-size:18px;line-height:1.2;padding:0 0 2px}
+#overviewWeather .overview-weather-line{display:block}
+#overviewWeather .weather-main,#overviewWeather .overview-weather-status{display:inline-block;border:0;background:white;color:#111;text-align:left;min-height:0;padding:0 6px 0 0;margin:0;font-size:24px;line-height:1.2;font-weight:bold;vertical-align:baseline;white-space:normal}
+#overviewWeather .overview-weather-status{font-size:17px}
+#overviewWeather .weather-summary{display:block;font-size:16px;line-height:1.2;margin:1px 0 0;vertical-align:baseline}
+@media(max-width:360px){
+  #displayHeader.overview-header #date{font-size:18px}
+  #overviewWeather .weather-main{font-size:22px}
 }
+#overviewWeather .weather-alert{font-size:16px;line-height:1.2;margin:2px 0;padding:2px}
+#overviewWeather .note{font-size:17px;margin:2px 0}
+.overview-bus{border-top:1px solid #555;padding:2px 0 3px}
+.overview-bus .overview-link{min-height:26px;padding:0}
+.overview-bus .note:empty,.overview-bus-details:empty,.overview-menu:empty{display:none}
+.overview-bus-slots{display:table;width:100%;table-layout:fixed}
+.overview-bus-slots .overview-bus-slot{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;border-bottom:0;padding:2px 5px 2px 0}
+.overview-bus-slots .overview-bus-slot+.overview-bus-slot{border-left:1px solid #aaa;padding:2px 0 2px 6px}
+.overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta{font-size:26px}
+.overview-bus-slots .overview-bus-slot:first-child .overview-bus-state{font-size:20px}
+.overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta{font-size:20px}
+.overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-state{font-size:18px}
+.overview-bus-line{display:block}
+.overview-bus-eta,.overview-bus-time{display:block;text-align:left;white-space:normal}
+.overview-bus-time{margin-top:1px}
+.overview-bus-details{font-size:16px}
 @media(max-width:420px){
   .overview-driving-grid{display:block}
   .overview-driving-card{display:block;width:100%;padding:4px 0 6px;border-left:0;border-bottom:1px solid #aaa}
@@ -230,7 +255,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 <p id="status" class="status" role="status"></p>
 <div id="display" class="hidden">
 <div id="displayNav"><button id="settings" type="button" aria-label="设置" title="设置">设置</button></div>
-<div id="displayContent"><p id="date" class="status"></p><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
+<div id="displayContent"><div id="displayHeader"><div id="headerRow"><p id="date" class="status"></p><div id="overviewWeather" class="hidden"></div></div></div><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
 <div id="settingsPanel" class="hidden"><button id="returnDisplay" type="button">返回看板</button><h1>设置</h1>
 <div id="settingsMenu"><a id="desktopAdminLink" href="/admin">电脑管理后台</a><h2>显示设置</h2><div id="detailLinks" class="module-choices"><span><button id="overviewMode" type="button">总览</button></span><span><button id="busMode" type="button">公交</button></span><span><button id="tasksMode" type="button">待办</button></span><span><button id="postersMode" type="button">海报</button></span><span><button id="menusMode" type="button">菜单</button></span><span><button id="drivingMode" type="button">驾驶</button></span><span><button id="weatherMode" type="button">天气</button></span></div><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
 <div id="weatherDisplayControls" class="hidden"><p class="status">天气地点轮播 · 每2分钟</p><button id="weatherNext" type="button">下一地点并返回看板</button></div>
