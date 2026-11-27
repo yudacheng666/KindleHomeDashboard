@@ -308,7 +308,7 @@ function paintAge(){
   if(mode==="overview"){
     var day=isFinite(now)?new Date(now+zoneOffset*60000).toISOString().slice(0,10):overviewDay;
     var label=overviewDate(day);
-    txt("date",(label||"日期未知")+"\n"+(time||"时间未知"));
+    slotSet(overviewRoots.clock,time||"时间未知");slotSet(overviewRoots.day,label||"日期未知");
   }else txt("date",time);
   // Overview has no normal timestamp row, but must still expire cached ETA locally.
   if(!etaSnapshot||(!ageNode&&(mode!=="overview"||["live","stale","no_live_data"].indexOf(etaSnapshot.status)<0)))return;
@@ -856,35 +856,42 @@ function overviewLink(root,label,action){
 }
 function stopOverview(){
   Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
+  if(overviewRoots.clock)clear(el("date"));
   overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
   clear(el("overviewWeather"));show("overviewWeather",false);el("displayHeader").className="";el("displayNav").setAttribute("data-overview","false");
 }
 function overviewLayout(){
   var root=el("body");clear(root);root.className="overview-page";
+  var dateRoot=el("date");txt("date","");clear(dateRoot);
+  overviewRoots.clock=append(dateRoot,"span","时间未知","overview-clock");
+  overviewRoots.day=append(dateRoot,"span","日期未知","overview-day");
   overviewRoots.bus=append(root,"section","","overview-bus");
   overviewRoots.weather=el("overviewWeather");clear(overviewRoots.weather);show("overviewWeather",true);el("displayHeader").className="overview-header";el("displayNav").setAttribute("data-overview","true");
   overviewRoots.driving=append(root,"div","","overview-driving");
   overviewRoots.home=append(root,"div","","overview-home");
-  ["bus","weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
+  stopAge();overviewBusShell(null,"正在读取");
+  ["weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
   txt("heading","");txt("index","");
+}
+function overviewBusShell(t,status){
+  var root=overviewRoots.bus;clear(root);
+  var link=overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});link.title=t?t.line.name:"公交";
+  var direction=t?t.boarding.name+" → "+t.destination.name:"";
+  var route=append(root,"p",direction,"note overview-bus-direction");route.title=direction;
+  busStatusNode=append(root,"p",status,"note overview-bus-status");
+  var slots=append(root,"div","","overview-bus-slots");
+  for(var i=0;i<2;i++)etaRows.push(buildOverviewSlot(slots,i));
 }
 function renderOverviewBus(v){
   var root=overviewRoots.bus,s=v.snapshot,t=v.trip,items=slotItems(s);
   var labels={live:"",stale:"数据未更新",expired:"数据已过期",paused:"暂停更新",blocked:"接口暂不可用",disabled:"公交未启用",config_error:"配置异常",unconfigured:"未设置公交",unverified:"核对线路中",needs_selection:"线路站序变化，需重新选站",unavailable:"等待首次更新",no_live_data:"",error:"更新失败",service_error:"服务异常"};
   var key=JSON.stringify([t,items.length,items.map(function(item){return item.vehicle&&item.vehicle.position||item.plan&&item.plan.time||"";}),s.status]);
   if(key!==overviewKeys.bus){
-    overviewKeys.bus=key;stopAge();clear(root);
-    overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});
-    if(t)append(root,"p",t.boarding.name+" → "+t.destination.name,"note");
+    overviewKeys.bus=key;stopAge();
     var statusText=Object.prototype.hasOwnProperty.call(labels,s.status)?labels[s.status]:"状态未知";
-    // Empty normal status is hidden by CSS; the same node can show expiry or errors.
-    busStatusNode=append(root,"p",statusText,"note overview-bus-status");
-    if(items.length){
-      var slots=append(root,"div","","overview-bus-slots");
-      for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(slots,i));
-    }
+    overviewBusShell(t,statusText);
   }
-  items.forEach(function(item,i){etaRows[i].item=item;});
+  etaRows.forEach(function(row,i){row.item=items[i]||null;});
   etaSnapshot=s;syncClock(s);paintAge();
 }
 function renderOverviewWeather(){
@@ -960,7 +967,7 @@ function renderOverviewHome(v){
   if(!tasks.length)append(todoRoot,"p","暂无待办","note");
 }
 function overviewFailure(k,status){
-  if(k==="bus"){stopAge();serverBase=NaN;paintAge();}
+  if(k==="bus"){stopAge();serverBase=NaN;paintAge();delete overviewKeys.bus;overviewBusShell(null,status===404?"模块未启用":"暂不可用，旧内容已隐藏");return;}
   if(k==="weather"){weatherPages=[];weatherOrder="";weatherCursor=0;stopRotation();show("weatherDisplayControls",false);}
   if(k==="home"){data=null;overviewDay="";paintAge();}
   delete overviewKeys[k];var root=overviewRoots[k];clear(root);
