@@ -703,7 +703,7 @@ function renderDrivingGroups(root,v,limit,summary){
         note=(messages[g.status]||"")+(g.fetched_at?" · 更新于 "+weatherTime(g.fetched_at):"");
         if(g.routes&&g.routes.length<3&&g.routes.length>0)note+=" · 仅返回"+g.routes.length+"条";
       }
-      if(g.reversed)note="返程"+(note?" · "+note:"");
+      if(g.reversed&&!summary)note="返程"+(note?" · "+note:"");
       if(note)append(group,"p",note,"driving-foot");
     });
 }
