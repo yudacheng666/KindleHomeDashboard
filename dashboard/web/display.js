@@ -237,10 +237,9 @@ function buildSlot(root,i){
 }
 function buildOverviewSlot(root,i){
   var row=slotNode(root,"div","overview-bus-slot");
-  var heading=slotNode(row,"div","overview-bus-label");heading.textContent=i===0?"首车":"次车";
   var pair=slotNode(row,"div","overview-bus-line"),eta=slotNode(pair,"span","overview-bus-eta"),time=slotNode(pair,"span","overview-bus-time");
   var detail=slotNode(row,"p","overview-bus-details");
-  return {heading:heading,eta:eta,time:time,stops:detail,distance:null,item:null,overview:true};
+  return {eta:eta,time:time,stops:detail,distance:null,item:null,overview:true};
 }
 function slotSet(node,value){if(node&&node.textContent!==value)node.textContent=value;}
 function updateEta(rows,s,now){
@@ -248,7 +247,6 @@ function updateEta(rows,s,now){
   rows.forEach(function(row,i){
     var item=row.item||{},v=item.vehicle,p=item.plan,label="",time="",stops="",distance="",compact=false;
     if(row.overview){
-      slotSet(row.heading,i===0?"首车":"次车");
       if(!valid){label="等待更新";compact=true;}
       else if(p){
         var currentOverview=new Date(now+zoneOffset*60000),minuteOverview=currentOverview.getUTCHours()*60+currentOverview.getUTCMinutes(),deltaOverview=null;
@@ -266,7 +264,7 @@ function updateEta(rows,s,now){
         var detailParts=[];if(v.stops_remaining!=null)detailParts.push("剩余 "+v.stops_remaining+" 站");if(v.distance_m!=null)detailParts.push(v.distance_m+" 米");stops=detailParts.join(" · ");
       }else{label="暂无车辆";compact=true;}
       row.eta.className="overview-bus-eta"+(compact?" overview-bus-state":"");
-      slotSet(row.eta,label);slotSet(row.time,time);slotSet(row.stops,stops);return;
+      slotSet(row.eta,label);slotSet(row.time,(i===0?"首车":"次车")+(time?" · "+time:""));slotSet(row.stops,stops);return;
     }
     slotSet(row.heading,(i===0?"最近一辆":"下一辆")+(p?" · 发车计划":""));
     if(!valid){label="等待数据更新";compact=true;}

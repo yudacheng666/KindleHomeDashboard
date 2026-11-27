@@ -112,7 +112,6 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .overview-half+.overview-half{padding:3px 0 4px 6px}
 .overview-page .bus-slot-label{font-size:16px;line-height:1.15;margin:0}
 .overview-bus-slot{padding:3px 0 4px;border-bottom:1px solid #aaa}
-.overview-bus-label{font-size:16px;font-weight:bold;line-height:1.15;color:#333}
 .overview-bus-line{display:table;width:100%;table-layout:fixed;line-height:1.2}
 .overview-bus-eta,.overview-bus-time{display:table-cell;vertical-align:baseline}
 .overview-bus-eta{font-size:21px;font-weight:bold}
@@ -156,11 +155,12 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 #displayHeader.overview-header{overflow:hidden}
 #display{position:relative}
 #displayNav .settings-icon{display:none}
-#displayNav[data-overview="true"]{position:absolute;right:0;bottom:0;float:none;margin:0}
+#displayNav[data-overview="true"]{position:fixed;right:4px;bottom:4px;float:none;margin:0;z-index:2}
 #displayNav[data-overview="true"] #settings{display:block;width:44px;height:44px;padding:8px;border:0;background:#fff}
 #displayNav[data-overview="true"] .settings-text{display:none}
 #displayNav[data-overview="true"] .settings-icon{display:block;width:26px;height:26px;margin:0 auto}
-#displayNav[data-overview="true"] + #displayContent{box-sizing:border-box;min-height:calc(100vh - 8px);padding-bottom:44px}
+/* Keep the content scrollable above the always-visible 44px settings target. */
+#displayNav[data-overview="true"] + #displayContent{box-sizing:border-box;max-height:calc(100vh - 52px);overflow-y:auto;overflow-x:hidden}
 #displayHeader.overview-header #headerRow{display:table;width:100%;table-layout:fixed}
 #displayHeader.overview-header #date{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 6px 2px 0;min-height:0;line-height:1.2;text-align:left;white-space:pre-line;word-wrap:break-word}
 #displayHeader.overview-header #overviewWeather{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 0 2px 6px;border-left:1px solid #aaa;text-align:left;word-wrap:break-word}
