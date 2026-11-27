@@ -4,9 +4,9 @@
 var path=location.pathname,pages=[
 ["/admin","首页","总览","查看配置入口与本地连接状态。","home"],
 ["/admin/display","显示设置","显示设置","管理看板显示设置，预览各展示页面。","screen"],
-["/admin/bus","公交设置","公交设置","选择线路、方向、乘车站点和采集时段。","bus"],
-["/admin/weather","天气设置","天气设置","管理最多三个天气地点及采集配置。","weather"],
-["/admin/driving","驾驶设置","驾驶设置","分别编辑最多三个目的地、起终点及采集时段。","car"],
+["/admin/bus","公交设置","公交设置","选择线路、方向、乘车站点和更新时间。","bus"],
+["/admin/weather","天气设置","天气设置","管理最多三个天气地点及更新设置。","weather"],
+["/admin/driving","驾驶设置","驾驶设置","分别编辑最多三个目的地、起终点及更新时间。","car"],
 ["/admin/family","家庭管理","家庭管理","维护待办、每周菜单、菜品库及提醒海报。","family"],
 ["/admin/system","系统设置","系统信息","查看软件版本、访问方式及部署说明。","settings"]];
 var current=pages.filter(function(p){return p[0]===path;})[0];if(!current)return;
@@ -55,6 +55,7 @@ if(path==="/admin/display"||path==="/admin/family"){
   var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=480,h=640;
   var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});
   var appearance=button(actions,"原始画面",function(){device=!device;resize();});appearance.id="previewAppearance";
+  var defaults=button(actions,"恢复默认",function(){width.value="480";height.value="640";mode.value="overview";fit=true;device=true;load();});defaults.id="previewDefaults";
   var apply=button(actions,"应用视口 / 刷新",load);apply.id="previewApply";fitButton.id="previewFit";oneButton.id="previewOne";
   var feedback=make(preview,"p","","admin-preview-error");feedback.id="previewFeedback";feedback.setAttribute("role","status");
   var stage=make(preview,"div",null,"admin-preview-stage"),wrap=make(stage,"div",null,"admin-preview-wrap"),shell=make(wrap,"div",null,"admin-preview-device"),screen=make(shell,"div",null,"admin-preview-screen"),brand=make(shell,"span","kindle","admin-preview-brand");stage.id="previewStage";shell.id="previewDevice";screen.id="previewScreen";brand.setAttribute("aria-hidden","true");

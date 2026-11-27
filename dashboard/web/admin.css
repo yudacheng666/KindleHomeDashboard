@@ -69,3 +69,5 @@ body.desktop-admin{margin:0;max-width:none;padding:0;background:#f5f7fb;color:#1
 .desktop-admin .admin-family-toolbar{display:flex;justify-content:flex-end;margin-bottom:6px}
 .desktop-admin .admin-preview-error{color:#a12626;font-size:13px}.desktop-admin .admin-preview-error:empty{display:none}
 .desktop-admin.admin-weather #weatherDetail>h2,.desktop-admin.admin-driving #drivingDetail>h2{display:none}
+
+.desktop-admin #view .bus-next{padding:4px 0}.desktop-admin #view .bus-next .bus-details{margin-top:2px}
