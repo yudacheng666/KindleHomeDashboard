@@ -3,7 +3,7 @@
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false,historyOpen=false,catalogCategory="",catalogQuery="",menusLoaded=false,stopQuick=null,resumeQuick=null,quickCanLeave=null;
-function initialTab(){var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#catalog"?"catalog":h==="#display"?"displaySettings":"tasks";}
+function initialTab(){if(typeof location!=="undefined"&&location.pathname==="/admin/display")return "displaySettings";var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#catalog"?"catalog":h==="#display"?"displaySettings":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -423,6 +423,7 @@ var returnMode=returnMatch?returnMatch[1]:"tasks";
 el("returnLink").href=returnMode==="auto"?"/auto":"/display#"+returnMode;
 el("busTab").href="/bus#return-"+returnMode;
 el("returnLink").onclick=el("busTab").onclick=function(){return !busy&&canLeave();};
+if(typeof location!=="undefined"&&location.pathname.indexOf("/admin/")===0)window.KHD_ADMIN_CAN_LEAVE=function(){return !busy&&canLeave();};
 el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";admin=el("mode").value==="admin";if(direct&&!token)token="local-direct";if(direct&&admin&&!openAdmin&&token==="local-direct"){note("请输入管理凭证。");return;}load();};
 el("refresh").onclick=function(){if(!busy&&canLeave()){closeEditor();load();}};
 el("logout").onclick=function(){if(!busy&&canLeave())reset();};

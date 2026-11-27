@@ -3,7 +3,10 @@
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
 var token="", epoch=0, busy=false, data=null, pages=[], cursor=0, running=false;
-var autoEntry=typeof location!=="undefined"&&location.pathname==="/auto", automatic=false;
+var path=typeof location!=="undefined"?location.pathname:"";
+var preview=path==="/preview"||path==="/preview/auto";
+var adminModule=path==="/admin/weather"?"weather":path==="/admin/driving"?"driving":"";
+var autoEntry=path==="/auto"||path==="/preview/auto", automatic=false;
 var seconds=180, editing=false, section="tasks", settingsOpen=false;
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
 var weatherPages=[],weatherCursor=0,weatherOrder="",WEATHER_SECONDS=120;
@@ -111,6 +114,7 @@ function render(){
   txt("pause",running?"暂停轮播":"开始轮播");
 }
 function completeTask(t,on,button){
+  if(preview)return;
   if(!token||!data||data.date!==on||(t.occurrence&&t.occurrence>on)||data.can_complete!==true||!(mode==="overview"||(section==="tasks"&&mode==="family"))||settingsOpen)return;
   if(busy||(mode==="overview"&&overviewPending.home)){txt("status","正在同步，请稍后再试。");return;}
   if(!window.confirm("确认完成「"+t.title+"」？完成后保留历史记录。"))return;
@@ -141,18 +145,18 @@ function completeTask(t,on,button){
 // Never store credentials or page contents. The direct manual display can resume
 // after a mobile browser reload; token-authenticated and /auto entries cannot.
 function forgetResume(){
-  if(!direct||autoEntry)return;
+  if(preview||adminModule||!direct||autoEntry)return;
   try{window.sessionStorage.removeItem(resumeKey);}catch(e){}
 }
 function rememberResume(){
-  if(!direct||autoEntry||automatic||mode!=="family"||!token||!pages[cursor])return;
+  if(preview||adminModule||!direct||autoEntry||automatic||mode!=="family"||!token||!pages[cursor])return;
   try{window.sessionStorage.setItem(resumeKey,JSON.stringify({
     id:pages[cursor].id,running:running,seconds:seconds,
     section:section,saved:savedKey
   }));}catch(e){}
 }
 function restoreResume(){
-  if(!direct||autoEntry||automatic||mode!=="family")return;
+  if(preview||adminModule||!direct||autoEntry||automatic||mode!=="family")return;
   try{
     var s=JSON.parse(window.sessionStorage.getItem(resumeKey)||"null");
     forgetResume();
@@ -913,7 +917,7 @@ function manual(){
   refreshTimer=setTimeout(refresh,mode==="bus"?15000:30000);modeLabel();
 }
 function switchMode(next){
-  if(!token)return;
+  if(preview||adminModule||!token)return;
   if(settingsOpen&&!closeSettings())return;manual();
   if(next===mode)return;
   epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;editing=false;
@@ -921,7 +925,7 @@ function switchMode(next){
   tabs();hide("正在读取");refresh();
 }
 function switchSection(next){
-  if(!token)return;
+  if(preview||adminModule||!token)return;
   if(settingsOpen&&!closeSettings())return;manual();
   if(mode!=="family"){section=next;switchMode("family");return;}
   if(section===next)return;
@@ -967,9 +971,9 @@ function reset(keepResume){
   clearTimeout(refreshTimer);refreshTimer=null;hide("");el("token").value="";
   panel(false);show("options",false);show("display",false);show("login",true);
 }
-el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#overview"||(!hash&&typeof location!=="undefined"&&location.pathname==="/"))){mode="overview";resumePage="";forgetResume();}else if(!automatic&&(hash==="#bus"||hash==="#weather"||hash==="#driving")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
+el("connect").onclick=function(){if(busy)return;token=el("token").value;el("token").value="";if(direct&&!token)token="local-direct";if(token){if(adminModule){show("login",false);show("display",true);panel(true);el(adminModule+"Load").onclick();return;}automatic=autoEntry;restoreResume();var hash=typeof location!=="undefined"?location.hash:"";if(!automatic&&(hash==="#overview"||(!hash&&(path==="/"||preview)))){mode="overview";resumePage="";forgetResume();}else if(!automatic&&(hash==="#bus"||hash==="#weather"||hash==="#driving")){mode=hash.slice(1);resumePage="";forgetResume();}else if(!automatic&&["#tasks","#posters","#menus"].indexOf(hash)>=0){if(section!==hash.slice(1))resumePage="";section=hash.slice(1);}tabs();modeLabel();clearTimeout(refreshTimer);refreshTimer=null;refresh();}};
 el("autoMode").onclick=function(){
-  if(!token)return;
+  if(preview||adminModule||!token)return;
   if(settingsOpen&&!closeSettings())return;
   panel(false);stopRotation();automatic=true;forgetResume();epoch++;busy=false;editing=false;section="tasks";if(mode==="overview"){mode="family";hide("");}tabs();show("options",false);
   clearTimeout(refreshTimer);refreshTimer=null;modeLabel();refresh();
@@ -985,14 +989,14 @@ el("drivingMode").onclick=function(){switchMode("driving");};
 el("previous").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(-1,false);};
 el("next").onclick=function(){if(editing||section!=="posters"||mode!=="family")return;manual();running=false;stopRotation();advance(1,false);};
 el("pause").onclick=function(){if(!data||editing||section!=="posters")return;if(running)manual();running=!running;render();scheduleRotation();};
-el("settings").onclick=function(){if(!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
-function closeSettings(){if(!leaveDetail())return false;editing=false;panel(false);show("options",false);scheduleRotation();return true;}
+el("settings").onclick=function(){if(preview||adminModule||!token||settingsOpen)return;panel(true);stopRotation();el("seconds").value=String(seconds);show("options",mode==="family"&&section==="posters");};
+function closeSettings(){if(adminModule)return false;if(!leaveDetail())return false;editing=false;panel(false);show("options",false);scheduleRotation();return true;}
 el("returnDisplay").onclick=closeSettings;
 el("weatherNext").onclick=function(){if((mode!=="weather"&&mode!=="overview")||weatherPages.length<2||!settingsOpen)return;if(!closeSettings())return;weatherCursor=(weatherCursor+1)%weatherPages.length;if(mode==="overview")renderOverviewWeather();else renderWeather();};
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;if(closeSettings()){seconds=n;scheduleRotation();}};
 el("cancel").onclick=closeSettings;
 el("logout").onclick=function(){if(canLeaveSettings())reset();};
-["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage"].forEach(function(id){el(id).onclick=canLeaveSettings;});
+["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage","desktopAdminLink"].forEach(function(id){el(id).onclick=canLeaveSettings;});
 if(window.addEventListener){
   window.addEventListener("pagehide",function(){
     var keep=direct&&!autoEntry&&!automatic&&mode==="family"&&!!token;
@@ -1004,6 +1008,7 @@ if(window.addEventListener){
   },false);
 }
 if(document.addEventListener)document.addEventListener("visibilitychange",function(){
+  if(adminModule)return;
   if(document.hidden){
     rememberResume();stopOverview();stopAge();stopRotation();clearTimeout(refreshTimer);refreshTimer=null;epoch++;busy=false;
   }
@@ -1012,6 +1017,7 @@ if(document.addEventListener)document.addEventListener("visibilitychange",functi
     hide("正在重新读取");refresh();
   }
 },false);
+if(adminModule)window.KHD_ADMIN_CAN_LEAVE=canLeaveSettings;
 panel(false);show("options",false);txt("version",access.version?"软件版本："+access.version:"软件版本：未知");
 if(direct){el("connect").onclick();}
 }());
