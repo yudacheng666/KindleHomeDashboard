@@ -606,6 +606,16 @@ def main():
                 go_admin("/admin")
                 wait(lambda:js("return !!document.querySelector('.admin-module-grid')"))
                 assert js("return document.querySelectorAll('.admin-module-card').length===6")
+                assert js("""return (function(){
+                  var b=document.querySelector('.admin-brand strong'),r=document.createRange();
+                  r.selectNodeContents(b);
+                  return r.getClientRects().length===1 && r.getBoundingClientRect().right<=document.querySelector('.admin-sidebar').getBoundingClientRect().right
+                    && document.querySelectorAll('.admin-status-cell .admin-muted').length===3
+                    && !document.querySelector('.admin-enter')
+                    && !document.querySelector('#adminLanding .admin-info')
+                    && document.querySelector('.admin-module-card p').textContent==='管理看板显示设置，预览各展示页面。'
+                    && Array.prototype.every.call(document.querySelectorAll('.admin-module-card'),function(a){return a.tagName==='A' && a.getBoundingClientRect().height<125 && !!a.getAttribute('href');});
+                })()""")
                 assert js("return document.querySelectorAll('.admin-nav a[aria-current=page]').length===1 && document.documentElement.scrollWidth<=window.innerWidth")
                 go_admin("/admin/display")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return !!f && !!f.contentDocument && !!f.contentDocument.querySelector('.overview-page')"))
@@ -614,8 +624,43 @@ def main():
                 click("previewApply");click("previewOne")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560 && !!f.contentDocument.querySelector('.overview-page')"))
                 assert js("""var f=document.getElementById('previewFrame');return f.contentDocument.querySelector('script[src="/display.js"]')!==null && f.getBoundingClientRect().width===420 && f.getBoundingClientRect().height===560""")
+                assert js("""return (function(){
+                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice'),s=document.getElementById('previewScreen');
+                  var a=f.getBoundingClientRect(),b=d.getBoundingClientRect(),c=s.getBoundingClientRect();
+                  return b.width>a.width && b.height>a.height && a.width===c.width && a.height===c.height
+                    && a.left>b.left && a.top>b.top && getComputedStyle(f).filter!=='none';
+                })()""")
+                # Toggling appearance never reloads the real display or changes its
+                # viewport, computed font, line height or underlying content.
+                js("""var f=document.getElementById('previewFrame');window.testPreview=f;
+                  window.testPreviewFont=f.contentWindow.getComputedStyle(f.contentDocument.body).font;
+                  window.testPreviewBody=f.contentDocument.getElementById('body');""")
+                click("previewAppearance")
+                assert js("""return (function(){
+                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice');
+                  return f===window.testPreview && f.contentDocument.getElementById('body')===window.testPreviewBody
+                    && f.contentWindow.getComputedStyle(f.contentDocument.body).font===window.testPreviewFont
+                    && f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560
+                    && f.getBoundingClientRect().width===420 && f.getBoundingClientRect().height===560
+                    && d.getBoundingClientRect().width===420 && getComputedStyle(f).filter==='none';
+                })()""")
+                click("previewAppearance")
                 click("previewFit")
-                assert js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560")
+                assert js("""return (function(){
+                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice'),a=f.getBoundingClientRect(),b=d.getBoundingClientRect();
+                  return f===window.testPreview && f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560
+                    && Math.abs(a.width/a.height-420/560)<.001
+                    && Math.abs(a.width/420-b.width/d.offsetWidth)<.001
+                    && Math.abs(a.height/560-b.height/d.offsetHeight)<.001
+                    && a.width<=420 && f.contentWindow.getComputedStyle(f.contentDocument.body).font===window.testPreviewFont;
+                })()""")
+                js("document.getElementById('previewWidth').value='600';document.getElementById('previewHeight').value='800'")
+                click("previewApply")
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===600 && f.contentWindow.innerHeight===800 && !!f.contentDocument.querySelector('.overview-page')"))
+                assert js("""var f=document.getElementById('previewFrame'),a=f.getBoundingClientRect();return Math.abs(a.width/a.height-.75)<.001 && a.width<600""")
+                click("previewOne")
+                assert js("var f=document.getElementById('previewFrame');return f.getBoundingClientRect().width===600 && f.getBoundingClientRect().height===800")
+                click("previewFit")
                 js("var e=document.getElementById('previewMode');e.value='tasks';e.dispatchEvent(new Event('change'))")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentDocument.getElementById('heading') && f.contentDocument.getElementById('heading').textContent==='待办清单'"))
                 assert js("var f=document.getElementById('previewFrame');f.contentDocument.getElementById('settings').click();return f.contentDocument.getElementById('settingsPanel').className==='hidden'")
