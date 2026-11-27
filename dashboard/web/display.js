@@ -899,7 +899,7 @@ function fitOverviewViewport(){
   var c=el("displayContent"),d=overviewRoots.driving,h=overviewRoots.home;
   if(!d||!h||!d.style||!h.style||!c.clientHeight||!c.getBoundingClientRect)return;
   // Allocate map height using the actual remaining viewport and both route lists.
-  // Keep at least 130px for the household headings/lists whenever possible.
+  // Keep at least 100px for the household headings/lists whenever possible.
   // Only portrait wide viewports use this profile; other sizes keep existing CSS.
   var maps=d.querySelectorAll?d.querySelectorAll(".overview-driving-map"):[];
   if(maps.length){
@@ -907,7 +907,7 @@ function fitOverviewViewport(){
     if(wideOverview()){
       var current=maps[0].getBoundingClientRect().height;
       var overhead=d.getBoundingClientRect().height-current;
-      var available=c.getBoundingClientRect().bottom-9-d.getBoundingClientRect().top-overhead-130;
+      var available=c.getBoundingClientRect().bottom-9-d.getBoundingClientRect().top-overhead-100;
       var width=maps[0].clientWidth;
       if(width)mapHeight=Math.max(60,Math.floor(Math.min(width*0.62,240,available)))+"px";
     }

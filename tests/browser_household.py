@@ -66,7 +66,21 @@ def main():
         import struct, zlib
         def png_chunk(kind, data):
             return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data))
-        map_png=b"\x89PNG\r\n\x1a\n"+png_chunk(b"IHDR",struct.pack(">IIBBBBB",600,360,8,0,0,0,0))+png_chunk(b"IDAT",zlib.compress((b"\x00"+b"\xff"*600)*360))+png_chunk(b"IEND",b"")
+        # Abstract fictional road grid; no actual geography or map imagery.
+        pixels=[]
+        for y in range(360):
+            row=bytearray()
+            for x in range(600):
+                shade=235
+                if x%83<3 or (y+x//3)%67<3 or (x+y//2)%119<3:
+                    shade=190
+                if abs(y-(280-x//3))<4 and 70<x<520:
+                    shade=35
+                if (x-70)**2+(y-257)**2<64 or (x-520)**2+(y-107)**2<64:
+                    shade=20
+                row.append(shade)
+            pixels.append(b"\x00"+bytes(row))
+        map_png=b"\x89PNG\r\n\x1a\n"+png_chunk(b"IHDR",struct.pack(">IIBBBBB",600,360,8,0,0,0,0))+png_chunk(b"IDAT",zlib.compress(b"".join(pixels)))+png_chunk(b"IEND",b"")
         driving=DrivingService(directory,{"KHD_AMAP_KEY":"placeholder_test_credential"},
             clock=lambda:now,transport=lambda u,h:reply(600,1200,4800),
             image_transport=lambda u:("image/png",map_png))
@@ -459,13 +473,18 @@ def main():
                 # Screenshot the real product page at a provisional wide portrait
                 # viewport, not an illustration. All fixtures are fictional.
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":768,"height":640,"deviceScaleFactor":1,"mobile":False}})
-                wait(lambda:js("""return innerWidth===768&&innerHeight===640&&parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize)===32&&document.querySelector('.overview-driving-map').getBoundingClientRect().height>140&&document.querySelector('.overview-home').clientHeight>=125"""))
-                assert js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map img');return getComputedStyle(d).overflowY==='visible'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom&&m.getBoundingClientRect().width/m.parentNode.parentNode.clientWidth>=.75&&parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize)===25&&parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize)===23""")
+                wait(lambda:js("return innerWidth===768&&innerHeight===640"))
+                js("window.dispatchEvent(new Event('resize'))")
                 visual=os.environ.get("KHD_VISUAL_OUTPUT")
                 if visual:
                     os.makedirs(visual,exist_ok=True)
                     with open(os.path.join(visual,"overview-768x640.png"),"wb") as f:
                         f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
+                metrics=js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map'),img=m.querySelector('img');return {width:innerWidth,height:innerHeight,mapHeight:m.clientHeight,mapWidth:img.getBoundingClientRect().width,cardWidth:m.clientWidth,homeHeight:h.clientHeight,drivingTop:d.getBoundingClientRect().top,drivingHeight:d.clientHeight,contentHeight:c.clientHeight,scrollHeight:c.scrollHeight,clockFont:parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize),homeFont:parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize),menuFont:parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize)}""")
+                print("Fictional visual viewport metrics:",metrics,flush=True)
+                assert metrics["clockFont"]==32 and metrics["homeFont"]==25 and metrics["menuFont"]==23, metrics
+                assert metrics["mapHeight"]>140 and metrics["mapWidth"]/metrics["cardWidth"]>=.65 and metrics["homeHeight"]>=95, metrics
+                assert js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home');return getComputedStyle(d).overflowY==='visible'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom"""),metrics
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
