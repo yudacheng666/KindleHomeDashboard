@@ -242,6 +242,17 @@ function buildOverviewSlot(root,i){
   return {eta:eta,time:time,stops:detail,distance:null,item:null,overview:true};
 }
 function slotSet(node,value){if(node&&node.textContent!==value)node.textContent=value;}
+// Preserve the exact accessible text and avoid replacing ETA nodes on ticks
+// that do not change their content. Only the numeric fragments get emphasis.
+function overviewNumberText(node,value,split){
+  if(node._numberText===value&&node._numberSplit===split)return;
+  node._numberText=value;node._numberSplit=split;
+  clear(node);node.textContent="";
+  if(!split){node.textContent=value;return;}
+  value.split(/(-?\d+(?:\.\d+)?)/).forEach(function(part,i){
+    if(part)append(node,"span",part,i%2?"overview-number-value":"overview-number-unit");
+  });
+}
 function updateEta(rows,s,now){
   var stamp=s.fetched_at_ms,age=now-stamp,valid=typeof stamp==="number"&&isFinite(stamp)&&age>=0&&age<90000;
   rows.forEach(function(row,i){
@@ -264,7 +275,7 @@ function updateEta(rows,s,now){
         var detailParts=[];if(v.stops_remaining!=null)detailParts.push("剩余 "+v.stops_remaining+" 站");if(v.distance_m!=null)detailParts.push(v.distance_m+" 米");stops=detailParts.join(" · ");
       }else{label="暂无车辆";compact=true;}
       row.eta.className="overview-bus-eta"+(compact?" overview-bus-state":"");
-      slotSet(row.eta,label);slotSet(row.time,(i===0?"首车":"次车")+(time?" · "+time:""));slotSet(row.stops,stops);return;
+      overviewNumberText(row.eta,label,!compact);slotSet(row.time,(i===0?"首车":"次车")+(time?" · "+time:""));slotSet(row.stops,stops);return;
     }
     slotSet(row.heading,(i===0?"最近一辆":"下一辆")+(p?" · 发车计划":""));
     if(!valid){label="等待数据更新";compact=true;}
@@ -308,7 +319,7 @@ function paintAge(){
   if(mode==="overview"){
     var day=isFinite(now)?new Date(now+zoneOffset*60000).toISOString().slice(0,10):overviewDay;
     var label=overviewDate(day);
-    slotSet(overviewRoots.clock,time||"时间未知");slotSet(overviewRoots.day,label||"日期未知");
+    slotSet(overviewRoots.clock,time||"时间未知");if(overviewRoots.clock)overviewRoots.clock.setAttribute("data-known",time?"true":"false");slotSet(overviewRoots.day,label||"日期未知");
   }else txt("date",time);
   // Overview has no normal timestamp row, but must still expire cached ETA locally.
   if(!etaSnapshot||(!ageNode&&(mode!=="overview"||["live","stale","no_live_data"].indexOf(etaSnapshot.status)<0)))return;
@@ -684,7 +695,7 @@ function renderDrivingGroups(root,v,limit,summary){
         if(summary){
           var route=append(list,"div","","driving-route-row"+(i===0?" driving-fast":""));
           append(route,"span",String(i+1),"driving-route-number");
-          append(route,"span",drivingDuration(r.seconds),"driving-route-time");
+          overviewNumberText(append(route,"span","","driving-route-time"),drivingDuration(r.seconds),true);
           append(route,"span",(r.meters/1000).toFixed(1)+"km","driving-route-distance");
         }else{
           var text=(i+1)+"  "+drivingDuration(r.seconds);
@@ -893,8 +904,19 @@ function updateViewportInfo(){
   var n=el("viewportInfo"),w=window.innerWidth,h=window.innerHeight;
   if(n&&w&&h)n.textContent="当前网页可视区："+w+" × "+h+" CSS px；像素比 "+(window.devicePixelRatio||1)+"。电脑预览请填相同宽高（不含浏览器工具栏）。";
 }
+function fitOverviewWeatherType(){
+  var root=overviewRoots.weather;
+  if(!root||!root.querySelector)return;
+  var n=root.querySelector(".weather-main");
+  if(!n||!n.getBoundingClientRect||!window.getComputedStyle)return;
+  n.setAttribute("data-compact","false");
+  var line=parseFloat(window.getComputedStyle(n).lineHeight);
+  // Unusually long weather descriptions keep the original size/wrapping.
+  if(n.getBoundingClientRect().height>line+1||n.scrollWidth>n.clientWidth+1)n.setAttribute("data-compact","true");
+}
 function fitOverviewViewport(){
   fitOverviewBusHeading();
+  fitOverviewWeatherType();
   if(settingsOpen)updateViewportInfo();
   var c=el("displayContent"),d=overviewRoots.driving,h=overviewRoots.home;
   if(!d||!h||!d.style||!h.style||!c.clientHeight||!c.getBoundingClientRect)return;
@@ -968,6 +990,7 @@ function renderOverviewWeather(){
   weather.className=c&&c.status==="available"&&v.status!=="disabled"&&v.status!=="storage_error"?"weather-main":"overview-weather-status";
   weather.title="天气详情";
   if(weather.className==="weather-main"){
+    overviewNumberText(weather,label,true);
     append(line,"span","体感 "+weatherNum(c.data.feels,"°")+" · 湿度 "+weatherNum(c.data.humidity,"%"),"weather-summary");
   }
   weatherPages.forEach(function(p){var a=p.sections&&p.sections.alerts;
