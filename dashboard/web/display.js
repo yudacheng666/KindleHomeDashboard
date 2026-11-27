@@ -787,14 +787,16 @@ function overviewLayout(){
 }
 function renderOverviewBus(v){
   var root=overviewRoots.bus,s=v.snapshot,t=v.trip,items=slotItems(s);
-  var labels={live:"实时预计到站",stale:"旧数据",expired:"数据已过期",paused:"不在更新时间内",blocked:"接口限制访问",disabled:"公交自动更新已关闭",config_error:"公交配置错误",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序变化，请重新选站",unavailable:"等待首次更新",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地更新服务异常"};
-  var key=JSON.stringify([t,items.length,["live","stale","no_live_data"].indexOf(s.status)>=0]);
+  var labels={live:"",stale:"数据未更新",expired:"数据已过期",paused:"暂停更新",blocked:"接口暂不可用",disabled:"公交未启用",config_error:"配置异常",unconfigured:"未设置公交",unverified:"核对线路中",needs_selection:"线路站序变化，需重新选站",unavailable:"等待首次更新",no_live_data:"",error:"更新失败",service_error:"服务异常"};
+  var key=JSON.stringify([t,items.length,items.map(function(item){return item.vehicle&&item.vehicle.position||item.plan&&item.plan.time||"";}),s.status]);
   if(key!==overviewKeys.bus){
-    overviewKeys.bus=key;stopAge();clear(root);
+    overviewKeys.bus=key;stopAge();clear(root);etaRows=[];
     overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name,"note");
-    busStatusNode=append(root,"p",labels[s.status]||"状态未知","note");
-    for(var i=0;i<items.length;i++)etaRows.push(buildSlot(root,i));
+    var statusText=labels[s.status]||"状态未知";
+    if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
+    busStatusNode=statusText?append(root,"p",statusText,"note"):null;
+    for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(root,i));
     if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
   }
   items.forEach(function(item,i){etaRows[i].item=item;});
