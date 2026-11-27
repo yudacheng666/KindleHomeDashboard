@@ -3,7 +3,7 @@
 "use strict";
 var path=location.pathname,pages=[
 ["/admin","首页","总览","查看配置入口与本地连接状态。","home"],
-["/admin/display","显示设置","显示设置","配置海报轮播和菜单展示范围，按实际视口预览看板。","screen"],
+["/admin/display","显示设置","显示设置","管理看板显示设置，预览各展示页面。","screen"],
 ["/admin/bus","公交设置","公交设置","选择线路、方向、乘车站点和采集时段。","bus"],
 ["/admin/weather","天气设置","天气设置","管理最多三个天气地点及采集配置。","weather"],
 ["/admin/driving","驾驶设置","驾驶设置","分别编辑最多三个目的地、起终点及采集时段。","car"],
@@ -34,12 +34,12 @@ make(topRight,"span",access.version||"版本未知");if(path==="/admin/weather"|
 link(topRight,"返回展示页","/","admin-primary");
 var content=make(main,"div",null,"admin-content"),banner=make(content,"header",null,"admin-banner");make(banner,"h1",current[2]);make(banner,"p",current[3]);
 var work=make(content,"div");work.id="adminWork";children.forEach(function(n){work.appendChild(n);});document.title=current[2]+" · KindleHomeDashboard";
-function statusCell(root,label,value,description){var c=make(root,"div",null,"admin-status-cell");make(c,"span",label,"admin-muted");make(c,"strong",value);make(c,"span",description,"admin-muted");}
+function statusCell(root,label,value,description){var c=make(root,"div",null,"admin-status-cell");make(c,"span",label,"admin-muted");make(c,"strong",value);if(description)make(c,"span",description,"admin-muted");}
 if(path==="/admin"||path==="/admin/system"){
  var landing=el("adminLanding"),card=make(landing,"section",null,"admin-card");make(card,"h2","系统状态");var statuses=make(card,"div",null,"admin-status-grid");
- statusCell(statuses,"服务连接",window.KHD_ACCESS?"已响应":"未知","仅表示本地网页服务响应");statusCell(statuses,"软件版本",access.version||"未知","当前 NAS 运行版本");statusCell(statuses,"访问方式",access.openAdmin?"家庭直连":access.direct?"管理需凭证":"令牌访问","沿用现有访问权限");
+ statusCell(statuses,"服务连接",window.KHD_ACCESS?"已响应":"未知");statusCell(statuses,"软件版本",access.version||"未知");statusCell(statuses,"访问方式",access.openAdmin?"家庭直连":access.direct?"管理需凭证":"令牌访问");
  if(path==="/admin"){make(landing,"h2","功能模块","admin-section-title");var grid=make(landing,"div",null,"admin-module-grid");
- pages.slice(1).forEach(function(p){var a=link(grid,null,p[0],"admin-card admin-module-card"),i=make(a,"span",null,"admin-module-icon");icon(i,p[4]);var c=make(a,"div");make(c,"h2",p[1]);make(c,"p",p[3]);make(c,"span","进入设置 →","admin-enter");});make(landing,"p","所有配置保存在 NAS。各模块的保存、权限及采集规则保持不变。","admin-info");}
+ pages.slice(1).forEach(function(p){var a=link(grid,null,p[0],"admin-card admin-module-card"),i=make(a,"span",null,"admin-module-icon");icon(i,p[4]);var c=make(a,"div");make(c,"h2",p[1]);make(c,"p",p[3]);});}
  else{var info=make(landing,"section",null,"admin-card");info.style.marginTop="16px";make(info,"h2","部署与更新");make(info,"p","使用极空间 Docker 的镜像检查与容器更新功能，保留原数据卷。后台不控制 Docker，不会自动下载安装更新。");make(info,"p","访问凭证、天气及地图密钥在 NAS 私有配置中维护，本页不显示密钥。");}
 }
 if(path==="/admin/display"||path==="/admin/family"){

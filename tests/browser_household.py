@@ -606,6 +606,16 @@ def main():
                 go_admin("/admin")
                 wait(lambda:js("return !!document.querySelector('.admin-module-grid')"))
                 assert js("return document.querySelectorAll('.admin-module-card').length===6")
+                assert js("""return (function(){
+                  var b=document.querySelector('.admin-brand strong'),r=document.createRange();
+                  r.selectNodeContents(b);
+                  return r.getClientRects().length===1 && r.getBoundingClientRect().right<=document.querySelector('.admin-sidebar').getBoundingClientRect().right
+                    && document.querySelectorAll('.admin-status-cell .admin-muted').length===3
+                    && !document.querySelector('.admin-enter')
+                    && !document.querySelector('#adminLanding .admin-info')
+                    && document.querySelector('.admin-module-card p').textContent==='管理看板显示设置，预览各展示页面。'
+                    && Array.prototype.every.call(document.querySelectorAll('.admin-module-card'),function(a){return a.tagName==='A' && a.getBoundingClientRect().height<125 && !!a.getAttribute('href');});
+                })()""")
                 assert js("return document.querySelectorAll('.admin-nav a[aria-current=page]').length===1 && document.documentElement.scrollWidth<=window.innerWidth")
                 go_admin("/admin/display")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return !!f && !!f.contentDocument && !!f.contentDocument.querySelector('.overview-page')"))
