@@ -713,6 +713,22 @@ def main():
                     for state,expected in [(replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),"计划"),(replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),"暂无车辆"),(replace(live_snapshot,status="stale"),"数据未更新"),(replace(live_snapshot,status="expired",vehicles=(),departure_plans=()),"数据已过期")]:
                         bus.poller.last=state
                         assert overview_bus_geometry(expected)==baseline
+                # Exercise the real text-measurement path with fictional long names.
+                # Keep a single title line; only station text shrinks, and grows again
+                # on widening the viewport. Extreme length is clipped with an ellipsis.
+                js("""var d=document.querySelector('.overview-bus-direction');d.textContent=' · 虚构示例甲站点名称 → 虚构示例乙站点名称';window.dispatchEvent(new Event('resize'));""")
+                fit_heading = """return (function(){
+                  var b=document.querySelector('.overview-bus'),h=b.querySelector('.overview-link'),n=h.querySelector('.overview-bus-name'),d=h.querySelector('.overview-bus-direction');
+                  var a=n.getBoundingClientRect(),c=d.getBoundingClientRect(),r=h.getBoundingClientRect();
+                  return parseFloat(getComputedStyle(n).fontSize)===19&&getComputedStyle(h).whiteSpace==='nowrap'&&r.height===26&&c.left>=a.right-1&&c.right<=r.right+1&&Math.abs(a.top-c.top)<8&&d.scrollWidth<=d.clientWidth+1&&parseFloat(getComputedStyle(d).fontSize)<17&&parseFloat(getComputedStyle(d).fontSize)>=10;
+                })()"""
+                assert js(fit_heading)
+                wd("/session/"+sid+"/window/rect", {"width":600,"height":800})
+                wait(lambda:js("return parseFloat(getComputedStyle(document.querySelector('.overview-bus-direction')).fontSize)===17"))
+                wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
+                wait(lambda:js(fit_heading))
+                js("""var d=document.querySelector('.overview-bus-direction');d.textContent=' · '+('虚构站名'.repeat(50))+' → 终点';window.dispatchEvent(new Event('resize'));""")
+                assert js("""var d=document.querySelector('.overview-bus-direction'),h=d.parentNode;return parseFloat(getComputedStyle(d).fontSize)===10&&d.scrollWidth>d.clientWidth&&getComputedStyle(d).textOverflow==='ellipsis'&&h.getBoundingClientRect().height===26&&d.getBoundingClientRect().right<=h.getBoundingClientRect().right+1""")
                 bus.poller.last=live_snapshot
                 wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
                 # Use the existing cache, not a new upstream request.

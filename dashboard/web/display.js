@@ -70,7 +70,7 @@ function updateManagementLinks(){
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
-function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();else fitOverviewBusHeading();}
 function taskDateLabel(day,today){
   var d=new Date(day+"T00:00:00Z"),base=new Date(today+"T00:00:00Z");
   var label=(day.slice(0,4)===today.slice(0,4)?"":day.slice(0,4)+"/")+day.slice(5).replace("-","/");
@@ -873,13 +873,28 @@ function overviewLayout(){
   ["weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
   txt("heading","");txt("index","");
 }
+// Measure rendered text rather than character count: mixed CJK/Latin station names
+// have different widths. Refit only when the available width or text changes.
+function fitOverviewBusHeading(){
+  var h=overviewRoots.busHeader,n=overviewRoots.busName,d=overviewRoots.busDirection;
+  if(!h||!n||!d||!d.style||!h.clientWidth)return;
+  var width=h.clientWidth;
+  if(h._fitWidth===width&&h._fitText===d.textContent)return;
+  h._fitWidth=width;h._fitText=d.textContent;
+  d.style.maxWidth="none";d.style.fontSize="17px";
+  var remaining=Math.max(0,width-n.offsetWidth-1),size=17;
+  while(size>10&&d.offsetWidth>remaining){size--;d.style.fontSize=size+"px";}
+  d.style.maxWidth=remaining+"px";
+}
 function overviewBusShell(t,status){
   var root=overviewRoots.bus;clear(root);
   var name=t?t.line.name:"公交",direction=t?t.boarding.name+" → "+t.destination.name:"";
   var link=overviewLink(root,"",function(){switchMode("bus");});
   link.title=name+(direction?" · "+direction:"");
-  append(link,"span",name,"overview-bus-name");
-  append(link,"span",direction?" · "+direction:"","overview-bus-direction");
+  overviewRoots.busHeader=link;
+  overviewRoots.busName=append(link,"span",name,"overview-bus-name");
+  overviewRoots.busDirection=append(link,"span",direction?" · "+direction:"","overview-bus-direction");
+  fitOverviewBusHeading();
   busStatusNode=append(root,"p",status,"note overview-bus-status");
   var slots=append(root,"div","","overview-bus-slots");
   for(var i=0;i<2;i++)etaRows.push(buildOverviewSlot(slots,i));
@@ -990,6 +1005,7 @@ function requestOverview(k){
       if(status===404||status===503||el("login").className==="hidden"){show("login",false);show("display",true);}
       else txt("status","连接异常，请检查 NAS 网络");
     }
+    fitOverviewBusHeading();
     overviewTimers[k]=setTimeout(function(){requestOverview(k);},interval);
   }
   try{x.open("GET","/api/"+k+"/view",true);if(token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
@@ -1097,6 +1113,7 @@ el("cancel").onclick=closeSettings;
 el("logout").onclick=function(){if(canLeaveSettings())reset();};
 ["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage","desktopAdminLink"].forEach(function(id){el(id).onclick=canLeaveSettings;});
 if(window.addEventListener){
+  window.addEventListener("resize",fitOverviewBusHeading,false);
   window.addEventListener("pagehide",function(){
     var keep=direct&&!autoEntry&&!automatic&&mode==="family"&&!!token;
     if(keep)rememberResume();

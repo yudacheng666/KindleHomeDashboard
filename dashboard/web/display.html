@@ -179,14 +179,15 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 #overviewWeather .weather-alert{font-size:16px;line-height:1.2;margin:2px 0;padding:2px}
 #overviewWeather .note{font-size:17px;margin:2px 0}
 .overview-bus{box-sizing:border-box;height:149px;border-top:1px solid #555;padding:2px 0}
-.overview-bus .overview-link{display:block;width:100%;height:auto;min-height:26px;max-height:44px;line-height:22px;padding:0;white-space:normal;overflow:auto;word-wrap:break-word}
-.overview-bus-direction{font-size:17px;font-weight:normal;color:#333;white-space:normal}
+.overview-bus .overview-link{display:block;width:100%;height:26px;min-height:26px;line-height:26px;padding:0;white-space:nowrap;overflow:hidden}
+.overview-bus-name,.overview-bus-direction{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;word-wrap:normal}
+.overview-bus-direction{font-size:17px;font-weight:normal;color:#333}
 /* Reserve height on the section, not on missing rows. Keep all visible text at the top. */
 .overview-page .overview-bus-status{box-sizing:border-box;max-height:21px;line-height:21px;margin:0;overflow:auto}
 .overview-page .overview-bus-status{font-size:16px}
 .overview-bus-eta{height:32px;line-height:32px;overflow:auto}
 .overview-bus-time,.overview-page .overview-bus-details{box-sizing:border-box;max-height:20px;line-height:20px;margin:0;overflow:auto}
-@media(max-width:420px){.overview-bus{height:170px}.overview-bus .overview-link{max-height:66px}}
+@media(max-width:420px){.overview-bus{height:170px}}
 @media(max-width:360px){.overview-bus{height:210px}.overview-bus-time,.overview-page .overview-bus-details{max-height:40px}}
 .overview-bus-slots{display:table;width:100%;table-layout:fixed}
 .overview-bus-slots .overview-bus-slot{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;border-bottom:0;padding:2px 5px 2px 0}
