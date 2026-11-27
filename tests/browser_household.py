@@ -476,13 +476,26 @@ def main():
                 wait(lambda:js("return innerWidth===768&&innerHeight===640"))
                 js("window.dispatchEvent(new Event('resize'))")
                 visual=os.environ.get("KHD_VISUAL_OUTPUT")
+                # Disable only the new typography sheet on the same DOM and viewport.
+                # Compare real section and map geometry, not a hand-drawn preview.
+                geometry = """return Array.from(document.querySelectorAll('#displayHeader,.overview-bus,.overview-driving,.overview-driving-map,.overview-home,#settings')).map(n=>{var r=n.getBoundingClientRect();return [r.x,r.y,r.width,r.height];})"""
+                js("document.getElementById('overviewTypography').sheet.disabled=true;window.dispatchEvent(new Event('resize'))")
+                baseline_geometry=js(geometry)
+                if visual:
+                    os.makedirs(visual,exist_ok=True)
+                    with open(os.path.join(visual,"overview-before-768x640.png"),"wb") as f:
+                        f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
+                js("document.getElementById('overviewTypography').sheet.disabled=false;window.dispatchEvent(new Event('resize'))")
+                candidate_geometry=js(geometry)
+                assert len(baseline_geometry)==len(candidate_geometry) and all(abs(a-b)<=1 for old,new in zip(baseline_geometry,candidate_geometry) for a,b in zip(old,new)), (baseline_geometry,candidate_geometry)
+                assert js("""var t=document.querySelector('#overviewWeather .weather-main'),c=document.querySelector('.overview-clock'),n=document.querySelector('.driving-fast .driving-route-time .overview-number-value'),u=document.querySelector('.driving-fast .driving-route-time .overview-number-unit');return !!t&&!!n&&!!u&&parseFloat(getComputedStyle(c).fontSize)===40&&parseFloat(getComputedStyle(n).fontSize)===28&&parseFloat(getComputedStyle(u).fontSize)===16&&Array.from(document.querySelectorAll('.driving-route-time')).every(x=>x.scrollWidth<=x.clientWidth+1)""")
                 if visual:
                     os.makedirs(visual,exist_ok=True)
                     with open(os.path.join(visual,"overview-768x640.png"),"wb") as f:
                         f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
                 metrics=js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map'),img=m.querySelector('img');return {width:innerWidth,height:innerHeight,mapHeight:m.clientHeight,mapWidth:img.getBoundingClientRect().width,cardWidth:m.clientWidth,homeHeight:h.clientHeight,drivingTop:d.getBoundingClientRect().top,drivingHeight:d.clientHeight,contentHeight:c.clientHeight,scrollHeight:c.scrollHeight,clockFont:parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize),homeFont:parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize),menuFont:parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize)}""")
                 print("Fictional visual viewport metrics:",metrics,flush=True)
-                assert metrics["clockFont"]==32 and metrics["homeFont"]==25 and metrics["menuFont"]==23, metrics
+                assert metrics["clockFont"]==40 and metrics["homeFont"]==25 and metrics["menuFont"]==24, metrics
                 assert metrics["mapHeight"]>140 and metrics["mapWidth"]/metrics["cardWidth"]>=.65 and metrics["homeHeight"]>=95, metrics
                 assert js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home');return getComputedStyle(d).overflowY==='visible'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom"""),metrics
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
@@ -751,6 +764,16 @@ def main():
                     for state,expected in [(replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),"计划"),(replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),"暂无车辆"),(replace(live_snapshot,status="stale"),"数据未更新"),(replace(live_snapshot,status="expired",vehicles=(),departure_plans=()),"数据已过期")]:
                         bus.poller.last=state
                         assert overview_bus_geometry(expected)==baseline
+                # Wide Kindle profile: active and stale numeric labels both fit
+                # inside the fixed bus budget; the first number dominates the next.
+                wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":768,"height":640,"deviceScaleFactor":1,"mobile":False}})
+                bus.poller.last=live_snapshot
+                assert overview_bus_geometry("预计")==[139,139,10]
+                assert js("""var n=document.querySelectorAll('.overview-bus-eta:not(.overview-bus-state) .overview-number-value');return n.length===2&&parseFloat(getComputedStyle(n[0]).fontSize)===40&&parseFloat(getComputedStyle(n[1]).fontSize)===32&&Array.from(n).every(x=>x.parentNode.scrollHeight<=x.parentNode.clientHeight+1&&x.parentNode.scrollWidth<=x.parentNode.clientWidth+1)""")
+                bus.poller.last=replace(live_snapshot,status="stale")
+                assert overview_bus_geometry("数据未更新")==[139,139,10]
+                wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
+                wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 # Exercise the real text-measurement path with fictional long names.
                 # Keep a single title line; only station text shrinks, and grows again
                 # on widening the viewport. Extreme length is clipped with an ellipsis.
