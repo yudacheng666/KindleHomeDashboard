@@ -235,39 +235,11 @@ function buildSlot(root,i){
   var detail=slotNode(row,"div","bus-pair bus-details"),stops=slotNode(detail,"div","bus-left"),distance=slotNode(detail,"div","bus-right");
   return {heading:heading,eta:eta,time:time,stops:stops,distance:distance,item:null};
 }
-function buildOverviewSlot(root,i){
-  var row=slotNode(root,"div","overview-bus-slot");
-  var heading=slotNode(row,"div","overview-bus-label");heading.textContent=i===0?"首车":"次车";
-  var pair=slotNode(row,"div","overview-bus-line"),eta=slotNode(pair,"span","overview-bus-eta"),time=slotNode(pair,"span","overview-bus-time");
-  var detail=slotNode(row,"p","overview-bus-details");
-  return {heading:heading,eta:eta,time:time,stops:detail,distance:null,item:null,overview:true};
-}
-function slotSet(node,value){if(node&&node.textContent!==value)node.textContent=value;}
+function slotSet(node,value){if(node.textContent!==value)node.textContent=value;}
 function updateEta(rows,s,now){
   var stamp=s.fetched_at_ms,age=now-stamp,valid=typeof stamp==="number"&&isFinite(stamp)&&age>=0&&age<90000;
   rows.forEach(function(row,i){
-    var item=row.item||{},v=item.vehicle,p=item.plan,label="",time="",stops="",distance="",compact=false;
-    if(row.overview){
-      slotSet(row.heading,i===0?"首车":"次车");
-      if(!valid){label="等待更新";compact=true;}
-      else if(p){
-        var currentOverview=new Date(now+zoneOffset*60000),minuteOverview=currentOverview.getUTCHours()*60+currentOverview.getUTCMinutes(),deltaOverview=null;
-        if(p.time){var planParts=p.time.split(":");deltaOverview=Number(planParts[0])*60+Number(planParts[1])-minuteOverview;}
-        label=p.imminent===true||deltaOverview===0||deltaOverview===1?"即将发车":deltaOverview!==null&&deltaOverview<0&&deltaOverview>=-720?"等待确认":"等待发车";
-        time=p.time?"计划 "+p.time:"计划待定";compact=true;
-      }else if(v){
-        var overviewTarget=stamp+v.eta_min*60000,overviewRemaining=Math.ceil((overviewTarget-now)/60000);
-        if(s.status==="stale"){label="约 "+v.eta_min+" 分钟";time="原预计 "+clockTime(overviewTarget,now);}
-        else{
-          label=v.eta_min===0&&v.distance_m===0&&v.stops_remaining===0?"已到站附近":overviewRemaining<=0?"等待确认":overviewRemaining===1?"即将到站":"约 "+overviewRemaining+" 分钟";
-          time="预计 "+clockTime(overviewTarget,now);
-        }
-        compact=label.indexOf("分钟")<0||label.length>9;
-        var detailParts=[];if(v.stops_remaining!=null)detailParts.push("剩余 "+v.stops_remaining+" 站");if(v.distance_m!=null)detailParts.push(v.distance_m+" 米");stops=detailParts.join(" · ");
-      }else{label="暂无车辆";compact=true;}
-      row.eta.className="overview-bus-eta"+(compact?" overview-bus-state":"");
-      slotSet(row.eta,label);slotSet(row.time,time);slotSet(row.stops,stops);return;
-    }
+    var item=row.item,v=item.vehicle,p=item.plan,label="",time="",stops="",distance="",compact=false;
     slotSet(row.heading,(i===0?"最近一辆":"下一辆")+(p?" · 发车计划":""));
     if(!valid){label="等待数据更新";compact=true;}
     else if(p){
@@ -294,8 +266,7 @@ function updateEta(rows,s,now){
   });
   return valid;
 }
-function slotStatus(s,valid,compact){
-  if(compact)return !valid?"数据已过期":s.status==="stale"?"数据未更新":slotItems(s).length?"":"暂无车辆";
+function slotStatus(s,valid){
   return !valid?"数据时间异常或已过期":s.status==="stale"?"数据暂未更新 · 以下为旧数据":s.vehicles.length?"实时预计到站":slotItems(s).length?"等待首站发车（计划）":"暂未取得在途车辆信息";
 }
 function stopAge(){clearTimeout(expiryTimer);expiryTimer=null;ageNode=null;etaRows=[];etaSnapshot=null;busStatusNode=null;}
@@ -314,8 +285,8 @@ function paintAge(){
   }else txt("date",time);
   if(!ageNode||!etaSnapshot)return;
   var stamp=etaSnapshot.fetched_at_ms,valid=updateEta(etaRows,etaSnapshot,now);
-  if(busStatusNode)slotSet(busStatusNode,slotStatus(etaSnapshot,valid,mode==="overview"));
-  var label=!isFinite(stamp)||!isFinite(now)||stamp>now?(mode==="overview"?"时间异常":"更新时间未知（请检查 NAS 时间）"):(mode==="overview"?"更新 ":"数据更新于 ")+clockTime(stamp,now)+(valid?"":" · 数据已失去时效");
+  if(busStatusNode)slotSet(busStatusNode,slotStatus(etaSnapshot,valid));
+  var label=!isFinite(stamp)||!isFinite(now)||stamp>now?"更新时间未知（请检查 NAS 时间）":"数据更新于 "+clockTime(stamp,now)+(valid?"":" · 数据已失去时效");
   if(ageNode.textContent!==label)ageNode.textContent=label;
   // The local deadline does not wait for a slow or outstanding LAN read.
   if(valid)expiryTimer=setTimeout(paintAge,90000-(now-stamp));
@@ -329,8 +300,7 @@ function acceptBus(v){
     stopAge();lastRender=key;txt("date","");txt("heading",t?t.line.name:"实时公交");txt("index","");
     var root=el("body");clear(root);
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name);
-    var statusText=labels[s.status]||"状态未知";if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
-    busStatusNode=statusText?append(root,"p",statusText,"note"):null;
+    busStatusNode=append(root,"p",labels[s.status]||"状态未知","note");
     for(var i=0;i<items.length;i++)etaRows.push(buildSlot(root,i));
     if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
   }
@@ -631,11 +601,10 @@ el("weatherSave").onclick=function(){
 
 function renderDrivingGroups(root,v,limit,summary){
     if(!v.enabled||!v.groups.length)append(root,"p","驾驶未启用或未配置，请前往设置。","note");
-    var messages={disabled:"未启用",paused:"暂停更新",waiting:"等待更新",not_configured:"未设置地图",credential_error:"配置异常",storage_error:"配置异常",blocked:"更新已暂停",stale:"旧数据",unavailable:"暂不可用",ok:""};
-    var host=summary&&v.enabled&&v.groups.length?append(root,"div","","overview-driving-grid"):root;
+    var messages={disabled:"未启用",paused:"不在更新时间",waiting:"等待更新",not_configured:"请在NAS配置高德密钥",credential_error:"高德密钥配置有误",storage_error:"配置或额度存储异常",blocked:"已停止请求，请核查高德账号",stale:"旧数据",unavailable:"暂不可用",ok:""};
     (v.groups||[]).slice(0,limit).forEach(function(g){
-      var group=append(host,"section","","driving-group"+(summary?" overview-driving-card":""));append(group,"h2",g.name);
-      var pair=append(group,"div","","driving-pair"+(summary?" overview-driving-pair":"")),map=append(pair,"div","","driving-map"+(summary?" overview-driving-map":"")),list=append(pair,"div","","driving-routes"+(summary?" overview-driving-routes":""));
+      var group=append(root,"section","","driving-group");append(group,"h2",g.name);
+      var pair=append(group,"div","","driving-pair"),map=append(pair,"div","","driving-map"),list=append(pair,"div","","driving-routes");
       if(typeof g.image==="string"&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(g.image)){
         var image=append(map,"img","");image.alt=g.name+" 路线地图";image.onerror=function(){clear(map);append(map,"p","地图图片加载失败","note");};image.src=g.image;
         if(Array.isArray(g.map_routes)&&g.map_routes.length<(g.routes||[]).length)append(map,"p","图中路线："+g.map_routes.join("、"),"driving-foot");
@@ -644,29 +613,13 @@ function renderDrivingGroups(root,v,limit,summary){
         append(map,"p","地图暂不可用"+(mapMessages[g.map_error]?" · "+mapMessages[g.map_error]:""),"note");
       }
       (g.routes||[]).forEach(function(r,i){
-        if(summary){
-          var route=append(list,"div","","driving-route-row"+(i===0?" driving-fast":""));
-          append(route,"span",String(i+1),"driving-route-number");
-          append(route,"span",Math.ceil(r.seconds/60)+"分钟","driving-route-time");
-          append(route,"span",(r.meters/1000).toFixed(1)+"km","driving-route-distance");
-        }else{
-          var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
-          append(list,"p",text,i===0?"driving-fast":"");
-          append(list,"p",(r.meters/1000).toFixed(1)+"km");
-        }
+        var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
+        append(list,"p",text,i===0?"driving-fast":"");
+        append(list,"p",(r.meters/1000).toFixed(1)+"km");
       });
       if(!g.routes||!g.routes.length)append(list,"p","暂无可用路线");
-      var note;
-      if(summary){
-        var noteParts=[],updated=typeof g.fetched_at==="string"?g.fetched_at.slice(11,16):"";
-        if(messages[g.status])noteParts.push(messages[g.status]);
-        if(updated)noteParts.push("更新 "+updated);
-        if(g.routes&&g.routes.length<3&&g.routes.length>0)noteParts.push("仅 "+g.routes.length+" 条");
-        note=noteParts.join(" · ");
-      }else{
-        note=(messages[g.status]||"")+(g.fetched_at?" · 更新于 "+weatherTime(g.fetched_at):"");
-        if(g.routes&&g.routes.length<3&&g.routes.length>0)note+=" · 仅返回"+g.routes.length+"条";
-      }
+      var note=(messages[g.status]||"")+(g.fetched_at?" · 更新于 "+weatherTime(g.fetched_at):"");
+      if(g.routes&&g.routes.length<3&&g.routes.length>0)note+=" · 仅返回"+g.routes.length+"条";
       if(note)append(group,"p",note,"driving-foot");
     });
 
@@ -834,15 +787,14 @@ function overviewLayout(){
 }
 function renderOverviewBus(v){
   var root=overviewRoots.bus,s=v.snapshot,t=v.trip,items=slotItems(s);
-  var labels={live:"",stale:"数据未更新",expired:"数据已过期",paused:"暂停更新",blocked:"接口暂不可用",disabled:"公交未启用",config_error:"配置异常",unconfigured:"未设置公交",unverified:"核对线路中",needs_selection:"线路站序变化，需重新选站",unavailable:"等待首次更新",no_live_data:"",error:"更新失败",service_error:"服务异常"};
-  var key=JSON.stringify([t,items.length,items.map(function(item){return item.vehicle&&item.vehicle.position||item.plan&&item.plan.time||"";}),s.status]);
+  var labels={live:"实时预计到站",stale:"旧数据",expired:"数据已过期",paused:"不在更新时间内",blocked:"接口限制访问",disabled:"公交自动更新已关闭",config_error:"公交配置错误",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序变化，请重新选站",unavailable:"等待首次更新",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地更新服务异常"};
+  var key=JSON.stringify([t,items.length,["live","stale","no_live_data"].indexOf(s.status)>=0]);
   if(key!==overviewKeys.bus){
-    overviewKeys.bus=key;stopAge();clear(root);etaRows=[];
+    overviewKeys.bus=key;stopAge();clear(root);
     overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name,"note");
-    var statusText=labels[s.status]||"状态未知";if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
-    busStatusNode=statusText?append(root,"p",statusText,"note"):null;
-    for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(root,i));
+    busStatusNode=append(root,"p",labels[s.status]||"状态未知","note");
+    for(var i=0;i<items.length;i++)etaRows.push(buildSlot(root,i));
     if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
   }
   items.forEach(function(item,i){etaRows[i].item=item;});
@@ -880,7 +832,7 @@ function renderOverviewDriving(v){
   var key=JSON.stringify([v.enabled,v.groups.length,v.groups.slice(0,2)]);if(key===overviewKeys.driving)return;
   overviewKeys.driving=key;var root=overviewRoots.driving;clear(root);
   renderDrivingGroups(root,v,2,true);
-  var link=overviewLink(root,v.groups.length>2?"另 "+(v.groups.length-2)+" 个目的地 · 全部路线":"全部路线",function(){switchMode("driving");});link.className+=" overview-driving-link";
+  overviewLink(root,v.groups.length>2?"另 "+(v.groups.length-2)+" 个目的地 · 全部路线":"全部路线",function(){switchMode("driving");});
 }
 function renderOverviewHome(v){
   overviewDay=v.date;data=v;paintAge();
@@ -891,10 +843,9 @@ function renderOverviewHome(v){
   var includeTomorrow=!!tomorrow&&(menus.some(function(m){return m.day===tomorrow;})||!!(v.menu_range&&v.menu_range.first<=tomorrow&&v.menu_range.last>=tomorrow));
   var key=JSON.stringify([v.date,tasks,menus,includeTomorrow,v.can_complete]);if(key===overviewKeys.home)return;
   overviewKeys.home=key;var root=overviewRoots.home;clear(root);
-  var menuRoot=append(root,"section","","overview-menu"),todoRoot=append(root,"section","","overview-todos");
   var names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
   (includeTomorrow?[v.date,tomorrow]:[v.date]).forEach(function(day,i){
-    var group=append(menuRoot,"section","","menu-day");
+    var group=append(root,"section","","menu-day");
     overviewLink(group,day.slice(5).replace("-","/")+" "+(i?"明日":"今日"),function(){switchSection("menus");});
     var meals=menus.filter(function(m){return m.day===day;});
     meals.sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
@@ -902,12 +853,12 @@ function renderOverviewHome(v){
     });
     if(!meals.length)append(group,"p","暂无菜单","note");
   });
-  var todoLink=overviewLink(todoRoot,tasks.length>3?"全部待办（"+tasks.length+"）":"待办",function(){switchSection("tasks");});todoLink.className+=" overview-todo-link";
+  overviewLink(root,tasks.length>3?"全部待办（"+tasks.length+"）":"待办",function(){switchSection("tasks");});
   var last="",dayGroup;
   tasks.slice(0,3).forEach(function(t){
     var day=t.occurrence||v.date;
     if(day!==last){
-      last=day;dayGroup=append(todoRoot,"section","","task-day");var l=taskDateLabel(day,v.date),h=append(dayGroup,"h3",l.label,"task-date");
+      last=day;dayGroup=append(root,"section","","task-day");var l=taskDateLabel(day,v.date),h=append(dayGroup,"h3",l.label,"task-date");
       if(day<v.date)append(h,"span","逾期","task-date-tag");else if(l.tag)append(h,"span",l.tag,"task-date-tag");
     }
     var row=append(dayGroup,"div","","task-row");append(row,"span",t.title,"task-text");
@@ -916,7 +867,7 @@ function renderOverviewHome(v){
       button.type="button";button.onclick=function(){completeTask(t,v.date,button);};
     }
   });
-  if(!tasks.length)append(todoRoot,"p","暂无待办","note");
+  if(!tasks.length)append(root,"p","暂无待办","note");
 }
 function overviewFailure(k,status){
   if(k==="bus"){stopAge();serverBase=NaN;paintAge();}

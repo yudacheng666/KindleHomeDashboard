@@ -239,7 +239,7 @@ def main():
                 go("/")
                 js("document.getElementById('token').value=arguments[0]",[reader])
                 click("connect")
-                wait(lambda:text_in("body","Fictional browser task") and text_in("body","公交自动更新已关闭"))
+                wait(lambda:text_in("body","Fictional browser task") and text_in("body","公交未启用"))
                 assert js("return document.getElementById('body').className==='overview-page' && !document.querySelector('.task-complete')")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
                 click("settings");click("returnDisplay")
