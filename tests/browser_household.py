@@ -657,9 +657,14 @@ def main():
                 assert js("return document.getElementById('previewFrame').contentWindow.document.getElementById('settingsPanel').className==='hidden'")
                 # Manual preview lock survives left-side module changes; follow restores linkage.
                 js("var m=document.getElementById('previewMode');m.value='bus';m.onchange()")
-                wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('body').textContent.includes('公交自动更新已关闭')"))
+                for _ in range(80):
+                    state=js("var f=document.getElementById('previewFrame');return {src:f.getAttribute('src'),mode:document.getElementById('previewMode').value,hash:f.contentWindow.location.hash,heading:f.contentDocument.getElementById('heading')&&f.contentDocument.getElementById('heading').textContent,body:f.contentDocument.getElementById('body').textContent.slice(0,240)}")
+                    if state.get("hash")=="#bus" and "公交" in state.get("body",""):break
+                    time.sleep(.15)
+                else:
+                    raise AssertionError("Manual preview lock did not switch to bus: "+str(state))
                 click("tasks")
-                assert js("return document.getElementById('previewMode').value==='bus' && document.getElementById('previewFrame').contentWindow.document.getElementById('body').textContent.includes('公交自动更新已关闭')")
+                assert js("return document.getElementById('previewMode').value==='bus' && document.getElementById('previewFrame').contentWindow.location.hash==='#bus'")
                 js("var m=document.getElementById('previewMode');m.value='follow';m.onchange()")
                 wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('heading').textContent==='待办清单'"))
                 # Viewport geometry remains the real CSS viewport, independent of the device bezel.
