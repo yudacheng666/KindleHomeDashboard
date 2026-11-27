@@ -59,3 +59,13 @@ body.desktop-admin{margin:0;max-width:none;padding:0;background:#f5f7fb;color:#1
 .desktop-admin .admin-brand strong{overflow-wrap:normal}.desktop-admin .admin-banner h1{font-weight:700}.desktop-admin #settingsPanel .save-feedback{font-size:14px}.desktop-admin .admin-top-right button{margin:0}
 
 .admin-module-card>div{min-width:0}.admin-module-card h2{margin:0 0 4px}.admin-brand>div{min-width:0}
+
+/* Desktop module boundaries: no legacy toolbar or cross-module tabs on display. */
+.desktop-admin.admin-display #home>#tabs,.desktop-admin.admin-display #home>#date,.desktop-admin.admin-display #home>#refresh,.desktop-admin.admin-display #home>#logout,.desktop-admin.admin-family #home>#date,.desktop-admin.admin-family #home>#logout{display:none!important}
+.desktop-admin.admin-display #content:not(.hidden){background:transparent;border:0;padding:0;box-shadow:none}
+.desktop-admin .admin-display-setting{background:#fff;border:1px solid #e0e6ef;border-radius:11px;padding:20px;margin-bottom:16px}
+.desktop-admin .admin-display-setting p{margin:8px 0}.desktop-admin .admin-display-setting button{margin-top:10px}
+.desktop-admin .admin-banner{background:transparent;border:0;border-radius:0;padding:0;margin:0 0 20px}.desktop-admin .admin-banner h1{margin:0}
+.desktop-admin .admin-family-toolbar{display:flex;justify-content:flex-end;margin-bottom:6px}
+.desktop-admin .admin-preview-error{color:#a12626;font-size:13px}.desktop-admin .admin-preview-error:empty{display:none}
+.desktop-admin.admin-weather #weatherDetail>h2,.desktop-admin.admin-driving #drivingDetail>h2{display:none}

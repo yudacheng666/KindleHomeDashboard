@@ -2,8 +2,9 @@
 (function(){
 "use strict";
 var access=window.KHD_ACCESS||{}, direct=access.direct===true, openAdmin=access.openAdmin===true;
+var desktopDisplay=typeof location!=="undefined"&&location.pathname==="/admin/display",desktopFamily=typeof location!=="undefined"&&location.pathname==="/admin/family";
 var token="",admin=false,busy=false,epoch=0,tab=initialTab(),data=null,menus=[],menuDate="",editing=false,historyOpen=false,catalogCategory="",catalogQuery="",menusLoaded=false,stopQuick=null,resumeQuick=null,quickCanLeave=null;
-function initialTab(){if(typeof location!=="undefined"&&location.pathname==="/admin/display")return "displaySettings";var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#catalog"?"catalog":h==="#display"?"displaySettings":"tasks";}
+function initialTab(){if(desktopDisplay)return "displaySettings";var h=typeof location!=="undefined"?(location.hash||"").split("/")[0]:"";return h==="#posters"?"posters":h==="#menus"?"menus":h==="#catalog"?"catalog":h==="#display"&&!desktopFamily?"displaySettings":"tasks";}
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function show(id,yes){el(id).className=yes?"":"hidden";}
@@ -48,15 +49,15 @@ function remove(path,body,label){
   if(window.confirm("确认删除"+label+"？此操作不可撤销。")){body.confirm=true;mutate(path,body);}
 }
 function editor(title){
-  closeEditor();editing=true;var p=el("editor");show("editor",true);node(p,"h2",title);return p;
+  closeEditor();editing=true;var p=el("editor");show("editor",true);if(desktopDisplay)el("content").className="panel hidden";node(p,"h2",title);return p;
 }
 function actions(p,save){btn(p,"保存",save).className="primary";btn(p,"取消",closeEditor);}
 function displayForm(){
-  var p=editor("保存轮播设置"),s=data.display_settings||{seconds:180,include_week:false,include_shopping:false,autoplay:false};
+  var p=editor(desktopDisplay?"海报轮播":"保存轮播设置"),s=data.display_settings||{seconds:180,include_week:false,include_shopping:false,autoplay:false};
   var interval=field(p,"每页停留",String(s.seconds),"select",[["120","2分钟"],["180","3分钟"],["300","5分钟"]]);
   var yesNo=[["false","否"],["true","是"]];
   var auto=field(p,"进入海报时自动开始轮播",String(s.autoplay),"select",yesNo);
-  node(p,"p","保存在 NAS；展示页的临时调整不覆盖这里的默认设置。");
+  if(!desktopDisplay)node(p,"p","保存在 NAS；展示页的临时调整不覆盖这里的默认设置。");
   actions(p,function(){mutate("display/set",{seconds:Number(interval.value),include_week:false,include_shopping:false,autoplay:auto.value==="true"});});
 }
 function menuDisplayForm(){
@@ -395,8 +396,23 @@ function readMenus(p){
   if(!days.length){node(p,"p","请选择有效日期");return;}
   req("menu/list",{first:days[0],last:days[days.length-1]},function(ok,v){if(ok&&Array.isArray(v.result)){menus=v.result;menusLoaded=true;menuRows(p,menus,true);}else{menus=[];node(p,"p","菜单读取失败");}});
 }
+function renderDesktopDisplay(p){
+  var s=data.display_settings||{},m=data.menu_display||{mode:"week",days:7};
+  var a=node(p,"section",undefined,"admin-display-setting");
+  node(a,"h2","海报轮播");
+  node(a,"p","自动轮播："+(s.autoplay?"开启":"关闭"));
+  node(a,"p","每页停留："+(s.seconds||180)/60+" 分钟");
+  if(admin)btn(a,"编辑轮播",function(){if(canLeave())displayForm();}).className="primary";
+  var b=node(p,"section",undefined,"admin-display-setting");
+  node(b,"h2","菜单展示范围");
+  node(b,"p",m.mode==="custom"?"今日起 "+m.days+" 天":m.mode==="rolling"?"今日起 7 天":"本自然周");
+  if(admin)btn(b,"编辑范围",function(){if(canLeave())menuDisplayForm();}).className="primary";
+  if(!admin)node(p,"p","仅查看，请使用管理权限编辑。","status");
+}
 function render(){
   var p=el("content");clear(p);if(!data)return;
+  if(desktopDisplay){tab="displaySettings";renderDesktopDisplay(p);return;}
+  if(desktopFamily&&tab==="displaySettings")tab="tasks";
   ["tasks","posters","menus","catalog","displaySettings"].forEach(function(t){el(t).className=t===tab?"primary":"";});
   if(tab==="displaySettings"){node(p,"h2","显示设置");var s=data.display_settings||{};node(p,"p","海报轮播："+(s.autoplay?"开启":"关闭")+" · 每页 "+(s.seconds||180)/60+" 分钟");if(admin){btn(p,"保存轮播设置",displayForm);btn(p,"菜单展示范围",menuDisplayForm);}}
   else if(tab==="tasks"){node(p,"h2","待办清单");
@@ -405,11 +421,11 @@ function render(){
       btn(p,"历史待办",function(){if(canLeave()){closeEditor();historyOpen=true;render();}}).className=historyOpen?"primary":"";
       if(historyOpen){history(p,data.history||[]);return;}
       btn(p,"新增待办",function(){taskForm(null);});
-      node(p,"small","周期任务在本期完成后仍保留管理入口，下个周期自动出现。");
+      if(!desktopFamily)node(p,"small","周期任务在本期完成后仍保留管理入口，下个周期自动出现。");
     }
     tasks(p,admin?data.tasks.filter(function(t){return t.repeat!=="once"||!t.completed;}):(Array.isArray(data.upcoming_tasks)?data.upcoming_tasks:data.tasks),admin);
   }
-  else if(tab==="posters"){node(p,"h2","海报");if(admin){btn(p,"新增海报",function(){posterForm(null);});btn(p,"保存轮播设置",displayForm);}posters(p,data.posters,admin);}
+  else if(tab==="posters"){node(p,"h2","海报");if(admin){btn(p,"新增海报",function(){posterForm(null);});if(!desktopFamily)btn(p,"保存轮播设置",displayForm);}posters(p,data.posters,admin);}
   else if(tab==="catalog"){catalogPage(p);}
   else if(tab==="menus"){var s=data.menu_display||{mode:"week",days:7};node(p,"h2",admin||s.mode==="week"?"本周菜单":"未来"+s.days+"天菜单");if(admin){
       var d=field(p,"查询所在周",menuDate,"date");btn(p,"查询",function(){if(canLeave()){closeEditor();menuDate=d.value;render();}});btn(p,"快捷排餐",function(){if(canLeave())quickMenu();});btn(p,"新增菜单",function(){if(canLeave()){menuDate=d.value;menuForm(null);}});
@@ -417,7 +433,7 @@ function render(){
     }else menuRows(p,data.week_menu,false);}
 }
 function canLeave(){return !editing||(quickCanLeave?quickCanLeave():window.confirm("放弃未保存的编辑？"));}
-["tasks","posters","menus","catalog","displaySettings"].forEach(function(t){el(t).onclick=function(){if(!busy&&canLeave()){closeEditor();tab=t;if(t==="catalog"&&admin)load();else render();}};});
+["tasks","posters","menus","catalog","displaySettings"].forEach(function(t){el(t).onclick=function(){if((desktopDisplay&&t!=="displaySettings")||(desktopFamily&&t==="displaySettings"))return;if(!busy&&canLeave()){closeEditor();tab=t;if(t==="catalog"&&admin)load();else render();}};});
 var returnMatch=typeof location!=="undefined"&&location.hash?location.hash.match(/(?:^#|\/)return-(overview|bus|tasks|posters|menus|weather|driving|auto)$/):null;
 var returnMode=returnMatch?returnMatch[1]:"tasks";
 el("returnLink").href=returnMode==="auto"?"/auto":"/display#"+returnMode;
