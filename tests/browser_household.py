@@ -411,12 +411,21 @@ def main():
                 })()""")
                 assert js("""return (function(){
                   var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
-                  return w.width>0&&d.width>0&&Math.abs(w.top-d.top)<=2&&d.right<=w.left+1&&w.right<=s.left+1&&Math.max(d.bottom,w.bottom,s.bottom)<=b.top+1
+                  return w.width>0&&d.width>0&&Math.abs(w.width-d.width)<=2&&Math.abs(w.top-d.top)<=2&&Math.abs(d.right-w.left)<=1&&Math.max(d.bottom,w.bottom)<=b.top+1
+                    &&Math.abs(d.right-c[0].getBoundingClientRect().right)<=2&&Math.abs(w.left-c[1].getBoundingClientRect().left)<=2
                     &&b.width>=document.getElementById('body').getBoundingClientRect().width-2&&c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2;
                 })()""")
+                footer_layout = """return (function(){
+                  var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),body=document.getElementById("body").getBoundingClientRect(),display=document.getElementById("display").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
+                  return Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(a.top-b.top)<=2
+                    &&getComputedStyle(d).textAlign==="center"&&getComputedStyle(w).textAlign==="center"
+                    &&getComputedStyle(s.querySelector(".settings-text")).display==="none"&&s.querySelector(".settings-icon").getBoundingClientRect().width>=24
+                    &&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top>=body.bottom-1&&Math.abs(r.right-display.right)<=1&&Math.abs(r.bottom-display.bottom)<=1;
+                })()"""
+                assert js(footer_layout)
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
-                assert js("""var d=document.getElementById('date').getBoundingClientRect(),w=document.getElementById('overviewWeather').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect();return w.width>0&&Math.abs(d.top-w.top)<=2&&d.right<=w.left+1&&w.right<=s.left+1""")
+                assert js(footer_layout)
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2""")
@@ -425,6 +434,7 @@ def main():
                 click("returnDisplay")
                 button("body","另 1 个目的地")
                 wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===3"))
+                assert js("return getComputedStyle(document.querySelector('#settings .settings-text')).display!=='none'&&getComputedStyle(document.querySelector('#settings .settings-icon')).display==='none'")
                 click("postersMode")
                 wait(lambda:text_in("heading","Fictional reminder"))
                 click("settings")

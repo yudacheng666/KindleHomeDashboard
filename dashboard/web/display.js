@@ -859,12 +859,12 @@ function overviewLink(root,label,action){
 function stopOverview(){
   Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
   overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
-  clear(el("overviewWeather"));show("overviewWeather",false);el("displayHeader").className="";
+  clear(el("overviewWeather"));show("overviewWeather",false);el("displayHeader").className="";el("displayNav").setAttribute("data-overview","false");
 }
 function overviewLayout(){
   var root=el("body");clear(root);root.className="overview-page";
   overviewRoots.bus=append(root,"section","","overview-bus");
-  overviewRoots.weather=el("overviewWeather");clear(overviewRoots.weather);show("overviewWeather",true);el("displayHeader").className="overview-header";
+  overviewRoots.weather=el("overviewWeather");clear(overviewRoots.weather);show("overviewWeather",true);el("displayHeader").className="overview-header";el("displayNav").setAttribute("data-overview","true");
   overviewRoots.driving=append(root,"div","","overview-driving");
   overviewRoots.home=append(root,"div","","overview-home");
   ["bus","weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
