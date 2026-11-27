@@ -121,7 +121,7 @@ assert.ok(descendants(el("body")).some(n=>n.textContent==="另 1 个目的地"))
 assert.ok(!descendants(el("body")).some(n=>/全部路线/.test(n.textContent)));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example dish"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Example task"));
-assert.ok(descendants(el("overviewWeather")).some(n=>n.textContent==="20°　晴"));
+assert.ok(descendants(el("overviewWeather")).some(n=>n.className==="weather-main"&&fullText(n)==="20°　晴"));
 assert.ok(!descendants(el("body")).some(n=>n.className==="weather-main"));
 const stableTodo=descendants(el("body")).find(n=>n.className==="overview-todos").children[1].children[0];
 data={...data,week_menu:data.week_menu.filter(m=>m.day!==date)};
