@@ -136,6 +136,13 @@ drivingStatus="ok";
 advance(30000);
 assert.equal(compactBusStatus().textContent,"");
 assert.ok(noOverviewTimestamps());
+const fixedBusRows=()=>{const root=descendants(el("body")).find(n=>n.className==="overview-bus-slots");assert.equal(root.children.length,2);assert.ok(root.children.every(n=>n.children.length===2&&n.children[0].children.length===2));assert.ok(compactBusStatus());};
+for(const state of ["paused","disabled","blocked","unverified","needs_selection","expired","no_live_data"]){
+  busData={...bus,snapshot:{...bus.snapshot,status:state,vehicles:[],departure_plans:[],fetched_at:new Date(FakeDate.now()).toISOString()}};
+  advance(15000);fixedBusRows();
+  assert.ok(!descendants(el("body")).some(n=>n.className==="overview-bus-time"&&/预计|计划/.test(n.textContent)));
+}
+busData=bus;advance(15000);
 click("settings");assert.equal(el("manageLink").href,"/bus#return-overview");click("returnDisplay");
 data=sample;weatherData=weatherExample;busData=bus;
 click("weatherMode");assert.equal(el("date").children.length,0);assert.equal(el("displayNav")["data-overview"],"false");assert.equal(el("displayHeader").className,"");assert.equal(el("overviewWeather").className,"hidden");assert.equal(el("overviewWeather").children.length,0);heading("Example");assert.ok(!descendants(el("body")).some(n=>/^观测\s/.test(n.textContent)));assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data provider/.test(n.textContent)||/qweather\.com|open-meteo\.com/.test(n.href||"")));assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));

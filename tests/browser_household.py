@@ -363,6 +363,9 @@ def main():
                 wait(lambda:text_in("drivingSettingStatus","已读取"))
                 assert js("return document.querySelectorAll('#drivingGroups > section').length===3")
                 assert js("return document.getElementById('drivingSave').parentNode.nextElementSibling.id==='drivingSettingStatus'")
+                # The last location save invalidates weather caches; populate the fictional current view again.
+                for _ in range(6): weather.step()
+                assert weather.read()["sections"]["current"]["status"]=="available"
                 click("returnDisplay")
                 click("overviewMode")
                 wait(lambda:js("return document.querySelectorAll('#body .overview-driving-card').length===2 && document.querySelectorAll('#body .overview-driving-map img').length===2 && document.querySelector('#body .overview-bus')!==null"))
@@ -407,7 +410,7 @@ def main():
                     &&Array.from(cards).every(function(n){return border(n,'Bottom')===0;})
                     &&(!menu.lastElementChild||border(menu.lastElementChild,'Bottom')===0)
                     &&border(todo,'Top')===(menu.children.length?1:0)
-                    &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height===0;});
+                    &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height>0;});
                 })()""")
                 assert js("""return (function(){
                   var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
@@ -662,8 +665,20 @@ def main():
                 wait(lambda:text_in("body","数据更新于"))
                 assert len(calls)==3
                 assert js(layout)
-                # Use the existing cache, not a new upstream request.
+                # Compare actual overview geometry using only cached fictional responses.
                 from dataclasses import replace
+                live_snapshot=bus.poller.last
+                wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
+                def overview_bus_geometry():
+                    go("/display#overview")
+                    wait(lambda:js("return document.querySelectorAll('#body .overview-bus-slot').length===2 && !!document.querySelector('#body .overview-bus-status') && !!document.querySelector('#body .overview-driving-card')"))
+                    return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top,...Array.from(b.querySelectorAll('.overview-bus-eta,.overview-bus-time,.overview-bus-details')).map(n=>n.getBoundingClientRect().height)]""")
+                baseline=overview_bus_geometry()
+                for state in [replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),replace(live_snapshot,status="stale"),replace(live_snapshot,status="expired",vehicles=(),departure_plans=())]:
+                    bus.poller.last=state
+                    assert overview_bus_geometry()==baseline
+                bus.poller.last=live_snapshot
+                # Use the existing cache, not a new upstream request.
                 bus.poller.last=replace(bus.poller.last, vehicles=bus.poller.last.vehicles[:1],
                                         scheduled_departures=1, departure_plans=({"time":"23:59","imminent":False},))
                 go("/bus")
