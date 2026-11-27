@@ -485,6 +485,14 @@ def main():
                 assert metrics["clockFont"]==32 and metrics["homeFont"]==25 and metrics["menuFont"]==23, metrics
                 assert metrics["mapHeight"]>140 and metrics["mapWidth"]/metrics["cardWidth"]>=.65 and metrics["homeHeight"]>=95, metrics
                 assert js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home');return getComputedStyle(d).overflowY==='visible'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom"""),metrics
+                # Match the provisional portrait preview default, not a landscape screen.
+                wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":768,"height":920,"deviceScaleFactor":1,"mobile":False}})
+                wait(lambda:js("return innerWidth===768&&innerHeight===920"))
+                js("window.dispatchEvent(new Event('resize'))")
+                assert js("""var c=document.getElementById('displayContent'),m=document.querySelector('.overview-driving-map'),h=document.querySelector('.overview-home');return c.scrollHeight<=c.clientHeight+1&&m.clientHeight>=200&&h.clientHeight>=240&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom""")
+                if visual:
+                    with open(os.path.join(visual,"overview-768x920.png"),"wb") as f:
+                        f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
@@ -801,7 +809,7 @@ def main():
                 assert js("""return (function(){
                   var f=document.getElementById('previewFrame');
                   return document.getElementById('previewMode').value==='follow'
-                    && f.contentWindow.innerWidth===768 && f.contentWindow.innerHeight===640
+                    && f.contentWindow.innerWidth===768 && f.contentWindow.innerHeight===920
                     && !!f.contentDocument.querySelector('.task-complete')
                     && getComputedStyle(document.querySelector('.admin-preview-panel')).position==='sticky'
                     && getComputedStyle(document.getElementById('displaySettings')).display==='none';
@@ -859,9 +867,13 @@ def main():
                 assert js("var f=document.getElementById('previewFrame'),a=f.getBoundingClientRect();return Math.abs(a.width/a.height-.75)<.001&&a.width<600")
                 click("previewOne")
                 assert js("var f=document.getElementById('previewFrame');return f.getBoundingClientRect().width===600&&f.getBoundingClientRect().height===800")
+                # Calibration survives moving between desktop management pages.
+                go_admin("/admin/system")
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f&&f.contentWindow.innerWidth===600&&f.contentWindow.innerHeight===800"))
+                assert js("return document.getElementById('previewWidth').value==='600'&&document.getElementById('previewHeight').value==='800'&&document.getElementById('previewDimensions').textContent.indexOf('手动设置')===0")
                 click("previewDefaults")
-                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===768&&f.contentWindow.innerHeight===640"))
-                assert js("return document.getElementById('previewMode').value==='follow'&&document.getElementById('previewWidth').value==='768'&&document.getElementById('previewHeight').value==='640'&&document.getElementById('previewFit').getAttribute('aria-pressed')==='true'&&document.getElementById('previewDevice').classList.contains('device-bezel')")
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===768&&f.contentWindow.innerHeight===920"))
+                assert js("return document.getElementById('previewMode').value==='follow'&&document.getElementById('previewWidth').value==='768'&&document.getElementById('previewHeight').value==='920'&&document.getElementById('previewFit').getAttribute('aria-pressed')==='true'&&document.getElementById('previewDevice').classList.contains('device-bezel')")
                 # Module routes all keep the same persistent preview and select their matching display.
                 go_admin("/admin/weather")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))

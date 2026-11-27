@@ -63,13 +63,21 @@ var controls=make(preview,"div",null,"admin-preview-controls");
 var modeLabel=make(controls,"label","预览内容"),mode=make(modeLabel,"select");mode.id="previewMode";
 [["follow","跟随模块"],["overview","综合展示"],["bus","公交"],["weather","天气"],["driving","驾驶"],["tasks","待办"],["posters","海报"],["menus","菜单"]].forEach(function(p){var o=make(mode,"option",p[1]);o.value=p[0];});
 function field(label,id,value,min,max){var l=make(controls,"label",label),n=make(l,"input");n.id=id;n.type="number";n.min=min;n.max=max;n.step="1";n.value=value;return n;}
-make(preview,"p","预览尺寸是网页可视区，不是屏幕分辨率。请在 Kindle 设置 → 系统信息读取可视宽高后输入；默认仅为估计，未校准。","admin-preview-error");
-var width=field("宽度（CSS px）","previewWidth",768,240,1600),height=field("高度（CSS px）","previewHeight",640,240,2400);
-var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=768,h=640,follow=true;
+var DEFAULT_W=768,DEFAULT_H=920,dimensionKey="khd-preview-viewport-v1";
+function readDimensions(){
+ try{var v=JSON.parse(localStorage.getItem(dimensionKey));if(v&&sizeOK(v.w,v.h))return v;}catch(e){}
+ return null;
+}
+function sizeOK(w,h){return Number.isInteger(w)&&Number.isInteger(h)&&w>=240&&w<=1600&&h>=240&&h<=2400;}
+var saved=readDimensions();
+make(preview,"p","在 Kindle 网页右下角齿轮 → 系统信息中读取实际可视宽高，再填入此处。应用后保存在当前浏览器；默认竖屏仅为估计。电脑与 Kindle 浏览器字体及墨水屏刷新仍可能不同。","admin-preview-error");
+var width=field("宽度（CSS px）","previewWidth",saved?saved.w:DEFAULT_W,240,1600),height=field("高度（CSS px）","previewHeight",saved?saved.h:DEFAULT_H,240,2400);
+var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=saved?saved.w:DEFAULT_W,h=saved?saved.h:DEFAULT_H,follow=true;
 var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});fitButton.id="previewFit";oneButton.id="previewOne";
-var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){width.value="768";height.value="640";w=768;h=640;feedback.textContent="";mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});appearance.id="previewAppearance";defaults.id="previewDefaults";
-var apply=button(actions,"应用尺寸",function(){var nw=Number(width.value),nh=Number(height.value);if(!validSize(nw,nh))return;w=nw;h=nh;resize();});apply.id="previewApply";
-function validSize(nw,nh){if(!Number.isInteger(nw)||!Number.isInteger(nh)||nw<240||nw>1600||nh<240||nh>2400){feedback.textContent="请输入有效的整数视口尺寸。";return false;}feedback.textContent="";return true;}
+var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){try{localStorage.removeItem(dimensionKey);}catch(e){}saved=null;width.value=String(DEFAULT_W);height.value=String(DEFAULT_H);w=DEFAULT_W;h=DEFAULT_H;feedback.textContent="";mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});appearance.id="previewAppearance";defaults.id="previewDefaults";
+var apply=button(actions,"应用尺寸",function(){var nw=Number(width.value),nh=Number(height.value);if(!validSize(nw,nh))return;w=nw;h=nh;saved={w:w,h:h};try{localStorage.setItem(dimensionKey,JSON.stringify(saved));}catch(e){feedback.textContent="已应用；此浏览器禁止保存尺寸。";}resize();});apply.id="previewApply";
+function validSize(nw,nh){if(!sizeOK(nw,nh)){feedback.textContent="请输入有效的整数视口尺寸。";return false;}feedback.textContent="";return true;}
+var dimensions=make(preview,"p","","admin-muted");dimensions.id="previewDimensions";
 var feedback=make(preview,"p","","admin-preview-error");feedback.id="previewFeedback";feedback.setAttribute("role","status");
 var stage=make(preview,"div",null,"admin-preview-stage"),wrap=make(stage,"div",null,"admin-preview-wrap"),shellDevice=make(wrap,"div",null,"admin-preview-device"),screen=make(shellDevice,"div",null,"admin-preview-screen"),brandMark=make(shellDevice,"span","kindle","admin-preview-brand");
 stage.id="previewStage";shellDevice.id="previewDevice";screen.id="previewScreen";brandMark.setAttribute("aria-hidden","true");
@@ -100,6 +108,7 @@ function loadFrame(next){
 }
 function resize(){
  if(!frame)return;
+ dimensions.textContent=(saved?"手动设置":"默认估计")+"："+w+" × "+h+" CSS px"+(w>=h?"（横屏；若设备为竖屏请检查宽高）":"（竖屏）");
  var edge=device?Math.round(Math.min(w,h)*0.055):0,bottom=device?Math.round(Math.min(w,h)*0.105):0,outerW=w+edge*2,outerH=h+edge+bottom;
  var scale=fit?Math.min(1,Math.max(1,stage.clientWidth-26)/outerW,Math.max(1,Math.min(720,window.innerHeight-245))/outerH):1;
  shellDevice.className="admin-preview-device"+(device?" device-bezel":"");shellDevice.style.width=outerW+"px";shellDevice.style.height=outerH+"px";shellDevice.style.transform="scale("+scale+")";
