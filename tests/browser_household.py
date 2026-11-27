@@ -440,6 +440,10 @@ def main():
                   return dates.length>=2&&Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(b.left-mid)<=2&&Math.abs(t.top-m.top)<=1&&Math.abs(t.left-a.left)<=1&&Math.abs(m.left-b.left-7)<=1&&todo.firstElementChild.textContent==='待办'&&menu.firstElementChild.textContent==='菜单'&&dates.every(d=>Math.abs(d.getBoundingClientRect().left-t.left)<=1);
                 })()"""
                 assert js(todo_alignment)
+                assert js("""return Array.from(document.querySelectorAll('.overview-menu .menu-meal')).every(function(row){
+                  var a=row.querySelector('.menu-meal-label'),b=row.querySelector('.menu-dishes'),x=getComputedStyle(a),y=getComputedStyle(b);
+                  return ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight','color','verticalAlign'].every(function(k){return x[k]===y[k];})&&x.fontSize==='19px'&&x.fontWeight==='400'&&x.whiteSpace==='nowrap';
+                })""")
                 assert js("""var row=document.querySelector('.overview-todos .task-row'),circle=row&&row.querySelector('.overview-task-circle');return !!circle&&circle.textContent==='○'&&circle.getAttribute('aria-label')==='完成待办'&&row.firstElementChild.contains(circle)&&circle.getBoundingClientRect().right<=row.querySelector('.task-text').getBoundingClientRect().left+1""")
                 footer_layout = """return (function(){
                   var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),content=document.getElementById("displayContent").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
