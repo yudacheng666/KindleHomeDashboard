@@ -875,9 +875,11 @@ function overviewLayout(){
 }
 function overviewBusShell(t,status){
   var root=overviewRoots.bus;clear(root);
-  var link=overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});link.title=t?t.line.name:"公交";
-  var direction=t?t.boarding.name+" → "+t.destination.name:"";
-  var route=append(root,"p",direction,"note overview-bus-direction");route.title=direction;
+  var name=t?t.line.name:"公交",direction=t?t.boarding.name+" → "+t.destination.name:"";
+  var link=overviewLink(root,"",function(){switchMode("bus");});
+  link.title=name+(direction?" · "+direction:"");
+  append(link,"span",name,"overview-bus-name");
+  append(link,"span",direction?" · "+direction:"","overview-bus-direction");
   busStatusNode=append(root,"p",status,"note overview-bus-status");
   var slots=append(root,"div","","overview-bus-slots");
   for(var i=0;i<2;i++)etaRows.push(buildOverviewSlot(slots,i));

@@ -79,6 +79,10 @@ assert.equal(descendants(el("body")).filter(n=>n.className.indexOf("overview-dri
 assert.equal(descendants(el("body")).filter(n=>n.className.indexOf("driving-route-row")===0).length,4);
 assert.ok(descendants(el("body")).some(n=>n.textContent==="1小时20分钟"));
 const switches=descendants(el("body")).filter(n=>n.className==="driving-reverse");assert.equal(switches.length,2);switches[1].onclick();assert.equal(directionWrites,1);assert.deepEqual(reversedGroups,[false,true,false]);assert.ok(descendants(el("body")).some(n=>n.textContent.indexOf("返程")===0));
+const busName=descendants(el("body")).find(n=>n.className==="overview-bus-name"),busDirection=descendants(el("body")).find(n=>n.className==="overview-bus-direction");
+assert.equal(busName.textContent,"Example line");assert.equal(busDirection.textContent," · A → B");
+const busHeader=descendants(el("body")).find(n=>n.children[0]===busName&&n.children[1]===busDirection);
+assert.ok(busHeader);assert.equal(busHeader.className,"overview-link");assert.equal(busHeader.title,"Example line · A → B");
 const vehicleRow=descendants(el("body")).find(n=>n.className==="overview-bus-slots");
 assert.equal(vehicleRow.children.length,2);
 assert.ok(vehicleRow.children.every(n=>n.className==="overview-bus-slot"));

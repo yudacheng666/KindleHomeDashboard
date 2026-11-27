@@ -696,11 +696,14 @@ def main():
                     wait(lambda:js("return document.querySelectorAll('#body .overview-bus-slot').length===2 && !!document.querySelector('#body .overview-bus-status') && !!document.querySelector('#body .overview-driving-card') && document.querySelector('#body .overview-bus').textContent.indexOf(arguments[0])>=0", [expected]))
                     assert js("""return (function(){
                       var b=document.querySelector('.overview-bus'),rows=Array.from(b.children).filter(n=>getComputedStyle(n).display!=='none'),end=b.getBoundingClientRect().bottom;
+                      var name=b.querySelector('.overview-bus-name'),direction=b.querySelector('.overview-bus-direction'),header=b.querySelector('.overview-link');
+                      var nr=name.getBoundingClientRect(),dr=direction.getBoundingClientRect();
+                      var inline=name.parentNode===header&&direction.parentNode===header&&name.nextElementSibling===direction&&direction.textContent.indexOf(' → ')>=0&&dr.left>=nr.right-1&&Math.abs(dr.top-nr.top)<5&&parseFloat(getComputedStyle(name).fontSize)>parseFloat(getComputedStyle(direction).fontSize)&&getComputedStyle(direction).fontWeight==='400';
                       var empty=Array.from(b.querySelectorAll('.overview-bus-direction:empty,.overview-bus-status:empty,.overview-bus-eta:empty,.overview-bus-time:empty,.overview-bus-details:empty'));
                       var adjacent=rows.every((n,i)=>i===0||Math.abs(n.getBoundingClientRect().top-rows[i-1].getBoundingClientRect().bottom)<=1);
                       var slots=Array.from(b.querySelectorAll('.overview-bus-slot'));
                       var compact=slots.every(n=>{var lines=Array.from(n.querySelectorAll('.overview-bus-eta,.overview-bus-time,.overview-bus-details')).filter(x=>getComputedStyle(x).display!=='none');return lines.every((x,i)=>i===0||Math.abs(x.getBoundingClientRect().top-lines[i-1].getBoundingClientRect().bottom)<=1);});
-                      return adjacent&&compact&&empty.every(n=>n.getBoundingClientRect().height===0)&&rows.every(n=>n.getBoundingClientRect().bottom<=end);
+                      return inline&&adjacent&&compact&&empty.every(n=>n.getBoundingClientRect().height===0)&&rows.every(n=>n.getBoundingClientRect().bottom<=end);
                     })()""")
                     return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top]""")
                 for width in (480,320):
