@@ -53,6 +53,8 @@ assert.ok(el("date").textContent.indexOf("1月5日 周一")===0);
 assert.ok(descendants(el("body")).some(n=>n.textContent==="Tomorrow dish"));
 assert.ok(descendants(el("overviewWeather")).some(n=>n.textContent==="Other location：Other warning"));
 assert.equal(el("overviewWeather").className,"");
+assert.equal(el("displayHeader").className,"overview-header");
+assert.ok(el("date").textContent.indexOf("\n")>0);
 assert.ok(!descendants(el("overviewWeather")).some(n=>n.textContent==="Example"||n.textContent==="Example 1/2"));
 const visibleWeather=descendants(el("overviewWeather")).find(n=>n.className==="weather-main");
 assert.ok(visibleWeather);
@@ -97,7 +99,7 @@ assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data
 assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));
 click("settings");assert.equal(el("manageLink").href,"/bus#return-overview");click("returnDisplay");
 data=sample;weatherData=weatherExample;busData=bus;
-click("weatherMode");assert.equal(el("overviewWeather").className,"hidden");assert.equal(el("overviewWeather").children.length,0);heading("Example");assert.ok(!descendants(el("body")).some(n=>/^观测\s/.test(n.textContent)));assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data provider/.test(n.textContent)||/qweather\.com|open-meteo\.com/.test(n.href||"")));assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
+click("weatherMode");assert.equal(el("displayHeader").className,"");assert.equal(el("overviewWeather").className,"hidden");assert.equal(el("overviewWeather").children.length,0);heading("Example");assert.ok(!descendants(el("body")).some(n=>/^观测\s/.test(n.textContent)));assert.ok(!descendants(el("body")).some(n=>/和风天气|Open-Meteo|Example data provider/.test(n.textContent)||/qweather\.com|open-meteo\.com/.test(n.href||"")));assert.ok(!descendants(el("body")).some(n=>n.textContent.indexOf("天气服务由")>=0));assert.ok(descendants(el("body")).some(n=>n.textContent==="20°C　晴"));assert.ok(descendants(el("body")).some(n=>n.textContent.includes("暂不可用")));
 advance(240000);heading("Example");assert.equal(el("index").textContent,"");
 weatherData={...weatherExample,additional:[{...weatherExample,name:"Example second",sections:{current:{...weatherExample.sections.current,data:{...weatherExample.sections.current.data,temp:25}}}}]};
 advance(30000);heading("Example");assert.equal(el("index").textContent,"1 / 2");

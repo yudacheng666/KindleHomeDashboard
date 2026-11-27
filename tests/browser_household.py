@@ -390,11 +390,13 @@ def main():
                 wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
                 assert js(readable)
                 assert js("""return (function(){
-                  var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
-                  return w.top>=d.bottom-1&&w.bottom<=b.top+1&&b.width>=document.getElementById('body').getBoundingClientRect().width-2&&c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2;
+                  var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
+                  return w.width>0&&d.width>0&&Math.abs(w.top-d.top)<=2&&d.right<=w.left+1&&w.right<=s.left+1&&Math.max(d.bottom,w.bottom,s.bottom)<=b.top+1
+                    &&b.width>=document.getElementById('body').getBoundingClientRect().width-2&&c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2;
                 })()""")
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
+                assert js("""var d=document.getElementById('date').getBoundingClientRect(),w=document.getElementById('overviewWeather').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect();return w.width>0&&Math.abs(d.top-w.top)<=2&&d.right<=w.left+1&&w.right<=s.left+1""")
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2""")

@@ -310,7 +310,7 @@ function paintAge(){
   if(mode==="overview"){
     var day=isFinite(now)?new Date(now+zoneOffset*60000).toISOString().slice(0,10):overviewDay;
     var label=overviewDate(day);
-    txt("date",(label||"日期未知")+"　"+(time||"时间未知"));
+    txt("date",(label||"日期未知")+"\n"+(time||"时间未知"));
   }else txt("date",time);
   if(!ageNode||!etaSnapshot)return;
   var stamp=etaSnapshot.fetched_at_ms,valid=updateEta(etaRows,etaSnapshot,now);
@@ -819,12 +819,12 @@ function overviewLink(root,label,action){
 function stopOverview(){
   Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
   overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
-  clear(el("overviewWeather"));show("overviewWeather",false);
+  clear(el("overviewWeather"));show("overviewWeather",false);el("displayHeader").className="";
 }
 function overviewLayout(){
   var root=el("body");clear(root);root.className="overview-page";
   overviewRoots.bus=append(root,"section","","overview-bus");
-  overviewRoots.weather=el("overviewWeather");clear(overviewRoots.weather);show("overviewWeather",true);
+  overviewRoots.weather=el("overviewWeather");clear(overviewRoots.weather);show("overviewWeather",true);el("displayHeader").className="overview-header";
   overviewRoots.driving=append(root,"div","","overview-driving");
   overviewRoots.home=append(root,"div","","overview-home");
   ["bus","weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
