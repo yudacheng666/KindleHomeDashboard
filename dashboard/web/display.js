@@ -598,13 +598,16 @@ function renderDrivingGroups(root,v,limit,summary){
       var group=append(root,"section","","driving-group");append(group,"h2",g.name);
       var pair=append(group,"div","","driving-pair"),map=append(pair,"div","","driving-map"),list=append(pair,"div","","driving-routes");
       if(typeof g.image==="string"&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(g.image)){
-        var image=append(map,"img","");image.alt=g.name+" 路线地图";image.src=g.image;
-      }else append(map,"p","地图暂不可用","note");
+        var image=append(map,"img","");image.alt=g.name+" 路线地图";image.onerror=function(){clear(map);append(map,"p","地图图片加载失败","note");};image.src=g.image;
+        if(Array.isArray(g.map_routes)&&g.map_routes.length<(g.routes||[]).length)append(map,"p","图中路线："+g.map_routes.join("、"),"driving-foot");
+      }else {
+        var mapMessages={map_url_too_long:"路线过长",map_geometry_unavailable:"缺少路线坐标",map_http_error:"地图接口异常",map_too_large:"地图图片过大",invalid_map:"地图响应异常",provider_rejected_request:"地图参数被拒绝",provider_blocked:"接口已阻断",request_limit:"已达请求限额"};
+        append(map,"p","地图暂不可用"+(mapMessages[g.map_error]?" · "+mapMessages[g.map_error]:""),"note");
+      }
       (g.routes||[]).forEach(function(r,i){
         var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
         append(list,"p",text,i===0?"driving-fast":"");
-        append(list,"p",(r.meters/1000).toFixed(1)+"km"+(summary?"":r.congested_meters===null?" · 路况未知":" · 已知拥堵 "+(r.congested_meters/1000).toFixed(1)+"km"));
-        if(!summary&&r.traffic_covered_meters<r.meters*0.9&&r.congested_meters!==null)append(list,"p","部分路况未知","driving-foot");
+        append(list,"p",(r.meters/1000).toFixed(1)+"km");
       });
       if(!g.routes||!g.routes.length)append(list,"p","暂无可用路线");
       var note=(messages[g.status]||"")+(g.fetched_at?" · 采集 "+weatherTime(g.fetched_at):"");
