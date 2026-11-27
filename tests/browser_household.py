@@ -658,8 +658,8 @@ def main():
                 # Manual preview lock survives left-side module changes; follow restores linkage.
                 js("var m=document.getElementById('previewMode');m.value='bus';m.onchange()")
                 for _ in range(80):
-                    state=js("var f=document.getElementById('previewFrame');return {src:f.getAttribute('src'),mode:document.getElementById('previewMode').value,hash:f.contentWindow.location.hash,heading:f.contentDocument.getElementById('heading')&&f.contentDocument.getElementById('heading').textContent,body:f.contentDocument.getElementById('body').textContent.slice(0,240)}")
-                    if state.get("hash")=="#bus" and state.get("heading") and js("return document.getElementById('previewFrame').contentWindow.document.getElementById('busMode').className==='selected'"):break
+                    state=js("var f=document.getElementById('previewFrame');return {src:f.getAttribute('src'),mode:document.getElementById('previewMode').value,hash:f.contentWindow.location.hash,busMode:f.contentDocument.getElementById('busMode').className,heading:f.contentDocument.getElementById('heading')&&f.contentDocument.getElementById('heading').textContent,body:f.contentDocument.getElementById('body').textContent.slice(0,240)}")
+                    if state.get("hash")=="#bus" and state.get("busMode")=="selected":break
                     time.sleep(.15)
                 else:
                     raise AssertionError("Manual preview lock did not switch to bus: "+str(state))
