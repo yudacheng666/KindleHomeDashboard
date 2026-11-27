@@ -634,7 +634,13 @@ def main():
                 })()""")
                 # Module-owned settings: poster rotation and menu display range are in their own tabs.
                 click("posters")
-                wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('heading').textContent==='Fictional reminder'"))
+                wait(lambda:js("return document.getElementById('previewFrame').getAttribute('src')==='/preview#posters'"))
+                for _ in range(80):
+                    state=js("var f=document.getElementById('previewFrame');return {src:f.getAttribute('src'),mode:document.getElementById('previewMode').value,hash:f.contentWindow.location.hash,heading:f.contentDocument.getElementById('heading')&&f.contentDocument.getElementById('heading').textContent,body:f.contentDocument.getElementById('body').textContent.slice(0,240)}")
+                    if state.get("heading")=="Fictional reminder":break
+                    time.sleep(.15)
+                else:
+                    raise AssertionError("Poster preview did not follow module: "+str(state))
                 button("content","轮播设置")
                 assert text_in("editor","每页停留")
                 button("editor","保存")
