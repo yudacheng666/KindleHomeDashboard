@@ -139,7 +139,7 @@ def main():
                 # Tab clicks are deliberately ignored while that request is busy.
                 wait(lambda:js("return document.getElementById('editor').className==='hidden'"))
                 # Retry the idempotent navigation until the reload has finished.
-                wait(lambda:js("document.getElementById('catalog').click();return document.getElementById('content').textContent.indexOf('家庭菜单维护')>=0"))
+                wait(lambda:js("if(document.getElementById('content').textContent.indexOf('家庭菜单维护')>=0)return true;document.getElementById('catalog').click();return false"))
                 # Catalog management and mixed point-select/manual weekly entry.
                 button("content","新增菜品")
                 js("document.querySelector('#editor input').value='Fictional catalog dish'")
