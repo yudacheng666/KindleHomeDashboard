@@ -343,22 +343,17 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 }
 </style>
 <style id="overviewTypography">
-/* Numeric emphasis only. Keep the existing header line boxes, route row
-   struts, map sizing and section budgets; use legacy WebKit-compatible CSS. */
-#date .overview-clock,#overviewWeather .weather-main{font-size:30px;line-height:28.8px}
-#date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:24px}
-#overviewWeather .weather-main .overview-number-unit{font-size:16px;font-weight:normal;line-height:0}
-#overviewWeather .weather-main[data-compact="true"] .overview-number-unit{font-size:inherit;font-weight:inherit;line-height:inherit}
-.overview-bus-eta .overview-number-unit{font-size:16px;font-weight:normal;line-height:0}
-.overview-bus-eta .overview-number-value{line-height:0}
-.overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:32px}
-.overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:26px}
-.overview-page .overview-bus-time,.overview-page .overview-bus-details{color:#111}
-@media(max-width:360px){
-  #date .overview-clock,#overviewWeather .weather-main{font-size:26px;line-height:26.4px}
-  #date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:22px}
-}
+/* Numeric emphasis only. Preserve original layout in narrow/short previews.
+   Keep existing header line boxes, route row struts and section budgets. */
 @media(min-width:421px){
+  #date .overview-clock,#overviewWeather .weather-main{font-size:30px;line-height:28.8px}
+  #date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:24px}
+  #overviewWeather .weather-main .overview-number-unit{font-size:16px;font-weight:normal;line-height:0}
+  #overviewWeather .weather-main[data-compact="true"] .overview-number-unit{font-size:inherit;font-weight:inherit;line-height:inherit}
+  .overview-bus-eta .overview-number-unit{font-size:16px;font-weight:normal;line-height:0}
+  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:30px}
+  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:24px}
+  .overview-page .overview-bus-time,.overview-page .overview-bus-details{color:#111}
   .overview-driving-card .driving-route-time .overview-number-unit{font-size:14px;font-weight:normal;line-height:0}
   .overview-driving-card .driving-route-time .overview-number-value{font-size:20px;line-height:0}
   .overview-driving-card .driving-fast .driving-route-time .overview-number-value{font-size:24px;font-weight:bold}
@@ -368,13 +363,14 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
   #date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:32px}
   #overviewWeather .weather-main .overview-number-unit{font-size:20px}
   #overviewWeather .weather-main[data-compact="true"] .overview-number-unit{font-size:inherit}
-  .overview-bus-eta{height:40px;line-height:40px}
+  .overview-bus-eta{height:44px;line-height:44px}
   .overview-bus-eta .overview-number-unit{font-size:20px}
   .overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:40px}
   .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:32px}
   /* A visible error/stale line shares the unchanged fixed bus budget. */
-  .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-eta{height:32px;line-height:32px}
-  .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:34px}
+  .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-eta{height:34px;line-height:34px}
+  .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:32px}
+  .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:26px}
   .overview-driving-card .driving-route-time .overview-number-unit{font-size:16px}
   .overview-driving-card .driving-route-time .overview-number-value{font-size:24px}
   .overview-driving-card .driving-fast .driving-route-time .overview-number-value{font-size:28px}

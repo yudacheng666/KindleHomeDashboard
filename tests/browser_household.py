@@ -509,6 +509,8 @@ def main():
                   var c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),a=document.querySelector('.overview-todos'),b=document.querySelector('.overview-menu'),d=document.querySelector('.overview-driving'),x=a.querySelector('.overview-home-scroll'),y=b.querySelector('.overview-home-scroll');
                   return getComputedStyle(c).overflowY==='hidden'&&getComputedStyle(d).overflowY==='visible'&&d.scrollHeight<=d.clientHeight+1&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom&&h.getBoundingClientRect().top>=d.getBoundingClientRect().bottom-1&&Math.abs(a.clientHeight-b.clientHeight)<=1&&x.clientHeight>0&&x.clientHeight===y.clientHeight;
                 })()"""
+                js("window.dispatchEvent(new Event('resize'))")
+                wait(lambda:js(fixed_home))
                 assert js(fixed_home), js("""return {viewport:[innerWidth,innerHeight],driving:document.querySelector('.overview-driving').getBoundingClientRect().toJSON(),home:document.querySelector('.overview-home').getBoundingClientRect().toJSON(),content:[document.getElementById('displayContent').clientHeight,document.getElementById('displayContent').scrollHeight]}""")
                 assert js("""var x=document.querySelector('.overview-todos .overview-home-scroll');return x.scrollHeight>x.clientHeight&&x.getAttribute('data-scrolling')==='false'""")
                 js("""var x=document.querySelector('.overview-todos .overview-home-scroll');x.scrollTop=x.scrollHeight;x.dispatchEvent(new Event('scroll'));""")
@@ -769,7 +771,9 @@ def main():
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":768,"height":640,"deviceScaleFactor":1,"mobile":False}})
                 bus.poller.last=live_snapshot
                 assert overview_bus_geometry("预计")==[139,139,10]
-                assert js("""var n=document.querySelectorAll('.overview-bus-eta:not(.overview-bus-state) .overview-number-value');return n.length===2&&parseFloat(getComputedStyle(n[0]).fontSize)===40&&parseFloat(getComputedStyle(n[1]).fontSize)===32&&Array.from(n).every(x=>x.parentNode.scrollHeight<=x.parentNode.clientHeight+1&&x.parentNode.scrollWidth<=x.parentNode.clientWidth+1)""")
+                bus_type_metrics="""return Array.from(document.querySelectorAll('.overview-bus-eta')).map(x=>({text:x.textContent,font:parseFloat(getComputedStyle(x).fontSize),numbers:x.querySelectorAll('.overview-number-value').length,scroll:[x.scrollWidth,x.scrollHeight],box:[x.clientWidth,x.clientHeight]}))"""
+                values=js(bus_type_metrics)
+                assert len(values)==2 and [v["font"] for v in values]==[40,32] and all(v["numbers"]==1 and all(s<=b+1 for s,b in zip(v["scroll"],v["box"])) for v in values), values
                 bus.poller.last=replace(live_snapshot,status="stale")
                 assert overview_bus_geometry("数据未更新")==[139,139,10]
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
