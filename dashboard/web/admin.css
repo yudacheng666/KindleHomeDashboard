@@ -111,3 +111,12 @@ body.desktop-admin{margin:0;max-width:none;padding:0;background:#f5f7fb;color:#1
  .desktop-admin .admin-preview-panel{position:static;height:auto;max-height:none}
  .desktop-admin .admin-preview-stage{height:auto;max-height:620px}
 }
+
+/* Keep editors usable in the narrower middle column. */
+.desktop-admin.admin-family .admin-family-content:has(#editor:not(.hidden)){grid-template-columns:minmax(0,1fr)}
+.desktop-admin.admin-family #editor{grid-column:1;grid-row:auto}
+.desktop-admin .admin-work-main .admin-split{grid-template-columns:minmax(110px,30%) minmax(0,1fr);gap:12px}
+.desktop-admin .admin-work-main .admin-list-pane{min-width:0;padding:10px}
+.desktop-admin .admin-work-main .admin-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:1120px){.desktop-admin .admin-work-main .admin-split{grid-template-columns:minmax(0,1fr)}.desktop-admin .admin-work-main .admin-status-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:450px){.desktop-admin .admin-work-main .admin-module-grid{grid-template-columns:minmax(0,1fr)}}

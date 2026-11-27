@@ -14,8 +14,8 @@ function node(parent,tag,s,cls){var n=document.createElement(tag);if(s!==undefin
 function btn(parent,label,fn){var n=node(parent,"button",label);n.type="button";n.onclick=function(){if(!busy)fn();};return n;}
 function notifyPreviewAuth(){if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}
 function notifyPreviewRefresh(){if(window.KHD_ADMIN_PREVIEW_REFRESH)window.KHD_ADMIN_PREVIEW_REFRESH();}
-function notifyPreviewMode(){var m=tab==="posters"?"posters":tab==="menus"||tab==="catalog"?"menus":"tasks";window.KHD_ADMIN_PREVIEW_MODE=m;if(window.KHD_ADMIN_PREVIEW_SET_MODE)window.KHD_ADMIN_PREVIEW_SET_MODE(m);}
-window.KHD_ADMIN_GET_TOKEN=function(){return sessionReady?token:"";};
+function notifyPreviewMode(){if(!desktopFamily)return;var m=tab==="posters"?"posters":tab==="menus"||tab==="catalog"?"menus":"tasks";window.KHD_ADMIN_PREVIEW_MODE=m;if(window.KHD_ADMIN_PREVIEW_SET_MODE)window.KHD_ADMIN_PREVIEW_SET_MODE(m);}
+if(desktopFamily)window.KHD_ADMIN_GET_TOKEN=function(){return sessionReady?token:"";};
 function field(parent,label,value,kind,options,max){
   var l=node(parent,"label",label),n=node(l,kind==="textarea"?"textarea":kind==="select"?"select":"input");
   if(kind==="select"){for(var i=0;i<options.length;i++){var o=node(n,"option",options[i][1]);o.value=options[i][0];}}
@@ -58,7 +58,7 @@ function editor(title){
 }
 function actions(p,save){btn(p,"保存",save).className="primary";btn(p,"取消",closeEditor);}
 function displayForm(){
-  var p=editor("海报轮播设置"),s=data.display_settings||{seconds:180,include_week:false,include_shopping:false,autoplay:false};
+  var p=editor(desktopFamily?"海报轮播设置":"保存轮播设置"),s=data.display_settings||{seconds:180,include_week:false,include_shopping:false,autoplay:false};
   var interval=field(p,"每页停留",String(s.seconds),"select",[["120","2分钟"],["180","3分钟"],["300","5分钟"]]);
   var yesNo=[["false","否"],["true","是"]];
   var auto=field(p,"进入海报时自动开始轮播",String(s.autoplay),"select",yesNo);
@@ -420,17 +420,17 @@ function render(){
   else if(tab==="posters"){
     node(p,"h2","海报");
     var ds=data.display_settings||{seconds:180,autoplay:false};
-    node(p,"p","轮播："+(ds.autoplay?"开启":"关闭")+" · 每页 "+(ds.seconds||180)/60+" 分钟","admin-module-setting-summary");
-    if(admin){btn(p,"轮播设置",function(){if(canLeave())displayForm();});btn(p,"新增海报",function(){posterForm(null);}).className="primary";}
+    if(desktopFamily)node(p,"p","轮播："+(ds.autoplay?"开启":"关闭")+" · 每页 "+(ds.seconds||180)/60+" 分钟","admin-module-setting-summary");
+    if(admin){if(desktopFamily){btn(p,"轮播设置",function(){if(canLeave())displayForm();});btn(p,"新增海报",function(){posterForm(null);}).className="primary";}else{btn(p,"新增海报",function(){posterForm(null);});btn(p,"保存轮播设置",displayForm);}}
     posters(p,data.posters,admin);
   }
   else if(tab==="catalog"){catalogPage(p);}
   else if(tab==="menus"){
     var s=data.menu_display||{mode:"week",days:7},range=s.mode==="custom"?"今日起 "+s.days+" 天":s.mode==="rolling"?"今日起 7 天":"本自然周";
     node(p,"h2",admin||s.mode==="week"?"本周菜单":"未来"+s.days+"天菜单");
-    node(p,"p","展示范围："+range,"admin-module-setting-summary");
+    if(desktopFamily)node(p,"p","展示范围："+range,"admin-module-setting-summary");
     if(admin){
-      btn(p,"菜单展示范围",function(){if(canLeave())menuDisplayForm();});
+      if(desktopFamily)btn(p,"菜单展示范围",function(){if(canLeave())menuDisplayForm();});
       var d=field(p,"查询所在周",menuDate,"date");btn(p,"查询",function(){if(canLeave()){closeEditor();menuDate=d.value;render();}});btn(p,"快捷排餐",function(){if(canLeave())quickMenu();});btn(p,"新增菜单",function(){if(canLeave()){menuDate=d.value;menuForm(null);}});
       readMenus(node(p,"div"));
     }else menuRows(p,data.week_menu,false);

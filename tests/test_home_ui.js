@@ -94,7 +94,7 @@ click(el("editor"),"完成排餐");countPoll=calls.length;tick();assert.equal(ca
 el("catalog").onclick();click(el("content"),"其他");
 const check=all(el("content"),n=>n.type==="checkbox")[0];check.checked=true;click(el("content"),"移动所选菜品");
 assert.ok(calls.some(c=>c[0].endsWith("/dish/move-other")&&c[1].keys.length===1&&c[1].category==="cat"));
-el("menus").onclick();click(el("content"),"菜单展示范围");all(el("editor"),n=>n.tag==="select")[0].value="custom";all(el("editor"),n=>n.tag==="input")[0].value="14";click(el("editor"),"保存");
+el("displaySettings").onclick();click(el("content"),"菜单展示范围");all(el("editor"),n=>n.tag==="select")[0].value="custom";all(el("editor"),n=>n.tag==="input")[0].value="14";click(el("editor"),"保存");
 assert.ok(calls.some(c=>c[0].endsWith("/menu/display")&&c[1].mode==="custom"&&c[1].days===14));
 el("menus").onclick();
 click(el("content"),"新增菜单");const ta=all(el("editor"),n=>n.tag==="textarea");ta[0].value="Dish A\nDish B";ta[1].value="Ingredient A";
@@ -121,7 +121,7 @@ menuOn.value="2026-01-06";menuMeal.value="dinner";click(el("editor"),"保存");
 assert.ok(calls.some(c=>c[0].endsWith("/menu/move")&&c[1].old_on===date&&c[1].old_meal==="lunch"&&c[1].on==="2026-01-06"&&c[1].meal==="dinner"));
 assert.ok(calls.some(c=>c[0].endsWith("/menu/list")&&c[1].first==="2026-01-05"&&c[1].last==="2026-01-11"));
 assert.ok(!calls.some(c=>c[0].includes("/shopping/")));
-el("posters").onclick();click(el("content"),"轮播设置");all(el("editor"),n=>n.tag==="select")[1].value="true";click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/display/set")&&c[1].autoplay===true&&!c[1].include_shopping));
+el("posters").onclick();click(el("content"),"保存轮播设置");all(el("editor"),n=>n.tag==="select")[1].value="true";click(el("editor"),"保存");assert.ok(calls.some(c=>c[0].endsWith("/display/set")&&c[1].autoplay===true&&!c[1].include_shopping));
 fail=true;el("refresh").onclick();assert.equal(el("content").children.length,0);
 el("logout").onclick();assert.equal(el("home").className,"hidden");assert.equal(el("date").textContent,"");
 fail=false;el("mode").value="read";el("token").value="example-reader";el("connect").onclick();el("tasks").onclick();
