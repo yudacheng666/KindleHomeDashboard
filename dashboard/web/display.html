@@ -174,16 +174,16 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 }
 #overviewWeather .weather-alert{font-size:16px;line-height:1.2;margin:2px 0;padding:2px}
 #overviewWeather .note{font-size:17px;margin:2px 0}
-.overview-bus{border-top:1px solid #555;padding:2px 0}
+.overview-bus{box-sizing:border-box;height:149px;border-top:1px solid #555;padding:2px 0}
 .overview-bus .overview-link{display:block;width:100%;height:26px;min-height:26px;padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-menu:empty{display:none}
-/* Reserve every bus row even when data is absent; long text can scroll inside its row. */
-.overview-page .overview-bus-direction,.overview-page .overview-bus-status{box-sizing:border-box;height:21px;line-height:21px;margin:0;overflow:auto}
+/* Reserve height on the section, not on missing rows. Keep all visible text at the top. */
+.overview-page .overview-bus-direction,.overview-page .overview-bus-status{box-sizing:border-box;max-height:21px;line-height:21px;margin:0;overflow:auto}
 .overview-page .overview-bus-status{font-size:16px}
 .overview-bus-eta{height:32px;line-height:32px;overflow:auto}
-.overview-bus-time,.overview-page .overview-bus-details{box-sizing:border-box;height:20px;line-height:20px;margin:0;overflow:auto}
-@media(max-width:420px){.overview-page .overview-bus-direction{height:42px}}
-@media(max-width:360px){.overview-bus-time,.overview-page .overview-bus-details{height:40px}}
+.overview-bus-time,.overview-page .overview-bus-details{box-sizing:border-box;max-height:20px;line-height:20px;margin:0;overflow:auto}
+@media(max-width:420px){.overview-bus{height:170px}.overview-page .overview-bus-direction{max-height:42px}}
+@media(max-width:360px){.overview-bus{height:210px}.overview-bus-time,.overview-page .overview-bus-details{max-height:40px}}
 .overview-bus-slots{display:table;width:100%;table-layout:fixed}
 .overview-bus-slots .overview-bus-slot{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;border-bottom:0;padding:2px 5px 2px 0}
 .overview-bus-slots .overview-bus-slot+.overview-bus-slot{border-left:1px solid #aaa;padding:2px 0 2px 6px}
@@ -194,6 +194,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-bus-line{display:block}
 .overview-bus-eta,.overview-bus-time{display:block;text-align:left;white-space:normal}
 .overview-bus-details{font-size:16px}
+.overview-page .overview-bus-direction:empty,.overview-page .overview-bus-status:empty,.overview-bus-eta:empty,.overview-bus-time:empty,.overview-page .overview-bus-details:empty{display:none}
 @media(max-width:420px){
   .overview-driving-grid{display:block}
   .overview-page .overview-driving-card{display:block;width:100%;padding:3px 0;border:0}
