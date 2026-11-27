@@ -154,12 +154,19 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .task-complete{font-size:16px;padding:1px 4px;min-height:36px}
 /* Overview header shares the date area; keep the dedicated weather page unchanged. */
 #displayHeader.overview-header{overflow:hidden}
+#display{position:relative}
+#displayNav .settings-icon{display:none}
+#displayNav[data-overview="true"]{position:absolute;right:0;bottom:0;float:none;margin:0}
+#displayNav[data-overview="true"] #settings{display:block;width:44px;height:44px;padding:8px;border:0;background:#fff}
+#displayNav[data-overview="true"] .settings-text{display:none}
+#displayNav[data-overview="true"] .settings-icon{display:block;width:26px;height:26px;margin:0 auto}
+#displayNav[data-overview="true"] + #displayContent{box-sizing:border-box;min-height:calc(100vh - 8px);padding-bottom:44px}
 #displayHeader.overview-header #headerRow{display:table;width:100%;table-layout:fixed}
-#displayHeader.overview-header #date{display:table-cell;width:45%;box-sizing:border-box;vertical-align:top;padding:2px 5px 2px 0;min-height:0;line-height:1.2;white-space:pre-line;word-wrap:break-word}
-#displayHeader.overview-header #overviewWeather{display:table-cell;width:55%;box-sizing:border-box;vertical-align:top;padding:0 4px 2px 6px;border-left:1px solid #aaa;word-wrap:break-word}
+#displayHeader.overview-header #date{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 6px 2px 0;min-height:0;line-height:1.2;text-align:left;white-space:pre-line;word-wrap:break-word}
+#displayHeader.overview-header #overviewWeather{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 0 2px 6px;border-left:1px solid #aaa;text-align:left;word-wrap:break-word}
 #overviewWeather{font-size:18px;line-height:1.2;padding:0 0 2px}
 #overviewWeather .overview-weather-line{display:block}
-#overviewWeather .weather-main,#overviewWeather .overview-weather-status{display:inline-block;border:0;background:white;color:#111;text-align:left;min-height:0;padding:0 6px 0 0;margin:0;font-size:24px;line-height:1.2;font-weight:bold;vertical-align:baseline;white-space:normal}
+#overviewWeather .weather-main,#overviewWeather .overview-weather-status{display:inline-block;border:0;background:white;color:#111;text-align:left;min-height:0;padding:0;margin:0;font-size:24px;line-height:1.2;font-weight:bold;vertical-align:baseline;white-space:normal}
 #overviewWeather .overview-weather-status{font-size:17px}
 #overviewWeather .weather-summary{display:block;font-size:16px;line-height:1.2;margin:1px 0 0;vertical-align:baseline}
 @media(max-width:360px){
@@ -259,7 +266,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 <body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button></div>
 <p id="status" class="status" role="status"></p>
 <div id="display" class="hidden">
-<div id="displayNav"><button id="settings" type="button" aria-label="设置" title="设置">设置</button></div>
+<div id="displayNav"><button id="settings" type="button" aria-label="设置" title="设置"><span class="settings-text">设置</span><svg class="settings-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.6 2h4.8l.5 2.8L17 6l2.7-1 2.4 4.1-2.2 1.9v2l2.2 1.9-2.4 4.1-2.7-1-2.1 1.2-.5 2.8H9.6l-.5-2.8L7 18l-2.7 1-2.4-4.1L4.1 13v-2L1.9 9.1 4.3 5 7 6l2.1-1.2z"/><circle cx="12" cy="12" r="3.2"/></svg></button></div>
 <div id="displayContent"><div id="displayHeader"><div id="headerRow"><p id="date" class="status"></p><div id="overviewWeather" class="hidden"></div></div></div><div id="frame" class="frame"><h1 id="heading"></h1><div id="body"></div></div><p id="index" class="status"></p></div>
 <div id="settingsPanel" class="hidden"><button id="returnDisplay" type="button">返回看板</button><h1>设置</h1>
 <div id="settingsMenu"><a id="desktopAdminLink" href="/admin">电脑管理后台</a><h2>显示设置</h2><div id="detailLinks" class="module-choices"><span><button id="overviewMode" type="button">总览</button></span><span><button id="busMode" type="button">公交</button></span><span><button id="tasksMode" type="button">待办</button></span><span><button id="postersMode" type="button">海报</button></span><span><button id="menusMode" type="button">菜单</button></span><span><button id="drivingMode" type="button">驾驶</button></span><span><button id="weatherMode" type="button">天气</button></span></div><a id="displayManage" href="/home#display">保存默认海报轮播设置</a><p id="modeStatus" class="status"></p><button id="autoMode" type="button">恢复自动分时</button>
