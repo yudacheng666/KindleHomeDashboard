@@ -331,7 +331,7 @@ function acceptBus(v){
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name);
     var statusText=labels[s.status]||"状态未知";if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
     busStatusNode=statusText?append(root,"p",statusText,"note"):null;
-    for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(root,i));
+    for(var i=0;i<items.length;i++)etaRows.push(buildSlot(root,i));
     if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
   }
   items.forEach(function(item,i){etaRows[i].item=item;});
@@ -840,8 +840,7 @@ function renderOverviewBus(v){
     overviewKeys.bus=key;stopAge();clear(root);etaRows=[];
     overviewLink(root,t?t.line.name:"公交",function(){switchMode("bus");});
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name,"note");
-    var statusText=labels[s.status]||"状态未知";
-    if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
+    var statusText=labels[s.status]||"状态未知";if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
     busStatusNode=statusText?append(root,"p",statusText,"note"):null;
     for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(root,i));
     if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
