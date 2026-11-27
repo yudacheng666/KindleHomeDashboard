@@ -44,7 +44,7 @@ if(path==="/admin"||path==="/admin/system"){
 }
 if(path==="/admin/display"||path==="/admin/family"){
  var family=el("home"),layout=make(family,"div",null,"admin-family-content");move(layout,["content","editor"]);
- if(path==="/admin/family"){var bar=make(content,"div",null,"admin-family-toolbar");content.insertBefore(bar,work);bar.appendChild(el("refresh"));}
+ if(path==="/admin/family"){var bar=make(family,"div",null,"admin-family-toolbar");family.insertBefore(bar,el("tabs"));bar.appendChild(el("refresh"));}
  if(path==="/admin/display"){
   var columns=make(content,"div",null,"admin-display-grid");columns.appendChild(work);
   var preview=make(columns,"section",null,"admin-card");make(preview,"h2","Kindle 显示预览");
