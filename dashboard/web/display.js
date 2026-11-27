@@ -613,9 +613,16 @@ function renderDrivingGroups(root,v,limit,summary){
         append(map,"p","地图暂不可用"+(mapMessages[g.map_error]?" · "+mapMessages[g.map_error]:""),"note");
       }
       (g.routes||[]).forEach(function(r,i){
-        var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
-        append(list,"p",text,i===0?"driving-fast":"");
-        append(list,"p",(r.meters/1000).toFixed(1)+"km");
+        var duration=Math.ceil(r.seconds/60)+"分钟",distance=(r.meters/1000).toFixed(1)+"km";
+        if(summary){
+          var row=append(list,"div","","driving-route"+(i===0?" driving-fast":""));
+          append(row,"span",String(i+1),"driving-route-number");
+          append(row,"span",duration,"driving-route-time");
+          append(row,"span",distance,"driving-route-distance");
+        }else{
+          append(list,"p",(i+1)+"  "+duration,i===0?"driving-fast":"");
+          append(list,"p",distance);
+        }
       });
       if(!g.routes||!g.routes.length)append(list,"p","暂无可用路线");
       var note=(messages[g.status]||"")+(g.fetched_at?" · 更新于 "+weatherTime(g.fetched_at):"");
