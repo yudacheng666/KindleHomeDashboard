@@ -819,12 +819,12 @@ function overviewLink(root,label,action){
 function stopOverview(){
   Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
   overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
+  clear(el("overviewWeather"));show("overviewWeather",false);
 }
 function overviewLayout(){
   var root=el("body");clear(root);root.className="overview-page";
-  var pair=append(root,"div","","overview-pair");
-  overviewRoots.bus=append(pair,"div","","overview-half");
-  overviewRoots.weather=append(pair,"div","","overview-half");
+  overviewRoots.bus=append(root,"section","","overview-bus");
+  overviewRoots.weather=el("overviewWeather");clear(overviewRoots.weather);show("overviewWeather",true);
   overviewRoots.driving=append(root,"div","","overview-driving");
   overviewRoots.home=append(root,"div","","overview-home");
   ["bus","weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
@@ -840,7 +840,10 @@ function renderOverviewBus(v){
     if(t)append(root,"p",t.boarding.name+" → "+t.destination.name,"note");
     var statusText=labels[s.status]||"状态未知";if(!items.length&&(s.status==="live"||s.status==="no_live_data"))statusText="暂无车辆";
     busStatusNode=statusText?append(root,"p",statusText,"note"):null;
-    for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(root,i));
+    if(items.length){
+      var slots=append(root,"div","","overview-bus-slots");
+      for(var i=0;i<items.length;i++)etaRows.push(buildOverviewSlot(slots,i));
+    }
     if(["live","stale","no_live_data"].indexOf(s.status)>=0)ageNode=append(root,"p","","note");
   }
   items.forEach(function(item,i){etaRows[i].item=item;});
@@ -853,13 +856,13 @@ function renderOverviewWeather(){
   var key=JSON.stringify([v.name,v.status,c,weatherCursor,weatherPages.length,weatherPages.map(function(p){return [p.name,p.sections&&p.sections.alerts];})]);
   if(key===overviewKeys.weather)return;
   overviewKeys.weather=key;clear(root);
-  overviewLink(root,(v.name||"天气")+(weatherPages.length>1?" "+(weatherCursor+1)+"/"+weatherPages.length:""),function(){switchMode("weather");});
-  if(v.status==="disabled")append(root,"p","天气未启用","note");
-  else if(v.status==="storage_error")append(root,"p","天气配置或限额异常","note");
-  else if(c&&c.status==="available"){
-    append(root,"p",weatherNum(c.data.temp,"°")+"　"+c.data.text,"weather-main");
-    append(root,"p","体感 "+weatherNum(c.data.feels,"°")+" · 湿度 "+weatherNum(c.data.humidity,"%"),"weather-summary");
-  }else append(root,"p","当前天气暂不可用","note");
+  var line=append(root,"div","","overview-weather-line"),label=v.status==="disabled"?"天气未启用":v.status==="storage_error"?"天气配置或限额异常":c&&c.status==="available"?weatherNum(c.data.temp,"°")+"　"+c.data.text:"当前天气暂不可用";
+  var weather=overviewLink(line,label,function(){switchMode("weather");});
+  weather.className=c&&c.status==="available"&&v.status!=="disabled"&&v.status!=="storage_error"?"weather-main":"overview-weather-status";
+  weather.title="天气详情";
+  if(weather.className==="weather-main"){
+    append(line,"span","体感 "+weatherNum(c.data.feels,"°")+" · 湿度 "+weatherNum(c.data.humidity,"%"),"weather-summary");
+  }
   weatherPages.forEach(function(p){var a=p.sections&&p.sections.alerts;
     if(a&&a.status==="available"&&a.data.length)a.data.forEach(function(x){append(root,"p",(p.name||"")+"："+(x.type==="cancel"?"解除信息 · ":"")+x.headline,"weather-alert");});
   });
@@ -878,7 +881,9 @@ function renderOverviewDriving(v){
   var key=JSON.stringify([v.enabled,v.groups.length,v.groups.slice(0,2)]);if(key===overviewKeys.driving)return;
   overviewKeys.driving=key;var root=overviewRoots.driving;clear(root);
   renderDrivingGroups(root,v,2,true);
-  var link=overviewLink(root,v.groups.length>2?"另 "+(v.groups.length-2)+" 个目的地 · 全部路线":"全部路线",function(){switchMode("driving");});link.className+=" overview-driving-link";
+  if(v.groups.length>2){
+    var link=overviewLink(root,"另 "+(v.groups.length-2)+" 个目的地",function(){switchMode("driving");});link.className+=" overview-driving-link";
+  }
 }
 function renderOverviewHome(v){
   overviewDay=v.date;data=v;paintAge();
@@ -891,10 +896,11 @@ function renderOverviewHome(v){
   overviewKeys.home=key;var root=overviewRoots.home;clear(root);
   var menuRoot=append(root,"section","","overview-menu"),todoRoot=append(root,"section","","overview-todos");
   var names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2};
-  (includeTomorrow?[v.date,tomorrow]:[v.date]).forEach(function(day,i){
-    var group=append(menuRoot,"section","","menu-day");
-    overviewLink(group,day.slice(5).replace("-","/")+" "+(i?"明日":"今日"),function(){switchSection("menus");});
+  (includeTomorrow?[v.date,tomorrow]:[v.date]).forEach(function(day){
     var meals=menus.filter(function(m){return m.day===day;});
+    if(day===v.date&&!meals.length)return;
+    var group=append(menuRoot,"section","","menu-day");
+    overviewLink(group,day.slice(5).replace("-","/")+" "+(day===v.date?"今日":"明日"),function(){switchSection("menus");});
     meals.sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
       var row=append(group,"div","","menu-meal");append(row,"span",names[m.meal],"menu-meal-label");append(row,"span",m.dishes.join("、"),"menu-dishes");
     });
