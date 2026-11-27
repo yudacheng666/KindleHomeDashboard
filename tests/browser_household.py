@@ -624,8 +624,43 @@ def main():
                 click("previewApply");click("previewOne")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560 && !!f.contentDocument.querySelector('.overview-page')"))
                 assert js("""var f=document.getElementById('previewFrame');return f.contentDocument.querySelector('script[src="/display.js"]')!==null && f.getBoundingClientRect().width===420 && f.getBoundingClientRect().height===560""")
+                assert js("""return (function(){
+                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice'),s=document.getElementById('previewScreen');
+                  var a=f.getBoundingClientRect(),b=d.getBoundingClientRect(),c=s.getBoundingClientRect();
+                  return b.width>a.width && b.height>a.height && a.width===c.width && a.height===c.height
+                    && a.left>b.left && a.top>b.top && getComputedStyle(f).filter!=='none';
+                })()""")
+                # Toggling appearance never reloads the real display or changes its
+                # viewport, computed font, line height or underlying content.
+                js("""var f=document.getElementById('previewFrame');window.testPreview=f;
+                  window.testPreviewFont=f.contentWindow.getComputedStyle(f.contentDocument.body).font;
+                  window.testPreviewBody=f.contentDocument.getElementById('body');""")
+                click("previewAppearance")
+                assert js("""return (function(){
+                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice');
+                  return f===window.testPreview && f.contentDocument.getElementById('body')===window.testPreviewBody
+                    && f.contentWindow.getComputedStyle(f.contentDocument.body).font===window.testPreviewFont
+                    && f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560
+                    && f.getBoundingClientRect().width===420 && f.getBoundingClientRect().height===560
+                    && d.getBoundingClientRect().width===420 && getComputedStyle(f).filter==='none';
+                })()""")
+                click("previewAppearance")
                 click("previewFit")
-                assert js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560")
+                assert js("""return (function(){
+                  var f=document.getElementById('previewFrame'),d=document.getElementById('previewDevice'),a=f.getBoundingClientRect(),b=d.getBoundingClientRect();
+                  return f===window.testPreview && f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560
+                    && Math.abs(a.width/a.height-420/560)<.001
+                    && Math.abs(a.width/420-b.width/d.offsetWidth)<.001
+                    && Math.abs(a.height/560-b.height/d.offsetHeight)<.001
+                    && a.width<=420 && f.contentWindow.getComputedStyle(f.contentDocument.body).font===window.testPreviewFont;
+                })()""")
+                js("document.getElementById('previewWidth').value='600';document.getElementById('previewHeight').value='800'")
+                click("previewApply")
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===600 && f.contentWindow.innerHeight===800 && !!f.contentDocument.querySelector('.overview-page')"))
+                assert js("""var f=document.getElementById('previewFrame'),a=f.getBoundingClientRect();return Math.abs(a.width/a.height-.75)<.001 && a.width<600""")
+                click("previewOne")
+                assert js("var f=document.getElementById('previewFrame');return f.getBoundingClientRect().width===600 && f.getBoundingClientRect().height===800")
+                click("previewFit")
                 js("var e=document.getElementById('previewMode');e.value='tasks';e.dispatchEvent(new Event('change'))")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentDocument.getElementById('heading') && f.contentDocument.getElementById('heading').textContent==='待办清单'"))
                 assert js("var f=document.getElementById('previewFrame');f.contentDocument.getElementById('settings').click();return f.contentDocument.getElementById('settingsPanel').className==='hidden'")

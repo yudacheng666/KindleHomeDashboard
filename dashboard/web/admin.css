@@ -38,7 +38,15 @@ body.desktop-admin{margin:0;max-width:none;padding:0;background:#f5f7fb;color:#1
 .desktop-admin #content{grid-column:1;grid-row:1}.desktop-admin #editor{grid-column:2;grid-row:1}.desktop-admin .admin-family-content:has(#content.hidden) #editor,.desktop-admin.admin-display #editor{grid-column:1;grid-row:auto}.desktop-admin.admin-display .admin-family-content{display:flex;flex-direction:column}
 .desktop-admin .admin-display-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(350px,.83fr);align-items:start;gap:20px}
 .admin-preview-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:12px 0}.admin-preview-controls label{flex:1 1 95px;font-size:12px;color:#57657b;margin:0}.admin-preview-controls input,.admin-preview-controls select{margin:3px 0 0!important}.admin-preview-actions{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.admin-preview-stage{background:#e8edf4;border:1px solid #d9e0eb;border-radius:10px;padding:12px;overflow:auto;max-height:calc(100vh - 210px);min-height:160px}.admin-preview-wrap{margin:0 auto;position:relative;overflow:hidden;background:#fff;border:0}.admin-preview-wrap iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;background:white;display:block;max-width:none}
+.admin-preview-stage{background:#e8edf4;border:1px solid #d9e0eb;border-radius:10px;padding:12px;overflow:auto;max-height:calc(100vh - 210px);min-height:160px}.admin-preview-wrap{margin:0 auto;position:relative;overflow:hidden;border:0}
+.admin-preview-device{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden}
+.admin-preview-screen{position:absolute;overflow:hidden;background:#fff}
+.admin-preview-screen iframe{position:absolute;left:0;top:0;border:0;background:white;display:block;max-width:none}
+.admin-preview-device.device-bezel{background:#292b2b;border-radius:16px;box-shadow:inset 0 0 0 1px #171818,inset 0 2px 3px #555}
+.admin-preview-device.device-bezel .admin-preview-screen{box-shadow:0 0 0 1px #161818}
+.admin-preview-device.device-bezel iframe{filter:grayscale(1) contrast(.91) brightness(.95)}
+.admin-preview-brand{display:none;position:absolute;left:0;right:0;align-items:center;justify-content:center;color:#aeafae;font-family:Arial,sans-serif;letter-spacing:-.04em}
+.admin-preview-device.device-bezel .admin-preview-brand{display:flex}
 .desktop-admin #settingsPanel{background:transparent;max-width:none;padding:0;font-size:15px;color:#18243a}.desktop-admin #settingsPanel>h1,.desktop-admin #returnDisplay,.desktop-admin #settingsBack,.desktop-admin #settingsMenu,.desktop-admin #displayNav,.desktop-admin #displayContent{display:none!important}
 .desktop-admin #settingsPanel.settings-detail-open #settingsDetail{margin-left:0;float:none;padding:22px}.desktop-admin #settingsPanel h2{font-size:20px;margin:0 0 10px}.desktop-admin #settingsPanel .status{font-size:13px}
 .desktop-admin #settingsPanel button,.desktop-admin #settingsPanel input,.desktop-admin #settingsPanel select,.desktop-admin #settingsPanel .driving-fields label{font-size:14px;min-height:38px}.desktop-admin #settingsPanel input[type=checkbox]{width:18px;min-height:18px;height:18px}

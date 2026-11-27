@@ -51,16 +51,34 @@ if(path==="/admin/display"||path==="/admin/family"){
   function field(label,id,value,min,max){var l=make(controls,"label",label),n=make(l,"input");n.id=id;n.type="number";n.min=min;n.max=max;n.step="1";n.value=value;return n;}
   var width=field("视口宽度（CSS px）","previewWidth",480,240,1600),height=field("视口高度（CSS px）","previewHeight",640,240,2400),ml=make(controls,"label","预览模式"),mode=make(ml,"select");mode.id="previewMode";
   [["overview","综合展示"],["bus","公交"],["weather","天气"],["driving","驾驶"],["tasks","待办"],["menus","菜单"],["posters","海报"],["auto","自动分时"]].forEach(function(p){var o=make(mode,"option",p[1]);o.value=p[0];});
-  var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,frame=null,w=480,h=640;
+  var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=480,h=640;
   var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});
+  var appearance=button(actions,"原始画面",function(){device=!device;resize();});appearance.id="previewAppearance";
   var apply=button(actions,"应用视口 / 刷新",load);apply.id="previewApply";fitButton.id="previewFit";oneButton.id="previewOne";
   var feedback=make(preview,"p","480×640 是示例 CSS 视口，未与实体 Kindle 校准。","admin-muted");feedback.id="previewFeedback";
-  var stage=make(preview,"div",null,"admin-preview-stage"),wrap=make(stage,"div",null,"admin-preview-wrap");stage.id="previewStage";
-  function resize(){if(!frame)return;var scale=fit?Math.min(1,Math.max(1,stage.clientWidth-26)/w,Math.max(1,Math.min(720,window.innerHeight-260))/h):1;
-   frame.style.width=w+"px";frame.style.height=h+"px";frame.style.transform="scale("+scale+")";wrap.style.width=(w*scale)+"px";wrap.style.height=(h*scale)+"px";fitButton.className=fit?"primary":"";oneButton.className=fit?"":"primary";feedback.textContent=w+" × "+h+" CSS px · "+Math.round(scale*100)+"% · 未经真机校准";}
+  var stage=make(preview,"div",null,"admin-preview-stage"),wrap=make(stage,"div",null,"admin-preview-wrap"),shell=make(wrap,"div",null,"admin-preview-device"),screen=make(shell,"div",null,"admin-preview-screen"),brand=make(shell,"span","kindle","admin-preview-brand");stage.id="previewStage";shell.id="previewDevice";screen.id="previewScreen";brand.setAttribute("aria-hidden","true");
+  function resize(){
+   if(!frame)return;
+   // The viewport is never derived from the decorative bezel. Scale the
+   // entire device once, and reserve its scaled footprint in normal flow.
+   var edge=device?Math.round(Math.min(w,h)*0.055):0,
+       bottom=device?Math.round(Math.min(w,h)*0.105):0,
+       outerW=w+edge*2,outerH=h+edge+bottom;
+   var scale=fit?Math.min(1,Math.max(1,stage.clientWidth-26)/outerW,Math.max(1,Math.min(720,window.innerHeight-260))/outerH):1;
+   shell.className="admin-preview-device"+(device?" device-bezel":"");
+   shell.style.width=outerW+"px";shell.style.height=outerH+"px";shell.style.transform="scale("+scale+")";
+   screen.style.left=edge+"px";screen.style.top=edge+"px";screen.style.width=w+"px";screen.style.height=h+"px";
+   frame.style.width=w+"px";frame.style.height=h+"px";
+   brand.style.bottom="0";brand.style.height=bottom+"px";brand.style.fontSize=Math.max(12,Math.round(edge*0.7))+"px";
+   wrap.style.width=(outerW*scale)+"px";wrap.style.height=(outerH*scale)+"px";
+   fitButton.className=fit?"primary":"";oneButton.className=fit?"":"primary";
+   fitButton.setAttribute("aria-pressed",String(fit));oneButton.setAttribute("aria-pressed",String(!fit));
+   appearance.textContent=device?"原始画面":"设备外观";appearance.setAttribute("aria-pressed",String(!device));
+   feedback.textContent=w+" × "+h+" CSS px · "+Math.round(scale*100)+"% · "+(device?"通用外观模拟 · ":"")+"未经真机校准";
+  }
   function load(){var nw=Number(width.value),nh=Number(height.value);if(!Number.isInteger(nw)||!Number.isInteger(nh)||nw<240||nw>1600||nh<240||nh>2400){feedback.textContent="请输入有效的整数视口尺寸（宽 240–1600，高 240–2400）。";return;}
-   w=nw;h=nh;if(frame)wrap.removeChild(frame);frame=make(wrap,"iframe");frame.id="previewFrame";frame.title="真实 Kindle 页面只读预览";frame.src=mode.value==="auto"?"/preview/auto":"/preview#"+mode.value;frame.setAttribute("referrerpolicy","no-referrer");resize();}
-  mode.onchange=load;window.addEventListener("resize",resize);make(preview,"p","1:1 指网页 CSS 像素，不是物理厘米尺寸。实体屏工具栏、字体渲染及电子墨水残影需要实机确认；内容超出视口可滚动。","admin-info");load();
+   w=nw;h=nh;if(frame)screen.removeChild(frame);frame=make(screen,"iframe");frame.id="previewFrame";frame.title="真实 Kindle 页面只读预览";frame.src=mode.value==="auto"?"/preview/auto":"/preview#"+mode.value;frame.setAttribute("referrerpolicy","no-referrer");resize();}
+  mode.onchange=load;window.addEventListener("resize",resize);make(preview,"p","设备外观与灰阶仅为模拟，原始画面可关闭外框及色调。1:1 指网页 CSS 像素；真实字体、物理尺寸与墨水屏刷新效果需实机校准。","admin-info");load();
  }
 }
 if(path==="/admin/weather"||path==="/admin/driving"){
