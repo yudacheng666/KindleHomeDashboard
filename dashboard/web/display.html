@@ -138,16 +138,17 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .overview-driving-card .driving-fast{font-size:18px;font-weight:bold}
 .overview-page .overview-driving-card .driving-foot{font-size:16px;line-height:1.2;margin:2px 0;word-wrap:break-word}
 .overview-driving-link{display:block;min-height:27px;font-size:16px;line-height:1.2;margin:1px 0}
-.overview-home{border-top:1px solid #555}
-.overview-todos{padding:3px 0 0;margin:0}
-.overview-todo-heading{line-height:1.25}
-.overview-todo-heading .overview-todo-link{display:inline-block;min-height:28px;font-size:19px;margin:0 0 0 8px;vertical-align:baseline;white-space:nowrap}
-.overview-todo-heading .task-date{display:inline-block;margin:0;vertical-align:baseline}
-.overview-todo-heading .note{display:inline;margin:0}
-/* Reserve only the lower-right corner, never an entire footer row.
-   The final date group contains at least 44px of text/controls or natural space. */
-.overview-page .overview-todos .task-day:last-child,.overview-todos>.overview-todo-heading{box-sizing:border-box;min-height:44px;padding-right:48px;word-wrap:break-word}
-.overview-home>.note{min-height:44px;margin-right:48px}
+.overview-home{border-top:1px solid #555;display:table;width:100%;table-layout:fixed}
+.overview-todos,.overview-menu{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;margin:0;padding:3px 6px 0 0;word-wrap:break-word}
+.overview-menu{border-left:1px solid #555;padding:3px 0 0 6px}
+.overview-page .overview-home-title{display:block;min-height:26px;padding:0;margin:0;font-size:19px;text-align:left}
+.overview-page .overview-menu .menu-day{padding:3px 0;border-bottom:1px solid #777}
+.overview-page .overview-menu .menu-date{font-size:19px;line-height:1.2;margin:0 0 2px}
+.overview-page .overview-menu .menu-meal{display:block;padding:1px 0;line-height:1.25;word-wrap:break-word}
+.overview-page .overview-menu .menu-meal-label,.overview-page .overview-menu .menu-dishes{display:inline;font-size:19px;white-space:normal}
+.overview-page .overview-menu .menu-meal-label{margin-right:4px;font-size:16px}
+/* Only the last group in the right column reserves the floating gear width. */
+.overview-page .overview-menu .overview-menu-last{box-sizing:border-box;min-height:44px;padding-right:48px;border-bottom:0;word-wrap:break-word}
 .overview-page .task-day{padding:3px 0;border-bottom:1px solid #777}
 .overview-todos .task-day:last-child{border-bottom:0}
 .overview-page .task-date{font-size:19px;line-height:1.2;margin:0 0 2px}
@@ -178,7 +179,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 }
 #overviewWeather .weather-alert{font-size:16px;line-height:1.2;margin:2px 0;padding:2px}
 #overviewWeather .note{font-size:17px;margin:2px 0}
-.overview-bus{box-sizing:border-box;height:149px;border-top:1px solid #555;padding:2px 0}
+.overview-bus{box-sizing:border-box;height:139px;margin-top:10px;border-top:1px solid #555;padding:2px 0}
 .overview-bus .overview-link{display:block;width:100%;height:26px;min-height:26px;line-height:26px;padding:0;white-space:nowrap;overflow:hidden}
 .overview-bus-name,.overview-bus-direction{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;word-wrap:normal}
 .overview-bus-direction{font-size:17px;font-weight:normal;color:#333}
@@ -187,8 +188,8 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .overview-bus-status{font-size:16px}
 .overview-bus-eta{height:32px;line-height:32px;overflow:auto}
 .overview-bus-time,.overview-page .overview-bus-details{box-sizing:border-box;max-height:20px;line-height:20px;margin:0;overflow:auto}
-@media(max-width:420px){.overview-bus{height:170px}}
-@media(max-width:360px){.overview-bus{height:210px}.overview-bus-time,.overview-page .overview-bus-details{max-height:40px}}
+@media(max-width:420px){.overview-bus{height:160px}}
+@media(max-width:360px){.overview-bus{height:200px}.overview-bus-time,.overview-page .overview-bus-details{max-height:40px}}
 .overview-bus-slots{display:table;width:100%;table-layout:fixed}
 .overview-bus-slots .overview-bus-slot{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;border-bottom:0;padding:2px 5px 2px 0}
 .overview-bus-slots .overview-bus-slot+.overview-bus-slot{border-left:1px solid #aaa;padding:2px 0 2px 6px}

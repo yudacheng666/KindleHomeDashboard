@@ -413,8 +413,8 @@ def main():
                   var border=function(n,side){return parseFloat(getComputedStyle(n)['border'+side+'Width']);};
                   return border(grid,'Top')===0&&border(grid,'Bottom')===0&&border(root.querySelector('.overview-driving'),'Top')===1&&border(home,'Top')===1
                     &&Array.from(cards).every(function(n){return border(n,'Bottom')===0;})
-                    &&!menu&&home.children.length===1&&home.firstElementChild===todo&&border(todo,'Top')===0
-                    &&!root.querySelector('.menu-day,.menu-meal,.menu-dishes')&&root.textContent.indexOf('Fictional dish')<0&&root.textContent.indexOf('暂无菜单')<0
+                    &&menu&&home.children.length===2&&home.firstElementChild===todo&&border(todo,'Top')===0&&border(menu,'Left')===1
+                    &&menu.textContent.indexOf('Fictional dish')>=0&&menu.querySelector('.menu-dishes')
                     &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height===0;});
                 })()""")
                 assert js("""return (function(){
@@ -435,10 +435,8 @@ def main():
                 assert js(header_type)
                 wait(lambda:text_in("body","Fictional future footer task"))
                 todo_alignment = """return (function(){
-                  var h=document.querySelector('.overview-todo-heading'),b=h&&h.querySelector('.overview-todo-link'),dates=Array.from(document.querySelectorAll('.overview-todos .task-date'));
-                  if(!b||dates.length<2)return false;
-                  var a=b.getBoundingClientRect(),c=dates[0].getBoundingClientRect();
-                  return a.left>=c.right&&Math.abs(c.top-a.top)<12&&dates.every(d=>Math.abs(d.getBoundingClientRect().left-c.left)<=1);
+                  var todo=document.querySelector('.overview-todos'),menu=document.querySelector('.overview-menu'),dates=Array.from(todo.querySelectorAll('.task-date')),a=todo.getBoundingClientRect(),b=menu.getBoundingClientRect(),t=todo.firstElementChild.getBoundingClientRect(),m=menu.firstElementChild.getBoundingClientRect(),mid=document.getElementById('overviewWeather').getBoundingClientRect().left;
+                  return dates.length>=2&&Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(b.left-mid)<=2&&Math.abs(t.top-m.top)<=1&&Math.abs(t.left-a.left)<=1&&Math.abs(m.left-b.left-7)<=1&&todo.firstElementChild.textContent==='待办'&&menu.firstElementChild.textContent==='菜单'&&dates.every(d=>Math.abs(d.getBoundingClientRect().left-t.left)<=1);
                 })()"""
                 assert js(todo_alignment)
                 footer_layout = """return (function(){
@@ -462,10 +460,10 @@ def main():
                 assert js(footer_layout)
                 assert js("""var c=document.getElementById("displayContent");return c.scrollTop>0&&Math.abs(c.scrollHeight-c.clientHeight-c.scrollTop)<=2""")
                 assert js("""return (function(){
-                  var c=document.getElementById("displayContent").getBoundingClientRect(),last=document.querySelector('.overview-todos .task-day:last-child .task-row:last-child'),s=document.getElementById("settings").getBoundingClientRect();
-                  if(!last)return false;
-                  var r=last.getBoundingClientRect(),x=r.left+r.width/2,y=r.bottom-2;
-                  return r.top>=c.top&&r.bottom<=c.bottom-1&&r.bottom>s.top&&r.right<=s.left-1&&last.contains(document.elementFromPoint(x,y));
+                  var c=document.getElementById("displayContent").getBoundingClientRect(),last=document.querySelector('.overview-todos .task-day:last-child .task-row:last-child'),menu=document.querySelector('.overview-menu-last'),s=document.getElementById("settings").getBoundingClientRect();
+                  if(!last||!menu)return false;
+                  var r=last.getBoundingClientRect(),m=menu.getBoundingClientRect(),x=r.left+r.width/2,y=r.bottom-2;
+                  return r.top>=c.top&&r.bottom<=c.bottom-1&&r.right<=s.left-1&&last.contains(document.elementFromPoint(x,y))&&m.bottom<=c.bottom-1&&parseFloat(getComputedStyle(menu).paddingRight)>=48;
                 })()""")
                 js("""document.getElementById("displayContent").scrollTop=0""")
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
@@ -705,11 +703,12 @@ def main():
                       var compact=slots.every(n=>{var lines=Array.from(n.querySelectorAll('.overview-bus-eta,.overview-bus-time,.overview-bus-details')).filter(x=>getComputedStyle(x).display!=='none');return lines.every((x,i)=>i===0||Math.abs(x.getBoundingClientRect().top-lines[i-1].getBoundingClientRect().bottom)<=1);});
                       return inline&&adjacent&&compact&&empty.every(n=>n.getBoundingClientRect().height===0)&&rows.every(n=>n.getBoundingClientRect().bottom<=end);
                     })()""")
-                    return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top]""")
+                    return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top,parseFloat(getComputedStyle(b).marginTop)]""")
                 for width in (480,320):
                     wd("/session/"+sid+"/window/rect", {"width":width,"height":640})
                     bus.poller.last=live_snapshot
                     baseline=overview_bus_geometry("预计")
+                    assert baseline==([139,139,10] if width==480 else [200,200,10])
                     for state,expected in [(replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),"计划"),(replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),"暂无车辆"),(replace(live_snapshot,status="stale"),"数据未更新"),(replace(live_snapshot,status="expired",vehicles=(),departure_plans=()),"数据已过期")]:
                         bus.poller.last=state
                         assert overview_bus_geometry(expected)==baseline
