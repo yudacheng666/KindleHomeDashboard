@@ -261,3 +261,38 @@ console.log("Household display simulation passed: automatic switching, override,
   confirmed=true;completeButton().onclick();assert.equal(posts,1);assert.ok(completeButton());assert.ok(el("status").textContent.includes("未确认"));
   postFail=false;completeButton().onclick();assert.equal(posts,2);assert.ok(!completeButton());assert.ok(descendants(el("body")).some(n=>n.textContent==="Future example"));
 }
+
+
+// The embedded admin preview is interactive only after its same-origin parent
+// supplies the already-verified session token; credentials never enter the URL.
+{
+  const parent={messages:[],postMessage(message,origin){this.messages.push([message,origin]);}};
+  let posted=0;
+  const current={...sample,can_complete:true,upcoming_tasks:[task]};
+  class PreviewXHR {
+    open(method,path){this.method=method;this.path=path;}
+    setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer parent-admin-token");}
+    send(body){
+      if(this.method==="GET"){assert.equal(this.path,"/api/home/view");this.status=200;this.responseText=JSON.stringify(current);}
+      else{
+        assert.equal(this.path,"/api/home/task/complete");
+        assert.deepEqual(JSON.parse(body),{key:task.id,on:date,completed:true});
+        posted++;current.tasks=[];current.upcoming_tasks=[];this.status=200;this.responseText=JSON.stringify({result:null});
+      }
+      this.readyState=4;this.onreadystatechange();
+    }
+    abort(){}
+  }
+  const previewEvents={},previewWindow={parent,addEventListener(n,f){previewEvents[n]=f;},confirm:()=>true};
+  vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{
+    document:doc,window:previewWindow,location:{pathname:"/preview",hash:"#tasks",origin:"http://127.0.0.1"},
+    XMLHttpRequest:PreviewXHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer
+  });
+  assert.ok(parent.messages.some(x=>x[0].type==="khd-admin-preview-auth-request"));
+  assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,0);
+  previewEvents.message({origin:"http://127.0.0.1",source:parent,data:{type:"khd-admin-preview-auth",token:"parent-admin-token"}});
+  assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,1);
+  const complete=descendants(el("body")).find(n=>n.className==="task-complete");
+  complete.onclick();assert.equal(posted,1);
+  assert.equal(descendants(el("body")).filter(n=>n.className==="task-complete").length,0);
+}
