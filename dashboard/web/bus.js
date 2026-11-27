@@ -5,9 +5,9 @@ var access=typeof window!=="undefined"&&window.KHD_ACCESS||{}, direct=access.dir
 var token="", admin=false, busy=false, generation=0, configuring=false;
 var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], scheduleEditable=false, searchedKeyword="", groups=[], choices=[], ageTimer=null, collectedAt=null, etaRows=[], etaSnapshot=null;
 function el(id){return document.getElementById(id);}
-function notifyPreviewAuth(){if(window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}
-function notifyPreviewRefresh(){if(window.KHD_ADMIN_PREVIEW_REFRESH)window.KHD_ADMIN_PREVIEW_REFRESH();}
-window.KHD_ADMIN_GET_TOKEN=function(){return token;};
+function notifyPreviewAuth(){if(typeof window!=="undefined"&&window.KHD_ADMIN_PREVIEW_AUTH)window.KHD_ADMIN_PREVIEW_AUTH();}
+function notifyPreviewRefresh(){if(typeof window!=="undefined"&&window.KHD_ADMIN_PREVIEW_REFRESH)window.KHD_ADMIN_PREVIEW_REFRESH();}
+if(typeof window!=="undefined")window.KHD_ADMIN_GET_TOKEN=function(){return token;};
 function txt(id,value){var n=el(id);if(n.textContent!==value)n.textContent=value;}
 function show(id,visible){var n=el(id),c=visible?"":"hidden";if(n.className!==c)n.className=c;}
 function note(value){txt("message",typeof location!=="undefined"&&location.pathname==="/admin/bus"&&value==="已保存。"?"":value);}
