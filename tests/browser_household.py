@@ -457,7 +457,8 @@ def main():
                 assert js(todo_alignment)
                 assert js("""return Array.from(document.querySelectorAll('.overview-menu .menu-meal')).every(function(row){
                   var a=row.querySelector('.menu-meal-label'),b=row.querySelector('.menu-dishes'),x=getComputedStyle(a),y=getComputedStyle(b);
-                  return ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight','color','verticalAlign'].every(function(k){return x[k]===y[k];})&&x.fontSize==='19px'&&x.fontWeight==='400'&&x.whiteSpace==='nowrap';
+                  var expected=innerWidth>=560&&innerHeight>=550?'28px':innerWidth>=421?'24px':'19px';
+                  return ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight','color','verticalAlign'].every(function(k){return x[k]===y[k];})&&x.fontSize===expected&&x.fontWeight==='400'&&x.whiteSpace==='nowrap';
                 })""")
                 assert js("""var row=document.querySelector('.overview-todos .task-row'),circle=row&&row.querySelector('.overview-task-circle');return !!circle&&circle.textContent==='○'&&circle.getAttribute('aria-label')==='完成待办'&&row.firstElementChild.contains(circle)&&circle.getBoundingClientRect().right<=row.querySelector('.task-text').getBoundingClientRect().left+1""")
                 footer_layout = """return (function(){
