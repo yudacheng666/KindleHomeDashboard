@@ -76,7 +76,15 @@ function moduleMode(){
  if(path==="/admin/bus")return "bus";if(path==="/admin/weather")return "weather";if(path==="/admin/driving")return "driving";
  if(path==="/admin/family")return window.KHD_ADMIN_PREVIEW_MODE||"tasks";return "overview";
 }
-function sendAuth(){if(!frame||!frame.contentWindow)return;var value=typeof window.KHD_ADMIN_GET_TOKEN==="function"?window.KHD_ADMIN_GET_TOKEN():"";frame.contentWindow.postMessage({type:"khd-admin-preview-auth",token:typeof value==="string"?value:""},location.origin);}
+var lastPreviewAuth=null;
+function sendAuth(){
+ if(!frame||!frame.contentWindow)return;
+ var value="",hasGetter=typeof window.KHD_ADMIN_GET_TOKEN==="function";
+ if(hasGetter)value=window.KHD_ADMIN_GET_TOKEN();else if(access.direct===true)value="local-direct";else return;
+ if(typeof value!=="string")value="";
+ if(!value&&access.direct===true&&lastPreviewAuth===null)return;
+ frame.contentWindow.postMessage({type:"khd-admin-preview-auth",token:value},location.origin);lastPreviewAuth=value;
+}
 function loadFrame(next){var src=next==="auto"?"/preview/auto":"/preview#"+next;if(frame.getAttribute("src")===src){sendAuth();return;}frame.src=src;}
 function resize(){
  if(!frame)return;

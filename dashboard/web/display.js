@@ -10,7 +10,7 @@ var autoEntry=path==="/auto"||path==="/preview/auto", automatic=false;
 var seconds=180, editing=false, section="tasks", settingsOpen=false;
 function previewReadOnly(){return preview&&!adminPreview;}
 function notifyPreviewMode(){if(preview&&adminPreview&&window.parent&&window.parent!==window)window.parent.postMessage({type:"khd-preview-mode-change",mode:mode==="family"?section:mode},location.origin);}
-function refreshPreviewData(){if(mode==="overview"){stopOverview();startOverview();}else{epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;refresh();}}
+function refreshPreviewData(){epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;if(mode==="overview"){stopOverview();startOverview();}else refresh();}
 var refreshTimer=null, rotationTimer=null, lastRender="", mode="family", savedKey="", resumePage="";
 var weatherPages=[],weatherCursor=0,weatherOrder="",WEATHER_SECONDS=120;
 var overviewTimers={},overviewPending={},overviewRoots={},overviewKeys={},overviewDay="";
@@ -1030,6 +1030,7 @@ if(preview&&window.parent&&window.parent!==window&&window.addEventListener){
   if(event.data.type==="khd-admin-preview-auth"){
    var next=typeof event.data.token==="string"&&event.data.token.length<=128?event.data.token:"";
    if(next===token&&adminPreview===!!next)return;
+   epoch++;busy=false;clearTimeout(refreshTimer);refreshTimer=null;stopOverview();stopAge();stopRotation();
    adminPreview=!!next;token=next;
    if(!next){reset();return;}
    var hash=location.hash||"",sectionMode=["#tasks","#posters","#menus"].indexOf(hash)>=0?hash.slice(1):"tasks";
