@@ -413,12 +413,15 @@ def main():
                   var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
                   return w.width>0&&d.width>0&&Math.abs(w.width-d.width)<=2&&Math.abs(w.top-d.top)<=2&&Math.abs(d.right-w.left)<=1&&Math.max(d.bottom,w.bottom)<=b.top+1
                     &&Math.abs(d.right-c[0].getBoundingClientRect().right)<=2&&Math.abs(w.left-c[1].getBoundingClientRect().left)<=2
+                    &&Math.abs(d.left-c[0].querySelector('h2').getBoundingClientRect().left)<=1
+                    &&Math.abs(w.left+parseFloat(getComputedStyle(document.getElementById('overviewWeather')).borderLeftWidth)+parseFloat(getComputedStyle(document.getElementById('overviewWeather')).paddingLeft)-c[1].querySelector('h2').getBoundingClientRect().left)<=1
                     &&b.width>=document.getElementById('body').getBoundingClientRect().width-2&&c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2;
                 })()""")
                 footer_layout = """return (function(){
                   var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),body=document.getElementById("body").getBoundingClientRect(),display=document.getElementById("display").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
                   return Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(a.top-b.top)<=2
-                    &&getComputedStyle(d).textAlign==="center"&&getComputedStyle(w).textAlign==="center"
+                    &&getComputedStyle(d).textAlign==="left"&&getComputedStyle(w).textAlign==="left"
+                    &&parseFloat(getComputedStyle(d).paddingLeft)===0&&parseFloat(getComputedStyle(w).paddingLeft)===6
                     &&getComputedStyle(s.querySelector(".settings-text")).display==="none"&&s.querySelector(".settings-icon").getBoundingClientRect().width>=24
                     &&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top>=body.bottom-1&&Math.abs(r.right-display.right)<=1&&Math.abs(r.bottom-display.bottom)<=1;
                 })()"""
