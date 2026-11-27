@@ -3,6 +3,7 @@ const fs=require("node:fs"),vm=require("node:vm"),assert=require("node:assert/st
 class Node {
   constructor(tag){this.tag=tag;this.children=[];this.textContent="";this.value="";this.checked=false;this.className="";}
   get firstChild(){return this.children[0];}
+  setAttribute(k,v){this[k]=v;}
   appendChild(n){this.children.push(n);return n;}
   removeChild(n){this.children.splice(this.children.indexOf(n),1);}
 }
@@ -34,10 +35,11 @@ function advance(ms){
   }
   clock=end;
 }
+let reversedGroups=[false,false,false],directionWrites=0;
 class XHR {
-  open(method,path){assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto","/api/weather/view","/api/driving/view"].includes(path));this.path=path;}
-  setRequestHeader(k,v){assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
-  send(body){assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/driving/view"?{enabled:true,groups:["A","B","C"].map((name,i)=>({name,status:"ok",routes:[{seconds:600+i*60,meters:12000,congested_meters:i===0?0:1000,traffic_covered_meters:i===1?6000:12000},{seconds:900,meters:15000,congested_meters:null,traffic_covered_meters:0}],image:"data:image/png;base64,c3ludGhldGlj",fetched_at:"2026-01-05T00:00:00+08:00"}))}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
+  open(method,path){if(path==="/api/driving/reverse"){assert.equal(method,"POST");this.path=path;return;}assert.equal(method,"GET");assert.ok(["/api/home/view","/api/bus/view","/api/display/auto","/api/weather/view","/api/driving/view"].includes(path));this.path=path;}
+  setRequestHeader(k,v){if(k==="Content-Type"){assert.equal(v,"application/json");return;}assert.equal(k,"Authorization");assert.equal(v,"Bearer example-display-token");}
+  send(body){if(this.path==="/api/driving/reverse"){const b=JSON.parse(body);assert.equal(b.revision,"example-"+b.group+"-"+reversedGroups[b.group]);reversedGroups[b.group]=!reversedGroups[b.group];directionWrites++;this.status=200;this.responseText=JSON.stringify({status:"ok"});this.readyState=4;this.onreadystatechange();return;}assert.equal(body,null);requests++;if(this.path==="/api/bus/view")busRequests++;if(this.path==="/api/display/auto")autoRequests++;this.status=fail||200;const timedBus={...busData,snapshot:{...busData.snapshot,server_now_ms:FakeDate.now(),fetched_at_ms:Date.parse(busData.snapshot.fetched_at),timezone_offset_min:480}};this.responseText=JSON.stringify(fail?{}:this.path==="/api/driving/view"?{enabled:true,can_reverse:true,groups:["A","B","C"].map((name,i)=>({name,status:"ok",can_switch:true,reversed:reversedGroups[i],direction_revision:"example-"+i+"-"+reversedGroups[i],routes:[{seconds:600+i*60,meters:12000,congested_meters:i===0?0:1000,traffic_covered_meters:i===1?6000:12000},{seconds:4800,meters:15000,congested_meters:null,traffic_covered_meters:0}],image:"data:image/png;base64,c3ludGhldGlj",fetched_at:"2026-01-05T00:00:00+08:00"}))}:this.path==="/api/weather/view"?weatherData:this.path==="/api/bus/view"?timedBus:this.path==="/api/display/auto"?{mode:autoMode,view:autoMode==="bus"?timedBus:data}:data);this.readyState=4;this.onreadystatechange();}
   abort(){}
 }
 vm.runInNewContext(fs.readFileSync("dashboard/web/display.js","utf8"),{document:doc,window:{addEventListener(n,f){windowEvents[n]=f;}},XMLHttpRequest:XHR,Date:FakeDate,setTimeout:setTimer,clearTimeout:clearTimer});
@@ -69,6 +71,8 @@ assert.equal(el("displayNav").className,"");
 assert.equal(descendants(el("body")).filter(n=>n.className.indexOf("driving-group")===0).length,2);
 assert.equal(descendants(el("body")).filter(n=>n.className.indexOf("overview-driving-card")>=0).length,2);
 assert.equal(descendants(el("body")).filter(n=>n.className.indexOf("driving-route-row")===0).length,4);
+assert.ok(descendants(el("body")).some(n=>n.textContent==="1小时20分钟"));
+const switches=descendants(el("body")).filter(n=>n.className==="driving-reverse");assert.equal(switches.length,2);switches[1].onclick();assert.equal(directionWrites,1);assert.deepEqual(reversedGroups,[false,true,false]);assert.ok(descendants(el("body")).some(n=>n.textContent.indexOf("返程")===0));
 const vehicleRow=descendants(el("body")).find(n=>n.className==="overview-bus-slots");
 assert.equal(vehicleRow.children.length,2);
 assert.ok(vehicleRow.children.every(n=>n.className==="overview-bus-slot"));
@@ -121,7 +125,7 @@ assert.ok(descendants(el("body")).some(n=>n.textContent==="明日"));
 assert.ok(descendants(el("body")).some(n=>n.textContent.indexOf("2030/01/01")===0));
 assert.ok(!descendants(el("body")).some(n=>n.className==="task-complete"));
 data=sample;
-click("drivingMode");heading("驾驶");assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,3);assert.equal(descendants(el("body")).filter(n=>n.tag==="img").length,3);assert.ok(descendants(el("body")).some(n=>n.textContent==="1  10分钟"));assert.ok(descendants(el("body")).some(n=>n.textContent==="12.0km"));assert.ok(descendants(el("body")).some(n=>n.textContent==="15.0km"));assert.ok(!descendants(el("body")).some(n=>/已知拥堵|路况未知/.test(n.textContent)));click("tasksMode");heading("待办清单");
+click("drivingMode");heading("驾驶");assert.equal(descendants(el("body")).filter(n=>n.className==="driving-group").length,3);assert.equal(descendants(el("body")).filter(n=>n.tag==="img").length,3);assert.ok(descendants(el("body")).some(n=>n.textContent==="1  10分钟"));assert.ok(descendants(el("body")).some(n=>n.textContent==="2  1小时20分钟"));assert.equal(descendants(el("body")).filter(n=>n.className==="driving-reverse").length,3);assert.ok(descendants(el("body")).some(n=>n.textContent==="12.0km"));assert.ok(descendants(el("body")).some(n=>n.textContent==="15.0km"));assert.ok(!descendants(el("body")).some(n=>/已知拥堵|路况未知/.test(n.textContent)));click("tasksMode");heading("待办清单");
 assert.equal(el("token").value,"");assert.equal(el("familyControls").className,"hidden");
 assert.equal(el("settingsPanel").className,"hidden");click("settings");assert.equal(el("displayContent").className,"hidden");assert.equal(el("settingsPanel").className,"");assert.equal(el("manageLink").href,"/bus#return-tasks");assert.equal(el("displayManage").href,"/home#display/return-tasks");click("returnDisplay");assert.equal(el("displayContent").className,"");heading("待办清单");
 const first=el("body").children[0];advance(30000);assert.equal(el("body").children[0],first);

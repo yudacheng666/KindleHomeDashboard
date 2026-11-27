@@ -8,6 +8,7 @@ import stat
 import tempfile
 from threading import Event, RLock, Thread
 import time
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from .driving import Amap, DrivingLedger, DrivingError, DrivingBlocked, point
@@ -63,6 +64,10 @@ class DrivingService:
         self.settings=config(DEFAULT)
         self.records,self.due,self.failures={},{},{}
         self.generation=0
+        self.direction_epoch=uuid4().hex
+        self.reversed=set()
+        self.direction_versions={}
+        self.reverse_after={}
         self.error=""
         self.ledger,self.provider=None,None
         self.search_busy=False
@@ -118,6 +123,10 @@ class DrivingService:
                 if os.path.exists(temp): os.unlink(temp)
             self.settings=value
             self.generation+=1
+            self.direction_epoch=uuid4().hex
+            self.reversed.clear()
+            self.direction_versions.clear()
+            self.reverse_after.clear()
             self.records.clear()
             self.due.clear()
             self.failures.clear()
@@ -151,6 +160,34 @@ class DrivingService:
         local=self.clock().astimezone(self.zone)
         return enabled and any(w.contains(local) for w in windows)
 
+    def _direction_revision(self,i):
+        return f"{self.direction_epoch}:{i}:{self.direction_versions.get(i,0)}"
+
+    def reverse(self,body):
+        if not isinstance(body,dict) or set(body)!={"group","revision"} or type(body["group"]) is not int or not isinstance(body["revision"],str):
+            raise ValueError("invalid_driving_direction")
+        i=body["group"]
+        with self.lock:
+            if not 0<=i<len(self.settings["groups"]) or body["revision"]!=self._direction_revision(i):
+                return {"status":"stale"}
+            if self.stop.is_set() or not self.provider or not self.ledger or self.error:
+                return {"status":"unavailable"}
+            if self.ledger.usage()["blocked"]:
+                return {"status":"blocked"}
+            if not self._active(self.settings["groups"][i]):
+                return {"status":"paused"}
+            now=self.monotonic()
+            if now<self.reverse_after.get(i,0):
+                return {"status":"wait"}
+            self.reverse_after[i]=now+15
+            self.reversed.symmetric_difference_update({i})
+            self.direction_versions[i]=self.direction_versions.get(i,0)+1
+            self.records.pop(i,None)
+            self.failures.pop(i,None)
+            self.due[i]=now
+            self.wake.set()
+            return {"status":"ok"}
+
     def step(self):
         with self.lock:
             if self.stop.is_set() or not self.provider or not self.ledger:
@@ -167,7 +204,10 @@ class DrivingService:
                 return
             i=min(pending,key=lambda j:self.due.get(j,0))
             group=groups[i]
+            if i in self.reversed:
+                group={**group,"origin":group["destination"],"destination":group["origin"]}
             generation=self.generation
+            revision=self._direction_revision(i)
             self.due[i]=now+self.settings["interval"]
         try:
             routes=self.provider.routes(group["origin"],group["destination"])
@@ -175,7 +215,7 @@ class DrivingService:
             fetched=self.monotonic()
         except Exception:
             with self.lock:
-                if generation==self.generation:
+                if generation==self.generation and revision==self._direction_revision(i):
                     count=self.failures.get(i,0)+1
                     self.failures[i]=count
                     self.due[i]=self.monotonic()+min(1800,self.settings["interval"]*2**min(count,4))
@@ -184,7 +224,7 @@ class DrivingService:
         map_routes=[]
         map_error=None
         with self.lock:
-            if generation!=self.generation or self.stop.is_set() or not self._active(group):
+            if generation!=self.generation or revision!=self._direction_revision(i) or self.stop.is_set() or not self._active(group):
                 return
         try:
             mime,raw,indices=self.provider.map(group["origin"],group["destination"],routes)
@@ -197,7 +237,7 @@ class DrivingService:
         except Exception:
             map_error="map_unavailable"
         with self.lock:
-            if generation==self.generation and not self.stop.is_set() and self._active(group):
+            if generation==self.generation and revision==self._direction_revision(i) and not self.stop.is_set() and self._active(group):
                 self.records[i]={"routes":[r.view() for r in routes],"image":image,
                                  "map_routes":map_routes,"map_error":map_error,
                                  "fetched_at":stamp,"mono":fetched}
@@ -224,6 +264,8 @@ class DrivingService:
                 elif age>STALE or i in self.failures: status="stale"
                 else: status="ok"
                 rows.append({"name":group["name"],"status":status,
+                             "reversed":i in self.reversed,"direction_revision":self._direction_revision(i),
+                             "can_switch":bool(active and self.provider and usage and not usage["blocked"] and not self.error and not self.stop.is_set()),
                              "routes":record["routes"] if record else [],
                              "image":record["image"] if record else None,
                              "map_routes":record["map_routes"] if record else [],

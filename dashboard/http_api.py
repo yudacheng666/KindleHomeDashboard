@@ -113,6 +113,8 @@ class API:
         return {"mode": "bus", "view": self.bus_view(bus)}
 
     def dispatch(self, path, body):
+        if path == "/api/driving/reverse" and self.driving is not None:
+            return self.driving.reverse(body)
         if path == "/api/driving/search" and self.driving is not None:
             return self.driving.search_locations(body)
         if path == "/api/driving/settings" and self.driving is not None:
@@ -266,6 +268,9 @@ class Handler(BaseHTTPRequestHandler):
             view = payload if self.path == READ else payload["view"]
             headers = self.headers.get_all("Authorization") or []
             view["can_complete"] = self.server.api.authorized(headers[0] if headers else None, True)
+        if self.path == "/api/driving/view":
+            headers = self.headers.get_all("Authorization") or []
+            payload["can_reverse"] = self.server.api.authorized(headers[0] if headers else None, True)
         self.send_json(200, payload)
 
     def do_POST(self):
@@ -273,7 +278,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         home = self.path in POST_PATHS and self.server.api.household is not None
         weather = self.path in ("/api/weather/settings", "/api/weather/search") and self.server.api.weather is not None
-        driving = self.path in ("/api/driving/settings", "/api/driving/search") and self.server.api.driving is not None
+        driving = self.path in ("/api/driving/settings", "/api/driving/search", "/api/driving/reverse") and self.server.api.driving is not None
         if self.path not in ("/api/bus/search", "/api/bus/route", "/api/bus/save", "/api/bus/schedule") and not home and not weather and not driving:
             self.send_json(404, {"error": "not_found"})
             return

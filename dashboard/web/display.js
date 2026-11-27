@@ -628,28 +628,64 @@ el("weatherSave").onclick=function(){
   weatherSettingsRequest({enabled:enabled,consent:consent,name:main.name,latitude:main.latitude,longitude:main.longitude,additional:places});
 };
 
+function drivingDuration(seconds){
+  var minutes=Math.ceil(seconds/60);
+  return minutes>=60?Math.floor(minutes/60)+"小时"+(minutes%60?minutes%60+"分钟":""):minutes+"分钟";
+}
+var directionBusy=false;
+function reverseDriving(index,group,button){
+  if(directionBusy||busy||settingsOpen||previewReadOnly()||!token||!(mode==="overview"||mode==="driving"))return;
+  if(mode==="overview"&&overviewPending.driving)return;
+  directionBusy=true;button.disabled=true;
+  var g=epoch,x=new XMLHttpRequest(),ended=false,timer;
+  function finish(ok,v){
+    if(ended)return;ended=true;clearTimeout(timer);directionBusy=false;
+    if(g!==epoch)return;
+    button.disabled=false;
+    if(ok&&v&&v.status==="ok"){
+      // Clear old direction immediately; re-read NAS state, never flip old image.
+      refreshPreviewData();
+    }else{
+      var labels={wait:"切换过于频繁，请稍后再试。",stale:"路线已变化，请刷新后再试。",paused:"当前不在采集时段。",blocked:"地图更新已暂停。",unavailable:"暂时无法切换。"};
+      txt("status",ok&&v&&labels[v.status]?labels[v.status]:"切换未确认，请刷新后核对。");
+      if(ok&&v&&v.status==="stale")refreshPreviewData();
+    }
+  }
+  try{
+    x.open("POST","/api/driving/reverse",true);
+    if(token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
+    x.setRequestHeader("Content-Type","application/json");
+    x.onreadystatechange=function(){if(x.readyState!==4)return;var v=null;try{v=JSON.parse(x.responseText);}catch(e){}finish(x.status===200,v);};
+    timer=setTimeout(function(){finish(false,null);try{x.abort();}catch(e){}},12000);
+    x.send(JSON.stringify({group:index,revision:group.direction_revision}));
+  }catch(e){finish(false,null);}
+}
 function renderDrivingGroups(root,v,limit,summary){
     if(!v.enabled||!v.groups.length)append(root,"p","驾驶未启用或未配置，请前往设置。","note");
     var messages={disabled:"未启用",paused:"暂停更新",waiting:"等待更新",not_configured:"未设置地图",credential_error:"配置异常",storage_error:"配置异常",blocked:"更新已暂停",stale:"旧数据",unavailable:"暂不可用",ok:""};
     var host=summary&&v.enabled&&v.groups.length?append(root,"div","","overview-driving-grid"):root;
-    (v.groups||[]).slice(0,limit).forEach(function(g){
+    (v.groups||[]).slice(0,limit).forEach(function(g,index){
       var group=append(host,"section","","driving-group"+(summary?" overview-driving-card":""));append(group,"h2",g.name);
       var pair=append(group,"div","","driving-pair"+(summary?" overview-driving-pair":"")),map=append(pair,"div","","driving-map"+(summary?" overview-driving-map":"" )),list=append(pair,"div","","driving-routes"+(summary?" overview-driving-routes":""));
+      var frame=append(map,"div","","driving-map-frame");
       if(typeof g.image==="string"&&/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(g.image)){
-        var image=append(map,"img","");image.alt=g.name+" 路线地图";image.onerror=function(){clear(map);append(map,"p","地图图片加载失败","note");};image.src=g.image;
+        var image=append(frame,"img","");image.alt=g.name+" 路线地图";image.onerror=function(){if(image.parentNode)image.parentNode.removeChild(image);append(frame,"p","地图图片加载失败","note");};image.src=g.image;
         if(Array.isArray(g.map_routes)&&g.map_routes.length<(g.routes||[]).length)append(map,"p","图中路线："+g.map_routes.join("、"),"driving-foot");
       }else {
         var mapMessages={map_url_too_long:"路线过长",map_geometry_unavailable:"缺少路线坐标",map_http_error:"地图接口异常",map_too_large:"地图图片过大",invalid_map:"地图响应异常",provider_rejected_request:"地图参数被拒绝",provider_blocked:"接口已阻断",request_limit:"已达请求限额"};
-        append(map,"p","地图暂不可用"+(mapMessages[g.map_error]?" · "+mapMessages[g.map_error]:""),"note");
+        append(frame,"p",(g.status==="waiting"?"等待更新":"地图暂不可用")+(mapMessages[g.map_error]?" · "+mapMessages[g.map_error]:""),"note");
+      }
+      if(v.can_reverse===true&&g.can_switch===true&&!previewReadOnly()){
+        var toggle=append(frame,"button","⇄","driving-reverse");toggle.type="button";toggle.title=g.reversed?"切换为原方向":"交换起点与终点";toggle.setAttribute("aria-label",toggle.title);toggle.onclick=function(){reverseDriving(index,g,toggle);};
       }
       (g.routes||[]).forEach(function(r,i){
         if(summary){
           var route=append(list,"div","","driving-route-row"+(i===0?" driving-fast":""));
           append(route,"span",String(i+1),"driving-route-number");
-          append(route,"span",Math.ceil(r.seconds/60)+"分钟","driving-route-time");
+          append(route,"span",drivingDuration(r.seconds),"driving-route-time");
           append(route,"span",(r.meters/1000).toFixed(1)+"km","driving-route-distance");
         }else{
-          var text=(i+1)+"  "+Math.ceil(r.seconds/60)+"分钟";
+          var text=(i+1)+"  "+drivingDuration(r.seconds);
           append(list,"p",text,i===0?"driving-fast":"");
           append(list,"p",(r.meters/1000).toFixed(1)+"km");
         }
@@ -666,6 +702,7 @@ function renderDrivingGroups(root,v,limit,summary){
         note=(messages[g.status]||"")+(g.fetched_at?" · 更新于 "+weatherTime(g.fetched_at):"");
         if(g.routes&&g.routes.length<3&&g.routes.length>0)note+=" · 仅返回"+g.routes.length+"条";
       }
+      if(g.reversed)note="返程"+(note?" · "+note:"");
       if(note)append(group,"p",note,"driving-foot");
     });
 }
@@ -878,7 +915,7 @@ function acceptOverviewWeather(v){
   if(next.length<2||settingsOpen||document.hidden)stopRotation();else if(rotationTimer===null)scheduleRotation();
 }
 function renderOverviewDriving(v){
-  var key=JSON.stringify([v.enabled,v.groups.length,v.groups.slice(0,2)]);if(key===overviewKeys.driving)return;
+  var key=JSON.stringify([v.enabled,v.can_reverse,v.groups.length,v.groups.slice(0,2)]);if(key===overviewKeys.driving)return;
   overviewKeys.driving=key;var root=overviewRoots.driving;clear(root);
   renderDrivingGroups(root,v,2,true);
   if(v.groups.length>2){

@@ -106,6 +106,72 @@ class DrivingTests(unittest.TestCase):
         self.assertTrue(rows[2]["image"])
         self.assertEqual(rows[2]["map_routes"],[1,2,3])
 
+    def test_reverse_only_selected_group_and_keep_saved_endpoints(self):
+        calls=[]
+        mono=[10]
+        def transport(url,headers):
+            calls.append(parse_qs(urlparse(url).query))
+            return reply(600,3900,7200)
+        service=DrivingService(self.tmp.name,{"KHD_AMAP_KEY":"placeholder_test_credential"},
+            clock=lambda:self.now,monotonic=lambda:mono[0],transport=transport,
+            image_transport=lambda u:("image/png",b"synthetic"))
+        groups=[{"name":"Example"+str(i),"origin":"1,2","destination":str(i+2)+",3",
+                 "enabled":True,"windows":[{"days":list(range(7)),"start":0,"end":1440}]} for i in range(3)]
+        settings={**DEFAULT,"groups":groups,"enabled":True,"consent":True,"map_permission":True}
+        service.configure(settings)
+        for _ in groups: service.step()
+        before=service.read()["groups"]
+        saved=service.settings_view()["groups"]
+        body={"group":1,"revision":before[1]["direction_revision"]}
+        self.assertEqual(service.reverse(body)["status"],"ok")
+        rows=service.read()["groups"]
+        self.assertEqual(rows[0],before[0])
+        self.assertEqual(rows[2],before[2])
+        self.assertTrue(rows[1]["reversed"])
+        self.assertFalse(rows[1]["routes"])
+        self.assertIsNone(rows[1]["image"])
+        self.assertEqual(service.reverse(body)["status"],"stale")
+        current={"group":1,"revision":rows[1]["direction_revision"]}
+        self.assertEqual(service.reverse(current)["status"],"wait")
+        service.step()
+        self.assertEqual(calls[-1]["origin"],["3.000000,3.000000"])
+        self.assertEqual(calls[-1]["destination"],["1.000000,2.000000"])
+        self.assertEqual(service.read()["groups"][1]["routes"][1]["seconds"],3900)
+        self.assertEqual(service.settings_view()["groups"],saved)
+        mono[0]+=15
+        self.assertEqual(service.reverse(current)["status"],"ok")
+        service.step()
+        self.assertEqual(calls[-1]["origin"],["1.000000,2.000000"])
+        self.assertEqual(calls[-1]["destination"],["3.000000,3.000000"])
+        self.assertFalse(service.read()["groups"][1]["reversed"])
+        self.assertEqual(service.ledger.usage()["lbs"]["used"],10)
+        service.configure({**settings,"enabled":False})
+        row=service.read()["groups"][1]
+        self.assertEqual(service.reverse({"group":1,"revision":row["direction_revision"]})["status"],"paused")
+        self.assertFalse(row["can_switch"])
+
+    def test_reverse_discards_inflight_forward_result(self):
+        mono=[10]
+        service=DrivingService(self.tmp.name,{"KHD_AMAP_KEY":"placeholder_test_credential"},
+            clock=lambda:self.now,monotonic=lambda:mono[0],transport=lambda u,h:reply(600),
+            image_transport=lambda u:("image/png",b"synthetic"))
+        group={"name":"Example","origin":"1,2","destination":"2,3","enabled":True,
+               "windows":[{"days":list(range(7)),"start":0,"end":1440}]}
+        service.configure({**DEFAULT,"groups":[group],"enabled":True,"consent":True,"map_permission":True})
+        original=service.provider.routes
+        def swap_during_route(origin,destination):
+            row=service.read()["groups"][0]
+            self.assertEqual(service.reverse({"group":0,"revision":row["direction_revision"]})["status"],"ok")
+            return original(origin,destination)
+        service.provider.routes=swap_during_route
+        service.step()
+        self.assertTrue(service.read()["groups"][0]["reversed"])
+        self.assertEqual(service.read()["groups"][0]["routes"],[])
+        self.assertEqual(service.ledger.usage()["lbs"]["used"],1)
+        service.provider.routes=original
+        service.step()
+        self.assertTrue(service.read()["groups"][0]["image"])
+
     def test_account_caps_persist(self):
         with sqlite3.connect(self.ledger.path) as db:
             db.execute("INSERT INTO request_days VALUES(?,?,?)",("2026-01-15","lbs",29999))

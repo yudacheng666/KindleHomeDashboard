@@ -62,10 +62,13 @@ def main():
         weather=WeatherService(directory,ENV,clock=lambda:now,q_transport=fake_weather,backup_transport=lambda u,h:meteo())
         from dashboard.driving_service import DrivingService
         from test_driving import reply
-        import base64
+        import struct, zlib
+        def png_chunk(kind, data):
+            return struct.pack(">I",len(data))+kind+data+struct.pack(">I",zlib.crc32(kind+data))
+        map_png=b"\x89PNG\r\n\x1a\n"+png_chunk(b"IHDR",struct.pack(">IIBBBBB",600,360,8,0,0,0,0))+png_chunk(b"IDAT",zlib.compress((b"\x00"+b"\xff"*600)*360))+png_chunk(b"IEND",b"")
         driving=DrivingService(directory,{"KHD_AMAP_KEY":"placeholder_test_credential"},
-            clock=lambda:now,transport=lambda u,h:reply(600,900,1200),
-            image_transport=lambda u:("image/png",base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9gAAAABJRU5ErkJggg==")))
+            clock=lambda:now,transport=lambda u,h:reply(600,1200,4800),
+            image_transport=lambda u:("image/png",map_png))
         with LocalServer(API(runtime, reader, admin, household=home, weather=weather, driving=driving), 0) as server:
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -355,7 +358,7 @@ def main():
                 click("returnDisplay");click("drivingMode")
                 wait(lambda:js("return document.querySelectorAll('#body .driving-group').length===3"))
                 wait(lambda:js("return Array.from(document.querySelectorAll('#body .driving-map img')).length===3 && Array.from(document.querySelectorAll('#body .driving-map img')).every(function(x){return x.complete&&x.naturalWidth>0;})"))
-                assert text_in("body","10分钟") and text_in("body","20分钟")
+                assert text_in("body","10分钟") and text_in("body","20分钟") and text_in("body","1小时20分钟")
                 click("settings");click("drivingLoad")
                 wait(lambda:text_in("drivingSettingStatus","已读取"))
                 assert js("return document.querySelectorAll('#drivingGroups > section').length===3")
@@ -364,6 +367,12 @@ def main():
                 click("overviewMode")
                 wait(lambda:js("return document.querySelectorAll('#body .overview-driving-card').length===2 && document.querySelectorAll('#body .overview-driving-map img').length===2 && document.querySelector('#body .overview-bus')!==null"))
                 assert text_in("body","另 1 个目的地") and not text_in("body","全部路线")
+                assert text_in("body","1小时20分钟")
+                assert js("""return Array.from(document.querySelectorAll('#body .driving-reverse')).length===2 &&
+                  Array.from(document.querySelectorAll('#body .driving-reverse')).every(function(b){
+                    var a=b.getBoundingClientRect(),i=b.parentNode.querySelector('img').getBoundingClientRect();
+                    return a.left>=i.left&&a.right<=i.right&&a.top>=i.top&&a.bottom<=i.bottom;
+                  })""")
                 assert not text_in("body","已知拥堵") and not text_in("body","路况未知")
                 assert js("return Array.from(document.querySelectorAll('#body .overview-driving-routes')).every(function(n){return /km/.test(n.textContent)&&/分钟/.test(n.textContent);})")
                 assert js("""return (function(){
