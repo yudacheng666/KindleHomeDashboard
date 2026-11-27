@@ -1,10 +1,10 @@
 # Kindle 单页综合看板（统一实现候选）
 
-## rc.45 第二轮字体放大（用户已确认并合并，发布构建中）
+## rc.45 第二轮字体放大（已发布）
 
 用户反馈 rc.44 的40px时钟、40px公交首车和24px家庭正文在实际显示中仍不够大，已确认本次更大字号预览并授权发布。本候选进一步提高层级：宽视口（≥560×550 CSS px）时钟/天气48px、日期/天气辅助24px、公交首车44px/次车36px、标题26px、预计与详情22px、驾驶最快路线数字32px/其他路线数字28px、待办/菜单正文28px、日期24px、模块标题28px；421–559px采用36/34/28/24px温和档，≤420px保持原样。通过调整顶部行盒和内边距维持原头部总高度，数字行盒保持既有高度；底部内容继续在模块内部滚动。
 
-不改变六区域几何、公交固定139px、驾驶无滚动、地图尺寸/比例目标、底部区域高度及滚动、公交和家庭语义、刷新/采集/存储/权限。真实 Chromium PR CI 46030571806 与 push CI 46030561102 全通过：170项 Python 测试、Node 离线界面、Chromium 字体/公交实时与计划及失效/滚动/几何、虚构数据截图、Docker smoke、公开树和 gitleaks。768×640：时钟48px、家庭标题/正文28px、地图高154px、图宽256.64/栏宽374px、底部100px、正文632px无溢出；600×800：地图高179px、宽290px、底部235px、正文792px无溢出。用户已确认预览，PR #54 候选 8e9deacaecfe107ec75e6bb05a9654b3ddfe203a 已 squash 合并为 8c117111260ce9c42b7af0e71aef3ee93ebc79f5。发布工作流待完成。真实 Kindle/旧浏览器仍需现场验收。PR #51 仅修改电脑端预览校准，保持独立。
+不改变六区域几何、公交固定139px、驾驶无滚动、地图尺寸/比例目标、底部区域高度及滚动、公交和家庭语义、刷新/采集/存储/权限。真实 Chromium PR CI 46030571806 与 push CI 46030561102 全通过：170项 Python 测试、Node 离线界面、Chromium 字体/公交实时与计划及失效/滚动/几何、虚构数据截图、Docker smoke、公开树和 gitleaks。768×640：时钟48px、家庭标题/正文28px、地图高154px、图宽256.64/栏宽374px、底部100px、正文632px无溢出；600×800：地图高179px、宽290px、底部235px、正文792px无溢出。用户已确认预览，PR #54 候选 8e9deacaecfe107ec75e6bb05a9654b3ddfe203a 已 squash 合并为 8c117111260ce9c42b7af0e71aef3ee93ebc79f5。发布工作流 46031990275 成功；VERSION v0.1.0-rc.45，amd64/arm64 镜像构建及匿名拉取成功，版本镜像与 preview 摘要 sha256:408717616dbe7b099fc792fc5e70835b09979e61ed8baa4905cb97542a9d106a；[Release rc.45](https://github.com/yudacheng666/KindleHomeDashboard/releases/tag/v0.1.0-rc.45) 与 [compose.release.yaml](https://github.com/yudacheng666/KindleHomeDashboard/releases/download/v0.1.0-rc.45/compose.release.yaml) 已核对。真实 Kindle/旧浏览器仍需现场验收。PR #51 仅修改电脑端预览校准，保持独立。
 
 ## rc.44 关键数字字体分级（已发布）
 
