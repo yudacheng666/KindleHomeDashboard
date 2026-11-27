@@ -950,12 +950,17 @@ function renderOverviewHome(v){
     });
     if(!meals.length)append(group,"p","暂无菜单","note");
   });
-  var todoLink=overviewLink(todoRoot,tasks.length>3?"全部待办（"+tasks.length+"）":"待办",function(){switchSection("tasks");});todoLink.className+=" overview-todo-link";
+  function todoHeading(parent){
+    var heading=append(parent,"div","","overview-todo-heading");
+    var link=overviewLink(heading,tasks.length>3?"全部待办（"+tasks.length+"）":"待办",function(){switchSection("tasks");});link.className+=" overview-todo-link";
+    return heading;
+  }
   var last="",dayGroup;
   tasks.slice(0,3).forEach(function(t){
     var day=t.occurrence||v.date;
     if(day!==last){
-      last=day;dayGroup=append(todoRoot,"section","","task-day");var l=taskDateLabel(day,v.date),h=append(dayGroup,"h3",l.label,"task-date");
+      var first=!last;last=day;dayGroup=append(todoRoot,"section","","task-day");
+      var header=first?todoHeading(dayGroup):dayGroup,l=taskDateLabel(day,v.date),h=append(header,"h3",l.label,"task-date");
       if(day<v.date)append(h,"span","逾期","task-date-tag");else if(l.tag)append(h,"span",l.tag,"task-date-tag");
     }
     var row=append(dayGroup,"div","","task-row");append(row,"span",t.title,"task-text");
@@ -964,7 +969,7 @@ function renderOverviewHome(v){
       button.type="button";button.onclick=function(){completeTask(t,v.date,button);};
     }
   });
-  if(!tasks.length)append(todoRoot,"p","暂无待办","note");
+  if(!tasks.length)append(todoHeading(todoRoot),"span","暂无待办","note");
 }
 function overviewFailure(k,status){
   if(k==="bus"){stopAge();serverBase=NaN;paintAge();delete overviewKeys.bus;overviewBusShell(null,status===404?"模块未启用":"暂不可用，旧内容已隐藏");return;}

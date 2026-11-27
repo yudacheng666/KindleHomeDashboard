@@ -428,13 +428,18 @@ def main():
                   return clock.nextElementSibling===day&&same(clock,temp)&&same(day,summary)&&parseFloat(getComputedStyle(clock).fontSize)>parseFloat(getComputedStyle(day).fontSize)&&getComputedStyle(day).fontWeight==="400";
                 })()"""
                 assert js(header_type)
+                assert js("""return (function(){
+                  var h=document.querySelector('.overview-todo-heading'),b=h&&h.querySelector('.overview-todo-link'),d=h&&h.querySelector('.task-date');
+                  if(!b||!d)return false;
+                  var a=b.getBoundingClientRect(),c=d.getBoundingClientRect();return c.left>=a.right&&Math.abs(c.top-a.top)<12;
+                })()""")
                 footer_layout = """return (function(){
                   var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),content=document.getElementById("displayContent").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
                   return Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(a.top-b.top)<=2
                     &&getComputedStyle(d).textAlign==="left"&&getComputedStyle(w).textAlign==="left"
                     &&parseFloat(getComputedStyle(d).paddingLeft)===0&&parseFloat(getComputedStyle(w).paddingLeft)===6
                     &&getComputedStyle(s.querySelector(".settings-text")).display==="none"&&s.querySelector(".settings-icon").getBoundingClientRect().width>=24
-                    &&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top>=content.bottom-1&&Math.abs(r.right-(window.innerWidth-4))<=1&&Math.abs(r.bottom-(window.innerHeight-4))<=1
+                    &&getComputedStyle(document.getElementById("displayContent")).position==="fixed"&&Math.abs(content.top-4)<=1&&Math.abs(content.bottom-(window.innerHeight-52))<=1&&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top>=content.bottom-1&&Math.abs(r.right-(window.innerWidth-4))<=1&&Math.abs(r.bottom-(window.innerHeight-4))<=1
                     &&s.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));
                 })()"""
                 assert js(footer_layout)
@@ -447,6 +452,12 @@ def main():
                 js("""var c=document.getElementById("displayContent");c.scrollTop=c.scrollHeight""")
                 assert js(footer_layout)
                 assert js("""var c=document.getElementById("displayContent");return c.scrollTop>0&&Math.abs(c.scrollHeight-c.clientHeight-c.scrollTop)<=2""")
+                assert js("""return (function(){
+                  var c=document.getElementById("displayContent").getBoundingClientRect(),last=document.querySelector('.overview-todos .task-day:last-child .task-row:last-child'),s=document.getElementById("settings").getBoundingClientRect();
+                  if(!last)return false;
+                  var r=last.getBoundingClientRect(),x=r.left+r.width/2,y=r.bottom-2;
+                  return r.top>=c.top&&r.bottom<=c.bottom-1&&r.bottom<s.top&&last.contains(document.elementFromPoint(x,y));
+                })()""")
                 js("""document.getElementById("displayContent").scrollTop=0""")
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})

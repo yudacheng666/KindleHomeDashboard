@@ -94,6 +94,8 @@ assert.equal(compactBusStatus().textContent,"");
 assert.ok(!descendants(el("body")).some(n=>/最近一辆|下一辆|发车计划|本站到站时间未知|等待首站发车（计划）/.test(n.textContent)));
 assert.ok(descendants(el("body")).some(n=>n.className==="overview-menu"));
 assert.ok(descendants(el("body")).some(n=>n.className==="overview-todos"));
+const todoHeading=descendants(el("body")).find(n=>n.className==="overview-todo-heading");
+assert.ok(todoHeading);assert.equal(todoHeading.children[0].textContent,"待办");assert.equal(todoHeading.children[1].className,"task-date");
 assert.ok(descendants(el("body")).some(n=>n.textContent==="12.0km"));
 assert.ok(descendants(el("body")).some(n=>n.textContent==="15.0km"));
 assert.ok(!descendants(el("body")).some(n=>/已知拥堵|路况未知|路线及地图：高德地图/.test(n.textContent)));
