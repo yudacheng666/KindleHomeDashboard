@@ -1,5 +1,6 @@
 """Offline driving contract tests; no live locations, network or credentials."""
 from datetime import datetime, timezone, timedelta
+from dataclasses import replace
 from tempfile import TemporaryDirectory
 import sqlite3
 import unittest
@@ -52,6 +53,58 @@ class DrivingTests(unittest.TestCase):
         self.assertTrue(params["paths"].split("|")[-1].startswith("7,0x000000"))
         self.assertIn("1,0,1,16,0xFFFFFF,0x000000:",params["labels"])
         self.assertNotIn("location",params)
+
+    def test_map_partial_geometry_and_long_route(self):
+        calls=[]
+        api=Amap("placeholder_test_credential",self.ledger,
+                 image_transport=lambda url:(calls.append(url) or ("image/png",b"synthetic")),
+                 sleep=lambda _:None)
+        routes=normalize_routes(reply(100,200,300))
+        missing=replace(routes[1],points=())
+        mime,raw,indices=api.map("1,2","2,3",(routes[0],missing,routes[2]))
+        self.assertEqual(indices,(1,3))
+        params=parse_qs(urlparse(calls[-1]).query)
+        self.assertEqual(len(params["paths"][0].split("|")),2)
+        self.assertIn("3,0,1,16",params["labels"][0])
+        dense=tuple(f"{1+i/1000000:.6f},2.000000" for i in range(5000))
+        long=replace(routes[0],points=dense)
+        mime,raw,indices=api.map("1,2","2,3",(long,routes[1],routes[2]))
+        self.assertEqual(indices,(1,2,3))
+        self.assertLess(len(calls[-1]),7500)
+        self.assertIn("1,2;1.004999,2",parse_qs(urlparse(calls[-1]).query)["paths"][0])
+        self.assertEqual(self.ledger.usage()["lbs"]["used"],2)
+
+    def test_map_length_rejection_retries_once(self):
+        calls=[]
+        def image(url):
+            calls.append(url)
+            if len(calls)==1:
+                raise DrivingError("map_url_too_long")
+            return "image/png",b"synthetic"
+        api=Amap("placeholder_test_credential",self.ledger,image_transport=image,sleep=lambda _:None)
+        routes=normalize_routes(reply(100,200,300))
+        self.assertEqual(api.map("1,2","2,3",routes)[2],(1,))
+        self.assertEqual(self.ledger.usage()["lbs"]["used"],2)
+
+    def test_map_failure_preserves_eta_and_isolates_group(self):
+        from urllib.parse import parse_qs
+        def image(url):
+            if "3.000000,3.000000" in parse_qs(urlparse(url).query)["markers"][0]:
+                raise DrivingError("map_http_error")
+            return "image/png",b"synthetic"
+        service=DrivingService(self.tmp.name,{"KHD_AMAP_KEY":"placeholder_test_credential"},
+            clock=lambda:self.now,transport=lambda u,h:reply(100,200,300),image_transport=image)
+        groups=[{"name":"Example"+str(i),"origin":"1,2","destination":str(i+2)+",3",
+                 "enabled":True,"windows":[{"days":list(range(7)),"start":0,"end":1440}]} for i in range(3)]
+        service.configure({**DEFAULT,"groups":groups,"enabled":True,"consent":True,"map_permission":True})
+        for _ in groups: service.step()
+        rows=service.read()["groups"]
+        self.assertTrue(rows[0]["image"])
+        self.assertIsNone(rows[1]["image"])
+        self.assertEqual(rows[1]["map_error"],"map_http_error")
+        self.assertEqual(len(rows[1]["routes"]),3)
+        self.assertTrue(rows[2]["image"])
+        self.assertEqual(rows[2]["map_routes"],[1,2,3])
 
     def test_account_caps_persist(self):
         with sqlite3.connect(self.ledger.path) as db:

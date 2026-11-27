@@ -181,18 +181,25 @@ class DrivingService:
                     self.due[i]=self.monotonic()+min(1800,self.settings["interval"]*2**min(count,4))
             return
         image=None
+        map_routes=[]
+        map_error=None
         with self.lock:
             if generation!=self.generation or self.stop.is_set() or not self._active(group):
                 return
         try:
-            mime,raw=self.provider.map(group["origin"],group["destination"],routes)
+            mime,raw,indices=self.provider.map(group["origin"],group["destination"],routes)
+            map_routes=list(indices)
             image="data:"+mime+";base64,"+base64.b64encode(raw).decode("ascii")
+        except DrivingError as exc:
+            # Fixed categories only; never expose URLs, keys or coordinates.
+            category=str(exc)
+            map_error=category if category in ("map_url_too_long","map_geometry_unavailable","map_http_error","map_unavailable","map_too_large","invalid_map","provider_rejected_request","provider_blocked","request_limit") else "map_unavailable"
         except Exception:
-            # Preserve the new ETA list, never reuse a mismatched old map.
-            pass
+            map_error="map_unavailable"
         with self.lock:
             if generation==self.generation and not self.stop.is_set() and self._active(group):
                 self.records[i]={"routes":[r.view() for r in routes],"image":image,
+                                 "map_routes":map_routes,"map_error":map_error,
                                  "fetched_at":stamp,"mono":fetched}
                 self.failures.pop(i,None)
 
@@ -219,6 +226,8 @@ class DrivingService:
                 rows.append({"name":group["name"],"status":status,
                              "routes":record["routes"] if record else [],
                              "image":record["image"] if record else None,
+                             "map_routes":record["map_routes"] if record else [],
+                             "map_error":record["map_error"] if record else None,
                              "fetched_at":record["fetched_at"] if record else None})
             return {"enabled":self.settings["enabled"],"groups":copy.deepcopy(rows),"source":"高德地图"}
 

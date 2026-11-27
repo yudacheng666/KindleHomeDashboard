@@ -1,8 +1,9 @@
 """AMap driving adapter. No network or private storage on import."""
 from contextlib import closing
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import json
+import math
 import os
 import re
 import sqlite3
@@ -19,6 +20,8 @@ LIMITS = {"lbs": 30000, "search": 1000}
 BASE = "https://restapi.amap.com"
 STYLES = ((7, "0x000000"), (5, "0x666666"), (3, "0x999999"))
 MAX_IMAGE = 2 * 1024 * 1024
+MAX_MAP_URL = 65536
+MAP_COMPACT_TARGET = 7500
 BILLING_ZONE = timezone(timedelta(hours=8))
 
 
@@ -209,11 +212,48 @@ def normalize_routes(raw):
         raise DrivingError("invalid_response") from None
 
 
+def compact_point(value):
+    # Remove only redundant decimal zeroes, without rounding coordinates.
+    return ",".join(n.rstrip("0").rstrip(".") if "." in n else n for n in value.split(","))
+
+
+def compact_route(route):
+    """Display-only approximation: retain original points, endpoints and turns
+    beyond two metres of the connecting segment. Never change ETA or distance."""
+    if len(route.points)<3:
+        return route
+    raw=[tuple(map(float,p.split(","))) for p in route.points]
+    scale=111320*max(0.01,math.cos(math.radians(sum(y for _,y in raw)/len(raw))))
+    xy=[(x*scale,y*111320) for x,y in raw]
+    keep={0,len(xy)-1}
+    stack=[(0,len(xy)-1)]
+    # Bound pathological inputs; preserve original geometry if work cap exceeded.
+    work=0
+    while stack:
+        a,b=stack.pop()
+        work+=b-a
+        if work>500000:
+            return route
+        x,y=xy[a];dx=xy[b][0]-x;dy=xy[b][1]-y
+        denom=dx*dx+dy*dy
+        far=4.0;index=None
+        for i in range(a+1,b):
+            px,py=xy[i][0]-x,xy[i][1]-y
+            t=max(0,min(1,(px*dx+py*dy)/denom)) if denom else 0
+            dist=(px-t*dx)**2+(py-t*dy)**2
+            if dist>far:
+                far,index=dist,i
+        if index is not None:
+            keep.add(index)
+            stack.extend(((a,index),(index,b)))
+    return replace(route,points=tuple(route.points[i] for i in sorted(keep)))
+
+
 def map_parameters(origin,destination,routes):
     if not 1<=len(routes)<=3 or any(not x.points for x in routes):
         raise DrivingError("map_geometry_unavailable")
     # Back-to-front: the fastest route remains visible on shared segments.
-    paths = "|".join(f"{x.width},{x.color},1,,:{';'.join(x.points)}" for x in reversed(routes))
+    paths = "|".join(f"{x.width},{x.color},1,,:{';'.join(compact_point(p) for p in x.points)}" for x in reversed(routes))
     # Number labels are placed on actual route points. Prefer a point unique
     # to this route; the list also carries matching line color and width.
     labels = []
@@ -221,7 +261,7 @@ def map_parameters(origin,destination,routes):
         others = {p for j,r in enumerate(routes) if j!=i for p in r.points}
         unique = [p for p in route.points if p not in others]
         if unique:
-            labels.append(f"{i+1},0,1,16,0xFFFFFF,{route.color}:{unique[len(unique)//2]}")
+            labels.append(f"{STYLES.index((route.width,route.color))+1},0,1,16,0xFFFFFF,{route.color}:{compact_point(unique[len(unique)//2])}")
     params = {"size":"600*360","scale":"1","traffic":"0","paths":paths,
               "markers":f"mid,0x000000,S:{point(origin)}|mid,0x000000,E:{point(destination)}"}
     if labels:
@@ -259,6 +299,8 @@ def image_request(url):
             check_status(json.loads(raw))
         raise DrivingError("invalid_map")
     except HTTPError as exc:
+        if exc.code == 414:
+            raise DrivingError("map_url_too_long") from None
         if exc.code in (401,402,403,429):
             raise DrivingBlocked("provider_blocked") from None
         raise DrivingError("map_http_error") from None
@@ -282,7 +324,7 @@ class Amap:
 
     def _call(self,path,params,kind,image=False):
         url=BASE+path+"?"+urlencode({**params,"key":self.key})
-        if len(url)>65536:
+        if len(url)>MAX_MAP_URL:
             raise DrivingError("map_url_too_long")
         with self.lock:
             wait=self.next_request-self.monotonic()
@@ -307,7 +349,33 @@ class Amap:
         return normalize_routes(raw)
 
     def map(self,origin,destination,routes):
-        return self._call("/v3/staticmap",map_parameters(origin,destination,routes),"lbs",True)
+        drawable=tuple(r for r in routes if r.points)
+        if not drawable:
+            raise DrivingError("map_geometry_unavailable")
+        def plan(items):
+            params=map_parameters(origin,destination,items)
+            size=len(BASE+"/v3/staticmap?"+urlencode({**params,"key":self.key}))
+            return params,size
+        params,size=plan(drawable)
+        if size>MAP_COMPACT_TARGET:
+            drawable=tuple(compact_route(r) for r in drawable)
+            params,size=plan(drawable)
+        # Keep route numbers tied to the original sorted list. If the full
+        # request cannot fit, omit only undrawable alternatives, not the map.
+        while size>MAX_MAP_URL and len(drawable)>1:
+            drawable=drawable[:-1]
+            params,size=plan(drawable)
+        try:
+            mime,raw=self._call("/v3/staticmap",params,"lbs",True)
+        except DrivingError as exc:
+            # At most one retry for an explicit length rejection. Never retry
+            # access/quota rejection or unrelated provider failures.
+            if str(exc)!="map_url_too_long" or len(drawable)<2:
+                raise
+            drawable=drawable[:1]
+            params,_=plan(drawable)
+            mime,raw=self._call("/v3/staticmap",params,"lbs",True)
+        return mime,raw,tuple(STYLES.index((r.width,r.color))+1 for r in drawable)
 
     def search(self,keyword,region=""):
         if not isinstance(keyword,str) or not 1<=len(keyword.strip())<=80 or not isinstance(region,str) or len(region)>80:
