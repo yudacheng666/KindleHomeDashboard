@@ -488,7 +488,7 @@ def main():
                         f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
                 js("document.getElementById('overviewTypography').sheet.disabled=false;window.dispatchEvent(new Event('resize'))")
                 candidate_geometry=js(geometry)
-                assert len(baseline_geometry)==len(candidate_geometry) and all(abs(a-b)<=1 for old,new in zip(baseline_geometry,candidate_geometry) for a,b in zip(old,new)), (baseline_geometry,candidate_geometry,js("""return {date:[document.getElementById("date").getBoundingClientRect().height,document.querySelector(".overview-clock").getBoundingClientRect().height,getComputedStyle(document.querySelector(".overview-clock")).lineHeight,document.querySelector(".overview-day").getBoundingClientRect().height,getComputedStyle(document.querySelector(".overview-day")).lineHeight],weather:[document.getElementById("overviewWeather").getBoundingClientRect().height,document.querySelector(".weather-main").getBoundingClientRect().height,getComputedStyle(document.querySelector(".weather-main")).lineHeight,document.querySelector(".weather-summary").getBoundingClientRect().height,getComputedStyle(document.querySelector(".weather-summary")).lineHeight]}"""))
+                assert len(baseline_geometry)==len(candidate_geometry) and all(abs(a-b)<=1 for old,new in zip(baseline_geometry,candidate_geometry) for a,b in zip(old,new)), (baseline_geometry,candidate_geometry)
                 assert js("""var t=document.querySelector('#overviewWeather .weather-main'),c=document.querySelector('.overview-clock'),n=document.querySelector('.driving-fast .driving-route-time .overview-number-value'),u=document.querySelector('.driving-fast .driving-route-time .overview-number-unit');return !!t&&!!n&&!!u&&parseFloat(getComputedStyle(c).fontSize)===48&&parseFloat(getComputedStyle(t).fontSize)===48&&parseFloat(getComputedStyle(n).fontSize)===32&&parseFloat(getComputedStyle(u).fontSize)===18&&Array.from(document.querySelectorAll('.driving-route-time')).every(x=>x.scrollWidth<=x.clientWidth+1)""")
                 if visual:
                     os.makedirs(visual,exist_ok=True)
@@ -499,6 +499,17 @@ def main():
                 assert metrics["clockFont"]==48 and metrics["homeFont"]==28 and metrics["menuFont"]==28 and metrics["taskFont"]==28 and metrics["dayFont"]==24, metrics
                 assert metrics["mapHeight"]>140 and metrics["mapWidth"]/metrics["cardWidth"]>=.65 and metrics["homeHeight"]>=95, metrics
                 assert js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home');return getComputedStyle(d).overflowY==='visible'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom"""),metrics
+                # The Kindle is portrait; also capture the larger 600x800 CSS viewport.
+                wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":600,"height":800,"deviceScaleFactor":1,"mobile":False}})
+                wait(lambda:js("return innerWidth===600&&innerHeight===800"))
+                js("window.dispatchEvent(new Event('resize'))")
+                portrait=js("""var c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map'),img=m.querySelector('img');return {width:innerWidth,height:innerHeight,clockFont:parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize),homeFont:parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize),menuFont:parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize),taskFont:parseFloat(getComputedStyle(document.querySelector('.task-row')).fontSize),mapHeight:m.clientHeight,mapWidth:img.getBoundingClientRect().width,cardWidth:m.clientWidth,homeHeight:h.clientHeight,contentHeight:c.clientHeight,scrollHeight:c.scrollHeight}""")
+                print("Fictional portrait viewport metrics:",portrait,flush=True)
+                assert portrait["clockFont"]==48 and portrait["homeFont"]==28 and portrait["menuFont"]==28 and portrait["taskFont"]==28, portrait
+                assert portrait["mapHeight"]>140 and portrait["mapWidth"]/portrait["cardWidth"]>=.65 and portrait["homeHeight"]>=95 and portrait["scrollHeight"]<=portrait["contentHeight"]+1, portrait
+                if visual:
+                    with open(os.path.join(visual,"overview-600x800.png"),"wb") as f:
+                        f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
