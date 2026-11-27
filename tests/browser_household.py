@@ -457,7 +457,8 @@ def main():
                 assert js(todo_alignment)
                 assert js("""return Array.from(document.querySelectorAll('.overview-menu .menu-meal')).every(function(row){
                   var a=row.querySelector('.menu-meal-label'),b=row.querySelector('.menu-dishes'),x=getComputedStyle(a),y=getComputedStyle(b);
-                  return ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight','color','verticalAlign'].every(function(k){return x[k]===y[k];})&&x.fontSize==='19px'&&x.fontWeight==='400'&&x.whiteSpace==='nowrap';
+                  var expected=innerWidth>=560&&innerHeight>=550?'28px':innerWidth>=421?'24px':'19px';
+                  return ['fontFamily','fontSize','fontWeight','fontStyle','lineHeight','color','verticalAlign'].every(function(k){return x[k]===y[k];})&&x.fontSize===expected&&x.fontWeight==='400'&&x.whiteSpace==='nowrap';
                 })""")
                 assert js("""var row=document.querySelector('.overview-todos .task-row'),circle=row&&row.querySelector('.overview-task-circle');return !!circle&&circle.textContent==='○'&&circle.getAttribute('aria-label')==='完成待办'&&row.firstElementChild.contains(circle)&&circle.getBoundingClientRect().right<=row.querySelector('.task-text').getBoundingClientRect().left+1""")
                 footer_layout = """return (function(){
@@ -488,16 +489,27 @@ def main():
                 js("document.getElementById('overviewTypography').sheet.disabled=false;window.dispatchEvent(new Event('resize'))")
                 candidate_geometry=js(geometry)
                 assert len(baseline_geometry)==len(candidate_geometry) and all(abs(a-b)<=1 for old,new in zip(baseline_geometry,candidate_geometry) for a,b in zip(old,new)), (baseline_geometry,candidate_geometry)
-                assert js("""var t=document.querySelector('#overviewWeather .weather-main'),c=document.querySelector('.overview-clock'),n=document.querySelector('.driving-fast .driving-route-time .overview-number-value'),u=document.querySelector('.driving-fast .driving-route-time .overview-number-unit');return !!t&&!!n&&!!u&&parseFloat(getComputedStyle(c).fontSize)===40&&parseFloat(getComputedStyle(n).fontSize)===28&&parseFloat(getComputedStyle(u).fontSize)===16&&Array.from(document.querySelectorAll('.driving-route-time')).every(x=>x.scrollWidth<=x.clientWidth+1)""")
+                assert js("""var t=document.querySelector('#overviewWeather .weather-main'),c=document.querySelector('.overview-clock'),n=document.querySelector('.driving-fast .driving-route-time .overview-number-value'),u=document.querySelector('.driving-fast .driving-route-time .overview-number-unit');return !!t&&!!n&&!!u&&parseFloat(getComputedStyle(c).fontSize)===48&&parseFloat(getComputedStyle(t).fontSize)===48&&parseFloat(getComputedStyle(n).fontSize)===32&&parseFloat(getComputedStyle(u).fontSize)===18&&Array.from(document.querySelectorAll('.driving-route-time')).every(x=>x.scrollWidth<=x.clientWidth+1)""")
                 if visual:
                     os.makedirs(visual,exist_ok=True)
                     with open(os.path.join(visual,"overview-768x640.png"),"wb") as f:
                         f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
-                metrics=js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map'),img=m.querySelector('img');return {width:innerWidth,height:innerHeight,mapHeight:m.clientHeight,mapWidth:img.getBoundingClientRect().width,cardWidth:m.clientWidth,homeHeight:h.clientHeight,drivingTop:d.getBoundingClientRect().top,drivingHeight:d.clientHeight,contentHeight:c.clientHeight,scrollHeight:c.scrollHeight,clockFont:parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize),homeFont:parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize),menuFont:parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize)}""")
+                metrics=js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map'),img=m.querySelector('img');return {width:innerWidth,height:innerHeight,mapHeight:m.clientHeight,mapWidth:img.getBoundingClientRect().width,cardWidth:m.clientWidth,homeHeight:h.clientHeight,drivingTop:d.getBoundingClientRect().top,drivingHeight:d.clientHeight,contentHeight:c.clientHeight,scrollHeight:c.scrollHeight,clockFont:parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize),homeFont:parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize),menuFont:parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize),taskFont:parseFloat(getComputedStyle(document.querySelector('.task-row')).fontSize),dayFont:parseFloat(getComputedStyle(document.querySelector('.task-date')).fontSize)}""")
                 print("Fictional visual viewport metrics:",metrics,flush=True)
-                assert metrics["clockFont"]==40 and metrics["homeFont"]==25 and metrics["menuFont"]==24, metrics
+                assert metrics["clockFont"]==48 and metrics["homeFont"]==28 and metrics["menuFont"]==28 and metrics["taskFont"]==28 and metrics["dayFont"]==24, metrics
                 assert metrics["mapHeight"]>140 and metrics["mapWidth"]/metrics["cardWidth"]>=.65 and metrics["homeHeight"]>=95, metrics
                 assert js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home');return getComputedStyle(d).overflowY==='visible'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom"""),metrics
+                # The Kindle is portrait; also capture the larger 600x800 CSS viewport.
+                wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":600,"height":800,"deviceScaleFactor":1,"mobile":False}})
+                wait(lambda:js("return innerWidth===600&&innerHeight===800"))
+                js("window.dispatchEvent(new Event('resize'))")
+                portrait=js("""var c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map'),img=m.querySelector('img');return {width:innerWidth,height:innerHeight,clockFont:parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize),homeFont:parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize),menuFont:parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize),taskFont:parseFloat(getComputedStyle(document.querySelector('.task-row')).fontSize),mapHeight:m.clientHeight,mapWidth:img.getBoundingClientRect().width,cardWidth:m.clientWidth,homeHeight:h.clientHeight,contentHeight:c.clientHeight,scrollHeight:c.scrollHeight}""")
+                print("Fictional portrait viewport metrics:",portrait,flush=True)
+                assert portrait["clockFont"]==48 and portrait["homeFont"]==28 and portrait["menuFont"]==28 and portrait["taskFont"]==28, portrait
+                assert portrait["mapHeight"]>140 and portrait["mapWidth"]/portrait["cardWidth"]>=.65 and portrait["homeHeight"]>=95 and portrait["scrollHeight"]<=portrait["contentHeight"]+1, portrait
+                if visual:
+                    with open(os.path.join(visual,"overview-600x800.png"),"wb") as f:
+                        f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
@@ -773,7 +785,7 @@ def main():
                 assert overview_bus_geometry("预计")==[139,139,10]
                 bus_type_metrics="""return Array.from(document.querySelectorAll('.overview-bus-eta')).map(x=>({text:x.textContent,font:parseFloat(getComputedStyle(x).fontSize),numbers:x.querySelectorAll('.overview-number-value').length,scroll:[x.scrollWidth,x.scrollHeight],box:[x.clientWidth,x.clientHeight]}))"""
                 values=js(bus_type_metrics)
-                assert len(values)==2 and [v["font"] for v in values]==[40,32] and all(v["numbers"]==1 and all(s<=b+1 for s,b in zip(v["scroll"],v["box"])) for v in values), values
+                assert len(values)==2 and [v["font"] for v in values]==[44,36] and all(v["numbers"]==1 and all(s<=b+1 for s,b in zip(v["scroll"],v["box"])) for v in values), values
                 bus.poller.last=replace(live_snapshot,status="stale")
                 assert overview_bus_geometry("数据未更新")==[139,139,10]
                 wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})

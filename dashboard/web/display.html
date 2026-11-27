@@ -343,38 +343,59 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 }
 </style>
 <style id="overviewTypography">
-/* Numeric emphasis only. Preserve original layout in narrow/short previews.
-   Keep existing header line boxes, route row struts and section budgets. */
+/* Second readability pass: enlarge the information itself, not the six regions.
+   Keep the fixed bus budget, driving/map geometry and independent home scrolling. */
 @media(min-width:421px){
-  #date .overview-clock,#overviewWeather .weather-main{font-size:30px;line-height:28.8px}
-  #date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:24px}
-  #overviewWeather .weather-main .overview-number-unit{font-size:16px;font-weight:normal;line-height:0}
+  #date .overview-clock,#overviewWeather .weather-main{font-size:36px;line-height:36px}
+  #date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:28px}
+  #overviewWeather .weather-summary,#date .overview-day{font-size:22px;line-height:1.15;margin:0}
+  #overviewWeather .weather-main .overview-number-unit{font-size:18px;font-weight:normal;line-height:0}
   #overviewWeather .weather-main[data-compact="true"] .overview-number-unit{font-size:inherit;font-weight:inherit;line-height:inherit}
-  .overview-bus-eta .overview-number-unit{font-size:16px;font-weight:normal;line-height:0}
-  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:30px}
-  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:24px}
-  .overview-page .overview-bus-time,.overview-page .overview-bus-details{color:#111}
-  .overview-driving-card .driving-route-time .overview-number-unit{font-size:14px;font-weight:normal;line-height:0}
-  .overview-driving-card .driving-route-time .overview-number-value{font-size:20px;line-height:0}
-  .overview-driving-card .driving-fast .driving-route-time .overview-number-value{font-size:24px;font-weight:bold}
+  #overviewWeather .overview-weather-status{font-size:20px}
+  .overview-bus-eta{height:38px;line-height:38px}
+  .overview-bus-eta .overview-number-unit{font-size:18px;font-weight:normal;line-height:0}
+  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:34px}
+  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:28px}
+  .overview-page .overview-bus-time,.overview-page .overview-bus-details{font-size:20px;line-height:20px;max-height:20px;color:#111}
+  .overview-driving-card .driving-route-time .overview-number-unit{font-size:16px;font-weight:normal;line-height:0}
+  .overview-driving-card .driving-route-time .overview-number-value{font-size:24px;line-height:0}
+  .overview-driving-card .driving-fast .driving-route-time .overview-number-value{font-size:28px;font-weight:bold}
+  .overview-page .overview-home-title{font-size:24px;min-height:30px}
+  .overview-home-scroll{top:34px}
+  .overview-page .task-date,.overview-page .overview-menu .menu-date{font-size:22px}
+  .overview-page .task-row,.overview-page .overview-menu .menu-meal{font-size:24px;line-height:1.2}
+  .overview-page .overview-task-marker .overview-task-circle,.overview-task-inactive{font-size:26px}
 }
 @media(min-width:560px) and (min-height:550px){
-  #date .overview-clock,#overviewWeather .weather-main{font-size:40px;line-height:38.4px}
-  #date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:32px}
-  #overviewWeather .weather-main .overview-number-unit{font-size:20px}
+  #date .overview-clock,#overviewWeather .weather-main{font-size:48px;line-height:40.6px}
+  #date .overview-clock[data-known="false"],#overviewWeather .weather-main[data-compact="true"]{font-size:36px}
+  #displayHeader.overview-header #date{margin:0;padding:0 6px 0 0}
+  #overviewWeather{margin:0;padding:0}
+  #overviewWeather .weather-summary,#date .overview-day{font-size:24px;line-height:24px;margin:0}
+  #overviewWeather .weather-main .overview-number-unit{font-size:24px}
   #overviewWeather .weather-main[data-compact="true"] .overview-number-unit{font-size:inherit}
-  .overview-bus-eta{height:44px;line-height:44px}
-  .overview-bus-eta .overview-number-unit{font-size:20px}
-  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:40px}
-  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:32px}
+  #overviewWeather .overview-weather-status{font-size:24px;line-height:24px}
+  #overviewWeather .weather-alert{font-size:20px}
+  .overview-page .overview-bus .overview-link{font-size:26px;height:32px;min-height:32px;line-height:32px}
+  .overview-bus-eta{height:46px;line-height:46px}
+  .overview-bus-eta .overview-number-unit{font-size:24px}
+  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:44px}
+  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:36px}
+  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-state{font-size:26px}
+  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-state{font-size:24px}
   /* A visible error/stale line shares the unchanged fixed bus budget. */
   .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-eta{height:34px;line-height:34px}
   .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta:not(.overview-bus-state){font-size:32px}
-  .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:26px}
-  .overview-driving-card .driving-route-time .overview-number-unit{font-size:16px}
-  .overview-driving-card .driving-route-time .overview-number-value{font-size:24px}
-  .overview-driving-card .driving-fast .driving-route-time .overview-number-value{font-size:28px}
-  .overview-page .task-row,.overview-page .overview-menu .menu-meal{font-size:24px}
+  .overview-bus-status:not(:empty)+.overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta:not(.overview-bus-state){font-size:28px}
+  .overview-page .overview-bus-time,.overview-page .overview-bus-details{font-size:22px;line-height:22px;max-height:22px}
+  .overview-driving-card .driving-route-time .overview-number-unit{font-size:18px}
+  .overview-driving-card .driving-route-time .overview-number-value{font-size:28px}
+  .overview-driving-card .driving-fast .driving-route-time .overview-number-value{font-size:32px}
+  .overview-page .overview-home-title{font-size:28px;min-height:36px}
+  .overview-home-scroll{top:36px}
+  .overview-page .task-date,.overview-page .overview-menu .menu-date{font-size:24px}
+  .overview-page .task-row,.overview-page .overview-menu .menu-meal{font-size:28px;line-height:1.2}
+  .overview-page .overview-task-marker .overview-task-circle,.overview-task-inactive{font-size:28px}
 }
 </style></head>
 <body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button></div>
