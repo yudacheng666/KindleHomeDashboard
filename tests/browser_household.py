@@ -418,17 +418,24 @@ def main():
                     &&b.width>=document.getElementById('body').getBoundingClientRect().width-2&&c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2;
                 })()""")
                 footer_layout = """return (function(){
-                  var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),body=document.getElementById("body").getBoundingClientRect(),display=document.getElementById("display").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
+                  var d=document.getElementById("date"),w=document.getElementById("overviewWeather"),s=document.getElementById("settings"),content=document.getElementById("displayContent").getBoundingClientRect(),r=s.getBoundingClientRect(),a=d.getBoundingClientRect(),b=w.getBoundingClientRect();
                   return Math.abs(a.width-b.width)<=2&&Math.abs(a.right-b.left)<=1&&Math.abs(a.top-b.top)<=2
                     &&getComputedStyle(d).textAlign==="left"&&getComputedStyle(w).textAlign==="left"
                     &&parseFloat(getComputedStyle(d).paddingLeft)===0&&parseFloat(getComputedStyle(w).paddingLeft)===6
                     &&getComputedStyle(s.querySelector(".settings-text")).display==="none"&&s.querySelector(".settings-icon").getBoundingClientRect().width>=24
-                    &&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top>=body.bottom-1&&Math.abs(r.right-display.right)<=1&&Math.abs(r.bottom-display.bottom)<=1;
+                    &&s.getAttribute("aria-label")==="设置"&&r.width>=44&&r.height>=44&&r.top>=content.bottom-1&&Math.abs(r.right-(window.innerWidth-4))<=1&&Math.abs(r.bottom-(window.innerHeight-4))<=1
+                    &&s.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));
                 })()"""
                 assert js(footer_layout)
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
                 assert js(footer_layout)
+                # At a narrow viewport, scrolling must not move or hide settings.
+                assert js("""var c=document.getElementById("displayContent");return c.scrollHeight>c.clientHeight""")
+                js("""var c=document.getElementById("displayContent");c.scrollTop=c.scrollHeight""")
+                assert js(footer_layout)
+                assert js("""var c=document.getElementById("displayContent");return c.scrollTop>0&&Math.abs(c.scrollHeight-c.clientHeight-c.scrollTop)<=2""")
+                js("""document.getElementById("displayContent").scrollTop=0""")
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2""")
