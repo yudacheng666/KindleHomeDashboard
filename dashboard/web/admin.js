@@ -27,12 +27,12 @@ var shell=make(document.body,"div",null,"admin-shell"),side=make(shell,"aside",n
 var brandText=make(brand,"div");make(brandText,"strong","KindleHomeDashboard");make(brandText,"small","家庭信息终端");
 var nav=make(side,"nav",null,"admin-nav");nav.setAttribute("aria-label","管理模块");
 pages.forEach(function(p){var a=link(nav,null,p[0]);if(p===current)a.setAttribute("aria-current","page");icon(a,p[4]);make(a,"span",p[1]);});
-make(side,"div","局域网管理 · "+(access.version||"版本未知"),"admin-side-foot");
+
 var main=make(shell,"main",null,"admin-main"),top=make(main,"header",null,"admin-top");make(top,"strong","家庭管理后台");
 var topRight=make(top,"div",null,"admin-top-right"),conn=make(topRight,"span");if(window.KHD_ACCESS){make(conn,"i",null,"admin-dot");conn.appendChild(document.createTextNode("本地服务已响应"));}else conn.textContent="服务状态未知";
-make(topRight,"span",access.version||"版本未知");if(path==="/admin/weather"||path==="/admin/driving")button(topRight,"切换管理登录",function(){el("logout").click();});
+make(topRight,"span",access.version||"版本未知");if(!access.openAdmin&&["/admin/weather","/admin/driving","/admin/display","/admin/family","/admin/bus"].indexOf(path)>=0)button(topRight,"管理登录 / 退出",function(){el("logout").click();});
 link(topRight,"返回展示页","/","admin-primary");
-var content=make(main,"div",null,"admin-content"),banner=make(content,"header",null,"admin-banner");make(banner,"h1",current[2]);make(banner,"p",current[3]);
+var content=make(main,"div",null,"admin-content"),banner=make(content,"header",null,"admin-banner");make(banner,"h1",current[2]);
 var work=make(content,"div");work.id="adminWork";children.forEach(function(n){work.appendChild(n);});document.title=current[2]+" · KindleHomeDashboard";
 function statusCell(root,label,value,description){var c=make(root,"div",null,"admin-status-cell");make(c,"span",label,"admin-muted");make(c,"strong",value);if(description)make(c,"span",description,"admin-muted");}
 if(path==="/admin"||path==="/admin/system"){
@@ -40,13 +40,14 @@ if(path==="/admin"||path==="/admin/system"){
  statusCell(statuses,"服务连接",window.KHD_ACCESS?"已响应":"未知");statusCell(statuses,"软件版本",access.version||"未知");statusCell(statuses,"访问方式",access.openAdmin?"家庭直连":access.direct?"管理需凭证":"令牌访问");
  if(path==="/admin"){make(landing,"h2","功能模块","admin-section-title");var grid=make(landing,"div",null,"admin-module-grid");
  pages.slice(1).forEach(function(p){var a=link(grid,null,p[0],"admin-card admin-module-card"),i=make(a,"span",null,"admin-module-icon");icon(i,p[4]);var c=make(a,"div");make(c,"h2",p[1]);make(c,"p",p[3]);});}
- else{var info=make(landing,"section",null,"admin-card");info.style.marginTop="16px";make(info,"h2","部署与更新");make(info,"p","使用极空间 Docker 的镜像检查与容器更新功能，保留原数据卷。后台不控制 Docker，不会自动下载安装更新。");make(info,"p","访问凭证、天气及地图密钥在 NAS 私有配置中维护，本页不显示密钥。");}
+ else{var info=make(landing,"section",null,"admin-card");info.style.marginTop="16px";make(info,"h2","部署与更新");make(info,"p","更新：在极空间 Docker 更新现有镜像，保留原数据卷。");make(info,"p","访问凭证及服务密钥：在 NAS 私有配置中维护。");}
 }
 if(path==="/admin/display"||path==="/admin/family"){
  var family=el("home"),layout=make(family,"div",null,"admin-family-content");move(layout,["content","editor"]);
+ if(path==="/admin/family"){var bar=make(family,"div",null,"admin-family-toolbar");family.insertBefore(bar,el("tabs"));bar.appendChild(el("refresh"));}
  if(path==="/admin/display"){
   var columns=make(content,"div",null,"admin-display-grid");columns.appendChild(work);
-  var preview=make(columns,"section",null,"admin-card");make(preview,"h2","Kindle 显示预览");make(preview,"p","直接显示 NAS 上的真实页面及缓存数据。只读预览，不改变设备显示设置。","admin-muted");
+  var preview=make(columns,"section",null,"admin-card");make(preview,"h2","Kindle 显示预览");
   var controls=make(preview,"div",null,"admin-preview-controls");
   function field(label,id,value,min,max){var l=make(controls,"label",label),n=make(l,"input");n.id=id;n.type="number";n.min=min;n.max=max;n.step="1";n.value=value;return n;}
   var width=field("视口宽度（CSS px）","previewWidth",480,240,1600),height=field("视口高度（CSS px）","previewHeight",640,240,2400),ml=make(controls,"label","预览模式"),mode=make(ml,"select");mode.id="previewMode";
@@ -55,7 +56,7 @@ if(path==="/admin/display"||path==="/admin/family"){
   var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});
   var appearance=button(actions,"原始画面",function(){device=!device;resize();});appearance.id="previewAppearance";
   var apply=button(actions,"应用视口 / 刷新",load);apply.id="previewApply";fitButton.id="previewFit";oneButton.id="previewOne";
-  var feedback=make(preview,"p","480×640 是示例 CSS 视口，未与实体 Kindle 校准。","admin-muted");feedback.id="previewFeedback";
+  var feedback=make(preview,"p","","admin-preview-error");feedback.id="previewFeedback";feedback.setAttribute("role","status");
   var stage=make(preview,"div",null,"admin-preview-stage"),wrap=make(stage,"div",null,"admin-preview-wrap"),shell=make(wrap,"div",null,"admin-preview-device"),screen=make(shell,"div",null,"admin-preview-screen"),brand=make(shell,"span","kindle","admin-preview-brand");stage.id="previewStage";shell.id="previewDevice";screen.id="previewScreen";brand.setAttribute("aria-hidden","true");
   function resize(){
    if(!frame)return;
@@ -74,11 +75,11 @@ if(path==="/admin/display"||path==="/admin/family"){
    fitButton.className=fit?"primary":"";oneButton.className=fit?"":"primary";
    fitButton.setAttribute("aria-pressed",String(fit));oneButton.setAttribute("aria-pressed",String(!fit));
    appearance.textContent=device?"原始画面":"设备外观";appearance.setAttribute("aria-pressed",String(!device));
-   feedback.textContent=w+" × "+h+" CSS px · "+Math.round(scale*100)+"% · "+(device?"通用外观模拟 · ":"")+"未经真机校准";
+   
   }
   function load(){var nw=Number(width.value),nh=Number(height.value);if(!Number.isInteger(nw)||!Number.isInteger(nh)||nw<240||nw>1600||nh<240||nh>2400){feedback.textContent="请输入有效的整数视口尺寸（宽 240–1600，高 240–2400）。";return;}
-   w=nw;h=nh;if(frame)screen.removeChild(frame);frame=make(screen,"iframe");frame.id="previewFrame";frame.title="真实 Kindle 页面只读预览";frame.src=mode.value==="auto"?"/preview/auto":"/preview#"+mode.value;frame.setAttribute("referrerpolicy","no-referrer");resize();}
-  mode.onchange=load;window.addEventListener("resize",resize);make(preview,"p","设备外观与灰阶仅为模拟，原始画面可关闭外框及色调。1:1 指网页 CSS 像素；真实字体、物理尺寸与墨水屏刷新效果需实机校准。","admin-info");load();
+   feedback.textContent="";w=nw;h=nh;if(frame)screen.removeChild(frame);frame=make(screen,"iframe");frame.id="previewFrame";frame.title="真实 Kindle 页面只读预览";frame.src=mode.value==="auto"?"/preview/auto":"/preview#"+mode.value;frame.setAttribute("referrerpolicy","no-referrer");resize();}
+  mode.onchange=load;window.addEventListener("resize",resize);appearance.title="通用外框与灰阶模拟，非实体型号测绘";oneButton.title="网页 CSS 像素 1:1，非物理尺寸";width.title=height.title="默认尺寸仅为示例，请按实际设备视口填写";load();
  }
 }
 if(path==="/admin/weather"||path==="/admin/driving"){

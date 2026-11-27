@@ -619,7 +619,29 @@ def main():
                 assert js("return document.querySelectorAll('.admin-nav a[aria-current=page]').length===1 && document.documentElement.scrollWidth<=window.innerWidth")
                 go_admin("/admin/display")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return !!f && !!f.contentDocument && !!f.contentDocument.querySelector('.overview-page')"))
-                wait(lambda:js("return document.getElementById('home').className!=='hidden'"))
+                wait(lambda:text_in("content","菜单展示范围"))
+                assert js("""return (function(){
+                  var visible=function(id){return getComputedStyle(document.getElementById(id)).display!=='none';};
+                  return !visible('tabs') && !visible('date') && !visible('refresh') && !visible('logout')
+                    && document.querySelectorAll('.admin-display-setting').length===2
+                    && document.getElementById('previewFeedback').textContent===''
+                    && getComputedStyle(document.getElementById('previewFeedback')).display==='none'
+                    && !document.querySelector('.admin-display-grid .admin-info');
+                })()""")
+                js("document.getElementById('menus').click();document.getElementById('tasks').click()")
+                assert text_in("content","菜单展示范围") and not text_in("content","待办清单")
+                button("content","编辑轮播")
+                assert text_in("editor","每页停留")
+                button("editor","取消")
+                button("content","编辑范围")
+                assert text_in("editor","展示方式")
+                button("editor","取消")
+                js("document.getElementById('previewWidth').value='1'")
+                click("previewApply")
+                assert text_in("previewFeedback","请输入有效")
+                js("document.getElementById('previewWidth').value='420'")
+                click("previewApply")
+                assert js("return document.getElementById('previewFeedback').textContent===''")
                 js("document.getElementById('previewWidth').value='420';document.getElementById('previewHeight').value='560'")
                 click("previewApply");click("previewOne")
                 wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===420 && f.contentWindow.innerHeight===560 && !!f.contentDocument.querySelector('.overview-page')"))
@@ -675,7 +697,9 @@ def main():
                 assert js("return !!document.querySelector('.admin-list-pane #drivingLocations') && document.querySelectorAll('#drivingGroups > section:not(.hidden)').length===1")
                 go_admin("/admin/family")
                 wait(lambda:text_in("content","新增待办"))
-                assert js("return !!document.querySelector('.admin-family-content #content')")
+                assert js("return !!document.querySelector('.admin-family-content #content') && getComputedStyle(document.getElementById('displaySettings')).display==='none'")
+                js("document.getElementById('displaySettings').click()")
+                assert text_in("content","新增待办")
                 go_admin("/admin/bus")
                 wait(lambda:js("return document.getElementById('dashboard').className!=='hidden'"))
                 click("settings")
