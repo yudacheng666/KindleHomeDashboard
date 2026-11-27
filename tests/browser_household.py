@@ -410,7 +410,7 @@ def main():
                     &&Array.from(cards).every(function(n){return border(n,'Bottom')===0;})
                     &&(!menu.lastElementChild||border(menu.lastElementChild,'Bottom')===0)
                     &&border(todo,'Top')===(menu.children.length?1:0)
-                    &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height>0;});
+                    &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height===0;});
                 })()""")
                 assert js("""return (function(){
                   var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
@@ -673,12 +673,24 @@ def main():
                     click("busMode")
                     click("overviewMode")
                     wait(lambda:js("return document.querySelectorAll('#body .overview-bus-slot').length===2 && !!document.querySelector('#body .overview-bus-status') && !!document.querySelector('#body .overview-driving-card') && document.querySelector('#body .overview-bus').textContent.indexOf(arguments[0])>=0", [expected]))
-                    return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top,...Array.from(b.querySelectorAll('.overview-bus-eta,.overview-bus-time,.overview-bus-details')).map(n=>n.getBoundingClientRect().height)]""")
-                baseline=overview_bus_geometry("预计")
-                for state,expected in [(replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),"计划"),(replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),"暂无车辆"),(replace(live_snapshot,status="stale"),"数据未更新"),(replace(live_snapshot,status="expired",vehicles=(),departure_plans=()),"数据已过期")]:
-                    bus.poller.last=state
-                    assert overview_bus_geometry(expected)==baseline
+                    assert js("""return (function(){
+                      var b=document.querySelector('.overview-bus'),rows=Array.from(b.children).filter(n=>getComputedStyle(n).display!=='none'),end=b.getBoundingClientRect().bottom;
+                      var empty=Array.from(b.querySelectorAll('.overview-bus-direction:empty,.overview-bus-status:empty,.overview-bus-eta:empty,.overview-bus-time:empty,.overview-bus-details:empty'));
+                      var adjacent=rows.every((n,i)=>i===0||Math.abs(n.getBoundingClientRect().top-rows[i-1].getBoundingClientRect().bottom)<=1);
+                      var slots=Array.from(b.querySelectorAll('.overview-bus-slot'));
+                      var compact=slots.every(n=>{var lines=Array.from(n.querySelectorAll('.overview-bus-eta,.overview-bus-time,.overview-bus-details')).filter(x=>getComputedStyle(x).display!=='none');return lines.every((x,i)=>i===0||Math.abs(x.getBoundingClientRect().top-lines[i-1].getBoundingClientRect().bottom)<=1);});
+                      return adjacent&&compact&&empty.every(n=>n.getBoundingClientRect().height===0)&&rows.every(n=>n.getBoundingClientRect().bottom<=end);
+                    })()""")
+                    return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top]""")
+                for width in (480,320):
+                    wd("/session/"+sid+"/window/rect", {"width":width,"height":640})
+                    bus.poller.last=live_snapshot
+                    baseline=overview_bus_geometry("预计")
+                    for state,expected in [(replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),"计划"),(replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),"暂无车辆"),(replace(live_snapshot,status="stale"),"数据未更新"),(replace(live_snapshot,status="expired",vehicles=(),departure_plans=()),"数据已过期")]:
+                        bus.poller.last=state
+                        assert overview_bus_geometry(expected)==baseline
                 bus.poller.last=live_snapshot
+                wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
                 # Use the existing cache, not a new upstream request.
                 bus.poller.last=replace(bus.poller.last, vehicles=bus.poller.last.vehicles[:1],
                                         scheduled_departures=1, departure_plans=({"time":"23:59","imminent":False},))
