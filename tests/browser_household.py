@@ -368,6 +368,7 @@ def main():
                 wait(lambda:js("return document.querySelectorAll('#body .overview-driving-card').length===2 && document.querySelectorAll('#body .overview-driving-map img').length===2 && document.querySelector('#body .overview-bus')!==null"))
                 assert text_in("body","另 1 个目的地") and not text_in("body","全部路线")
                 assert text_in("body","1小时20分钟")
+                assert js("""return Array.from(document.querySelectorAll('#body .overview-driving-card .driving-foot,#body .overview-bus .note')).every(function(n){return !/更新\s+\d\d:\d\d|数据更新于|更新于\s/.test(n.textContent);})""")
                 assert js("""return Array.from(document.querySelectorAll('#body .driving-reverse')).length===2 &&
                   Array.from(document.querySelectorAll('#body .driving-reverse')).every(function(b){
                     var a=b.getBoundingClientRect(),i=b.parentNode.querySelector('img').getBoundingClientRect();
@@ -389,7 +390,7 @@ def main():
                   var nav=document.getElementById('displayNav'), menu=document.getElementById('settingsMenu');
                   var visible=function(n){return n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0;};
                   var rules=[['.overview-link',19],['.driving-route-row',18],['.driving-routes',18],['.driving-foot',16],['.menu-dishes',19],['.task-row',19]];
-                  var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return nodes.length>0&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
+                  var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return (r[0]==='.driving-foot'||nodes.length>0)&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
                   return nav.querySelectorAll('button').length===1&&visible(document.getElementById('settings'))
                     &&menu.contains(document.getElementById('busMode'))&&!visible(document.getElementById('busMode'))
                     &&ok&&document.documentElement.scrollWidth<=window.innerWidth;
@@ -398,6 +399,16 @@ def main():
                 original_rect=wd("/session/"+sid+"/window/rect")
                 wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
                 assert js(readable)
+                # One boundary per group; no empty timestamp row or duplicate borders.
+                assert js("""return (function(){
+                  var root=document.getElementById('body'),grid=root.querySelector('.overview-driving-grid'),cards=root.querySelectorAll('.overview-driving-card'),home=root.querySelector('.overview-home'),menu=root.querySelector('.overview-menu'),todo=root.querySelector('.overview-todos');
+                  var border=function(n,side){return parseFloat(getComputedStyle(n)['border'+side+'Width']);};
+                  return border(grid,'Top')===0&&border(grid,'Bottom')===0&&border(root.querySelector('.overview-driving'),'Top')===1&&border(home,'Top')===1
+                    &&Array.from(cards).every(function(n){return border(n,'Bottom')===0;})
+                    &&(!menu.lastElementChild||border(menu.lastElementChild,'Bottom')===0)
+                    &&border(todo,'Top')===(menu.children.length?1:0)
+                    &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height===0;});
+                })()""")
                 assert js("""return (function(){
                   var w=document.getElementById('overviewWeather').getBoundingClientRect(),d=document.getElementById('date').getBoundingClientRect(),s=document.getElementById('settings').getBoundingClientRect(),b=document.querySelector('#body .overview-bus').getBoundingClientRect(),c=document.querySelectorAll('#body .overview-driving-card');
                   return w.width>0&&d.width>0&&Math.abs(w.top-d.top)<=2&&d.right<=w.left+1&&w.right<=s.left+1&&Math.max(d.bottom,w.bottom,s.bottom)<=b.top+1
