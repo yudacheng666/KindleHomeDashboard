@@ -397,7 +397,7 @@ def main():
                 readable = """return (function(){
                   var nav=document.getElementById('displayNav'), menu=document.getElementById('settingsMenu');
                   var visible=function(n){return n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0;};
-                  var rules=[['.overview-link',19],['.driving-route-row',18],['.driving-routes',18],['.driving-foot',16],['.menu-dishes',19],['.task-row',19]];
+                  var rules=[['.overview-link',19],['.driving-route-row',18],['.driving-routes',18],['.driving-foot',16],['.task-row',19]];
                   var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return (r[0]==='.driving-foot'||nodes.length>0)&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
                   return nav.querySelectorAll('button').length===1&&visible(document.getElementById('settings'))
                     &&menu.contains(document.getElementById('busMode'))&&!visible(document.getElementById('busMode'))
@@ -413,8 +413,8 @@ def main():
                   var border=function(n,side){return parseFloat(getComputedStyle(n)['border'+side+'Width']);};
                   return border(grid,'Top')===0&&border(grid,'Bottom')===0&&border(root.querySelector('.overview-driving'),'Top')===1&&border(home,'Top')===1
                     &&Array.from(cards).every(function(n){return border(n,'Bottom')===0;})
-                    &&(!menu.lastElementChild||border(menu.lastElementChild,'Bottom')===0)
-                    &&border(todo,'Top')===(menu.children.length?1:0)
+                    &&!menu&&home.children.length===1&&home.firstElementChild===todo&&border(todo,'Top')===0
+                    &&!root.querySelector('.menu-day,.menu-meal,.menu-dishes')&&root.textContent.indexOf('Fictional dish')<0&&root.textContent.indexOf('暂无菜单')<0
                     &&Array.from(root.querySelectorAll('.overview-bus .note:empty')).every(function(n){return n.getBoundingClientRect().height===0;});
                 })()""")
                 assert js("""return (function(){
@@ -696,11 +696,14 @@ def main():
                     wait(lambda:js("return document.querySelectorAll('#body .overview-bus-slot').length===2 && !!document.querySelector('#body .overview-bus-status') && !!document.querySelector('#body .overview-driving-card') && document.querySelector('#body .overview-bus').textContent.indexOf(arguments[0])>=0", [expected]))
                     assert js("""return (function(){
                       var b=document.querySelector('.overview-bus'),rows=Array.from(b.children).filter(n=>getComputedStyle(n).display!=='none'),end=b.getBoundingClientRect().bottom;
+                      var name=b.querySelector('.overview-bus-name'),direction=b.querySelector('.overview-bus-direction'),header=b.querySelector('.overview-link');
+                      var nr=name.getBoundingClientRect(),dr=direction.getBoundingClientRect();
+                      var inline=name.parentNode===header&&direction.parentNode===header&&name.nextElementSibling===direction&&direction.textContent.indexOf(' → ')>=0&&dr.left>=nr.right-1&&Math.abs(dr.top-nr.top)<5&&parseFloat(getComputedStyle(name).fontSize)>parseFloat(getComputedStyle(direction).fontSize)&&getComputedStyle(direction).fontWeight==='400';
                       var empty=Array.from(b.querySelectorAll('.overview-bus-direction:empty,.overview-bus-status:empty,.overview-bus-eta:empty,.overview-bus-time:empty,.overview-bus-details:empty'));
                       var adjacent=rows.every((n,i)=>i===0||Math.abs(n.getBoundingClientRect().top-rows[i-1].getBoundingClientRect().bottom)<=1);
                       var slots=Array.from(b.querySelectorAll('.overview-bus-slot'));
                       var compact=slots.every(n=>{var lines=Array.from(n.querySelectorAll('.overview-bus-eta,.overview-bus-time,.overview-bus-details')).filter(x=>getComputedStyle(x).display!=='none');return lines.every((x,i)=>i===0||Math.abs(x.getBoundingClientRect().top-lines[i-1].getBoundingClientRect().bottom)<=1);});
-                      return adjacent&&compact&&empty.every(n=>n.getBoundingClientRect().height===0)&&rows.every(n=>n.getBoundingClientRect().bottom<=end);
+                      return inline&&adjacent&&compact&&empty.every(n=>n.getBoundingClientRect().height===0)&&rows.every(n=>n.getBoundingClientRect().bottom<=end);
                     })()""")
                     return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top]""")
                 for width in (480,320):
@@ -710,6 +713,22 @@ def main():
                     for state,expected in [(replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),"计划"),(replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),"暂无车辆"),(replace(live_snapshot,status="stale"),"数据未更新"),(replace(live_snapshot,status="expired",vehicles=(),departure_plans=()),"数据已过期")]:
                         bus.poller.last=state
                         assert overview_bus_geometry(expected)==baseline
+                # Exercise the real text-measurement path with fictional long names.
+                # Keep a single title line; only station text shrinks, and grows again
+                # on widening the viewport. Extreme length is clipped with an ellipsis.
+                js("""var d=document.querySelector('.overview-bus-direction');d.textContent=' · 虚构示例甲站点名称 → 虚构示例乙站点名称';window.dispatchEvent(new Event('resize'));""")
+                fit_heading = """return (function(){
+                  var b=document.querySelector('.overview-bus'),h=b.querySelector('.overview-link'),n=h.querySelector('.overview-bus-name'),d=h.querySelector('.overview-bus-direction');
+                  var a=n.getBoundingClientRect(),c=d.getBoundingClientRect(),r=h.getBoundingClientRect();
+                  return parseFloat(getComputedStyle(n).fontSize)===19&&getComputedStyle(h).whiteSpace==='nowrap'&&r.height===26&&c.left>=a.right-1&&c.right<=r.right+1&&Math.abs(a.top-c.top)<8&&d.scrollWidth<=d.clientWidth+1&&parseFloat(getComputedStyle(d).fontSize)<17&&parseFloat(getComputedStyle(d).fontSize)>=10;
+                })()"""
+                assert js(fit_heading)
+                wd("/session/"+sid+"/window/rect", {"width":600,"height":800})
+                wait(lambda:js("return parseFloat(getComputedStyle(document.querySelector('.overview-bus-direction')).fontSize)===17"))
+                wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
+                wait(lambda:js(fit_heading))
+                js("""var d=document.querySelector('.overview-bus-direction');d.textContent=' · '+('虚构站名'.repeat(50))+' → 终点';window.dispatchEvent(new Event('resize'));""")
+                assert js("""var d=document.querySelector('.overview-bus-direction'),h=d.parentNode;return parseFloat(getComputedStyle(d).fontSize)===10&&d.scrollWidth>d.clientWidth&&getComputedStyle(d).textOverflow==='ellipsis'&&h.getBoundingClientRect().height===26&&d.getBoundingClientRect().right<=h.getBoundingClientRect().right+1""")
                 bus.poller.last=live_snapshot
                 wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
                 # Use the existing cache, not a new upstream request.
