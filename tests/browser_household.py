@@ -3,6 +3,7 @@
 Run on a standard Linux runner with Chrome and ChromeDriver preinstalled.
 No third-party Python packages or external provider calls.
 """
+import base64
 import json
 import os
 import shutil
@@ -389,7 +390,7 @@ def main():
                   if(cards.length!==2||maps.length!==2||rows.length!==6)return false;
                   var a=cards[0].getBoundingClientRect(),c=cards[1].getBoundingClientRect();
                   return a.left<c.left&&Math.abs(a.top-c.top)<2&&a.right<=c.left+2
-                    &&Array.prototype.every.call(maps,function(n){var h=n.parentNode.parentNode.querySelector('h2').getBoundingClientRect();return Math.abs(n.getBoundingClientRect().height-140)<2&&n.getBoundingClientRect().top-h.bottom<=4;})
+                    &&Array.prototype.every.call(maps,function(n){var h=n.parentNode.parentNode.querySelector('h2').getBoundingClientRect();return (innerWidth>=560&&innerHeight>=550?n.getBoundingClientRect().height>=60&&n.getBoundingClientRect().height<=240:Math.abs(n.getBoundingClientRect().height-140)<2)&&n.getBoundingClientRect().top-h.bottom<=4;})
                     &&Array.prototype.every.call(rows,function(n){return n.scrollHeight<=n.clientHeight+2&&parseFloat(getComputedStyle(n).fontSize)>=18;});
                 })()""")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
@@ -455,6 +456,17 @@ def main():
                     &&s.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));
                 })()"""
                 assert js(footer_layout)
+                # Screenshot the real product page at a provisional wide portrait
+                # viewport, not an illustration. All fixtures are fictional.
+                wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.setDeviceMetricsOverride","params":{"width":768,"height":640,"deviceScaleFactor":1,"mobile":False}})
+                wait(lambda:js("""return innerWidth===768&&innerHeight===640&&parseFloat(getComputedStyle(document.querySelector('.overview-clock')).fontSize)===32&&document.querySelector('.overview-driving-map').getBoundingClientRect().height>140&&document.querySelector('.overview-home').clientHeight>=125"""))
+                assert js("""var d=document.querySelector('.overview-driving'),c=document.getElementById('displayContent'),h=document.querySelector('.overview-home'),m=document.querySelector('.overview-driving-map img');return getComputedStyle(d).overflowY==='visible'&&c.scrollHeight<=c.clientHeight+1&&h.getBoundingClientRect().bottom<=c.getBoundingClientRect().bottom&&m.getBoundingClientRect().width/m.parentNode.parentNode.clientWidth>=.75&&parseFloat(getComputedStyle(document.querySelector('.overview-home-title')).fontSize)===25&&parseFloat(getComputedStyle(document.querySelector('.menu-dishes')).fontSize)===23""")
+                visual=os.environ.get("KHD_VISUAL_OUTPUT")
+                if visual:
+                    os.makedirs(visual,exist_ok=True)
+                    with open(os.path.join(visual,"overview-768x640.png"),"wb") as f:
+                        f.write(base64.b64decode(wd("/session/"+sid+"/screenshot")))
+                wd("/session/"+sid+"/goog/cdp/execute", {"cmd":"Emulation.clearDeviceMetricsOverride","params":{}})
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
                 assert js(footer_layout)
@@ -731,7 +743,7 @@ def main():
                 })()"""
                 assert js(fit_heading)
                 wd("/session/"+sid+"/window/rect", {"width":600,"height":800})
-                wait(lambda:js("return parseFloat(getComputedStyle(document.querySelector('.overview-bus-direction')).fontSize)===17"))
+                wait(lambda:js("return parseFloat(getComputedStyle(document.querySelector('.overview-bus-direction')).fontSize)===(innerWidth>=560&&innerHeight>=550?20:17)"))
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 wait(lambda:js(fit_heading))
                 js("""var d=document.querySelector('.overview-bus-direction');d.textContent=' · '+('虚构站名'.repeat(50))+' → 终点';window.dispatchEvent(new Event('resize'));""")
@@ -770,7 +782,7 @@ def main():
                 assert js("""return (function(){
                   var f=document.getElementById('previewFrame');
                   return document.getElementById('previewMode').value==='follow'
-                    && f.contentWindow.innerWidth===480 && f.contentWindow.innerHeight===640
+                    && f.contentWindow.innerWidth===768 && f.contentWindow.innerHeight===640
                     && !!f.contentDocument.querySelector('.task-complete')
                     && getComputedStyle(document.querySelector('.admin-preview-panel')).position==='sticky'
                     && getComputedStyle(document.getElementById('displaySettings')).display==='none';
@@ -829,8 +841,8 @@ def main():
                 click("previewOne")
                 assert js("var f=document.getElementById('previewFrame');return f.getBoundingClientRect().width===600&&f.getBoundingClientRect().height===800")
                 click("previewDefaults")
-                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===480&&f.contentWindow.innerHeight===640"))
-                assert js("return document.getElementById('previewMode').value==='follow'&&document.getElementById('previewWidth').value==='480'&&document.getElementById('previewHeight').value==='640'&&document.getElementById('previewFit').getAttribute('aria-pressed')==='true'&&document.getElementById('previewDevice').classList.contains('device-bezel')")
+                wait(lambda:js("var f=document.getElementById('previewFrame');return f.contentWindow.innerWidth===768&&f.contentWindow.innerHeight===640"))
+                assert js("return document.getElementById('previewMode').value==='follow'&&document.getElementById('previewWidth').value==='768'&&document.getElementById('previewHeight').value==='640'&&document.getElementById('previewFit').getAttribute('aria-pressed')==='true'&&document.getElementById('previewDevice').classList.contains('device-bezel')")
                 # Module routes all keep the same persistent preview and select their matching display.
                 go_admin("/admin/weather")
                 wait(lambda:text_in("weatherSettingStatus","已读取"))

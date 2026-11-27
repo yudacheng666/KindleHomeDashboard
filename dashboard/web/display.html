@@ -316,6 +316,31 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .bus-next .eta{font-size:22px;line-height:1.2;font-weight:normal}
 .overview-page .bus-next .eta.bus-state{font-size:17px}
 .overview-page .bus-next .bus-time{font-size:16px;line-height:1.2;font-weight:normal}
+/* Wide portrait/e-ink profile: keep text legible relative to the available
+   viewport, not the desktop preview's ornamental bezel. Legacy WebKit CSS. */
+@media(min-width:560px) and (min-height:550px){
+  #overviewWeather .weather-main,#date .overview-clock{font-size:32px}
+  #overviewWeather .weather-summary,#date .overview-day{font-size:21px}
+  #overviewWeather .weather-alert{font-size:19px}
+  .overview-page .overview-link{font-size:24px}
+  .overview-page .overview-bus .overview-link{height:30px;min-height:30px;line-height:30px}
+  .overview-bus-direction{font-size:20px}
+  .overview-page .overview-bus-status{font-size:19px}
+  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-eta{font-size:32px}
+  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-eta{font-size:26px}
+  .overview-bus-slots .overview-bus-slot:first-child .overview-bus-state{font-size:24px}
+  .overview-bus-slots .overview-bus-slot+.overview-bus-slot .overview-bus-state{font-size:22px}
+  .overview-bus-time,.overview-page .overview-bus-details{font-size:20px;line-height:22px;max-height:22px}
+  .overview-page .overview-driving-card h2{font-size:24px}
+  .overview-page .overview-driving-card .driving-route-row{font-size:22px;line-height:1.15}
+  .overview-page .overview-driving-card .driving-foot{font-size:19px}
+  .overview-driving-link{font-size:20px}
+  .overview-page .overview-home-title{font-size:25px;min-height:32px;font-weight:bold}
+  .overview-home-scroll{top:36px}
+  .overview-page .task-date,.overview-page .overview-menu .menu-date{font-size:22px}
+  .overview-page .task-row,.overview-page .overview-menu .menu-meal{font-size:23px;line-height:1.25}
+  .overview-page .overview-task-marker .overview-task-circle,.overview-task-inactive{font-size:26px}
+}
 </style></head>
 <body><div id="login"><h1>家庭看板</h1><p>公交与家庭统一展示原型 · 本地网络</p><label for="token">只读访问令牌</label><input id="token" type="password" maxlength="128" autocomplete="off"><button id="connect" type="button">连接</button></div>
 <p id="status" class="status" role="status"></p>
@@ -329,7 +354,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 <div id="options" class="hidden"><label for="seconds">本次海报停留时间</label><select id="seconds"><option value="120">2分钟</option><option value="180">3分钟</option><option value="300">5分钟</option></select><p class="status">本次调整不修改 NAS 保存的默认设置。</p><button id="apply" type="button">应用本次显示设置</button><button id="cancel" type="button">取消</button></div>
 <div class="setting-list"><a id="manageLink" href="/bus">公交设置 · 线路、站点及更新时间</a><a id="tasksManage" href="/home#tasks">待办清单管理</a><a id="postersManage" href="/home#posters">海报管理 · 保存默认轮播设置</a><a id="menusManage" href="/home#menus">本周菜单管理</a><a id="catalogManage" href="/home#catalog">家庭菜单维护</a></div>
 
-<h2>出行与天气</h2><button id="weatherLoad" type="button" class="setting-entry">天气设置</button><button id="drivingLoad" type="button" class="setting-entry">驾驶设置</button><h2>系统信息</h2><p id="version" class="status"></p><button id="logout" type="button">退出连接</button></div>
+<h2>出行与天气</h2><button id="weatherLoad" type="button" class="setting-entry">天气设置</button><button id="drivingLoad" type="button" class="setting-entry">驾驶设置</button><h2>系统信息</h2><p id="version" class="status"></p><p id="viewportInfo" class="status"></p><button id="logout" type="button">退出连接</button></div>
 <div id="settingsDetail" class="hidden"><button id="settingsBack" type="button">返回设置</button>
 <section id="weatherDetail" class="hidden"><h2>天气设置</h2><p class="status">和风天气优先，Open-Meteo 备用。凭据在 NAS 私有容器配置中填写，网页不会读取或显示密钥。</p>
 <p id="weatherLoadStatus" class="status" role="status"></p><button id="weatherRetry" type="button" class="hidden">重新读取</button>
