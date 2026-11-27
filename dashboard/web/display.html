@@ -102,6 +102,65 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
   .overview-page .bus-slot>.bus-pair.bus-details>.bus-right{margin-left:4px}
   .overview-page .bus-time{white-space:normal}
 }
+
+/* Compact Kindle overview: two destination cards, aligned route rows and clear household groups. */
+.overview-page{font-size:20px;line-height:1.22}
+.overview-page .overview-link{font-size:19px;line-height:1.2;min-height:30px}
+.overview-page .note{font-size:17px;line-height:1.2}
+.overview-page .overview-pair{border-top:1px solid #555;border-bottom:1px solid #555}
+.overview-page .overview-half{padding:3px 5px 4px 0}
+.overview-page .overview-half+.overview-half{padding:3px 0 4px 6px}
+.overview-page .bus-slot-label{font-size:16px;line-height:1.15;margin:0}
+.overview-bus-slot{padding:3px 0 4px;border-bottom:1px solid #aaa}
+.overview-bus-label{font-size:16px;font-weight:bold;line-height:1.15;color:#333}
+.overview-bus-line{display:table;width:100%;table-layout:fixed;line-height:1.2}
+.overview-bus-eta,.overview-bus-time{display:table-cell;vertical-align:baseline}
+.overview-bus-eta{font-size:21px;font-weight:bold}
+.overview-bus-state{font-size:18px}
+.overview-bus-time{font-size:16px;text-align:right;white-space:nowrap}
+.overview-bus-details{font-size:15px;line-height:1.2;margin:1px 0 0;color:#333}
+.overview-page .weather-main{font-size:38px;line-height:1.12;margin:2px 0}
+.overview-page .weather-summary{font-size:18px;line-height:1.25}
+.overview-page .weather-alert{font-size:16px;line-height:1.2;margin:2px 0;padding:2px}
+.overview-driving-grid{display:table;width:100%;table-layout:fixed;border-top:1px solid #555;border-bottom:1px solid #555}
+.overview-driving-card{display:table-cell;width:50%;vertical-align:top;box-sizing:border-box;padding:4px 6px 5px 0;border:0}
+.overview-driving-card+.overview-driving-card{border-left:1px solid #555;padding:4px 0 5px 6px}
+.overview-page .overview-driving-card h2{font-size:20px;line-height:1.2;min-height:2.4em;margin:0 0 3px;word-wrap:break-word}
+.overview-driving-pair{display:block;width:100%}
+.overview-driving-map{display:block;width:100%;height:140px;padding:0;text-align:center;overflow:hidden}
+.overview-driving-map img{display:block;max-width:100%;max-height:140px;width:auto;height:auto;margin:0 auto}
+.overview-driving-routes{display:block;width:100%;font-size:18px;line-height:1.2}
+.driving-route-row{display:table;width:100%;table-layout:fixed;line-height:1.25;margin:1px 0;white-space:nowrap}
+.driving-route-number,.driving-route-time,.driving-route-distance{display:table-cell;vertical-align:middle}
+.driving-route-number{width:1.5em}
+.driving-route-time{width:4.4em}
+.driving-route-distance{text-align:right}
+.overview-page .overview-driving-card .driving-fast{font-size:18px;font-weight:bold}
+.overview-page .overview-driving-card .driving-foot{font-size:16px;line-height:1.2;margin:2px 0;word-wrap:break-word}
+.overview-driving-link{display:block;min-height:27px;font-size:16px;line-height:1.2;margin:1px 0}
+.overview-menu{padding-bottom:3px}
+.overview-todos{border-top:2px solid #555;margin-top:4px;padding-top:3px}
+.overview-todo-link{display:block;min-height:28px;font-size:19px}
+.overview-page .menu-day,.overview-page .task-day{padding:3px 0;border-bottom:1px solid #777}
+.overview-page .menu-date,.overview-page .task-date{font-size:19px;line-height:1.2;margin:0 0 2px}
+.overview-page .menu-meal{padding:1px 0}
+.overview-page .menu-meal-label,.overview-page .menu-dishes,.overview-page .task-row{font-size:19px;line-height:1.25}
+.overview-page .task-action{width:56px}
+.overview-page .task-complete{font-size:16px;padding:1px 4px;min-height:36px}
+@media(max-width:520px){
+  .overview-bus-line{display:block}
+  .overview-bus-eta,.overview-bus-time{display:block;text-align:left}
+  .overview-bus-time{margin-top:1px}
+}
+@media(max-width:420px){
+  .overview-driving-grid{display:block}
+  .overview-driving-card{display:block;width:100%;padding:4px 0 6px;border-left:0;border-bottom:1px solid #aaa}
+  .overview-driving-card+.overview-driving-card{padding:4px 0 6px;border-left:0}
+  .overview-page .overview-driving-card h2{min-height:0}
+  .overview-driving-map{height:150px}
+  .overview-driving-map img{max-height:150px}
+}
+
 #settingsPanel{max-width:960px;margin:0 auto;padding:12px;color:#1f2937;font:16px/1.5 sans-serif;background:#f5f6f8}
 #settingsPanel h1{font-size:24px;margin:8px 0}#settingsPanel h2{font-size:18px;margin:16px 0 6px}
 #settingsPanel .setting-list a,#settingsPanel #displayManage{display:block;box-sizing:border-box;min-height:52px;padding:13px 12px;border:0;border-bottom:1px solid #d1d5db;background:#fff;color:#1f2937;text-decoration:none}

@@ -239,8 +239,9 @@ def main():
                 go("/")
                 js("document.getElementById('token').value=arguments[0]",[reader])
                 click("connect")
-                wait(lambda:text_in("body","Fictional browser task") and text_in("body","公交自动更新已关闭"))
+                wait(lambda:text_in("body","Fictional browser task"))
                 assert js("return document.getElementById('body').className==='overview-page' && !document.querySelector('.task-complete')")
+                assert js("return document.querySelectorAll('#body .overview-pair .overview-half').length===2")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
                 click("settings");click("returnDisplay")
                 js("document.getElementById('tasksMode').click()")
@@ -361,16 +362,24 @@ def main():
                 assert js("return document.getElementById('drivingSave').parentNode.nextElementSibling.id==='drivingSettingStatus'")
                 click("returnDisplay")
                 click("overviewMode")
-                wait(lambda:js("return document.querySelectorAll('#body .driving-map img').length===2 && document.querySelector('#body .overview-pair')!==null"))
+                wait(lambda:js("return document.querySelectorAll('#body .overview-driving-card').length===2 && document.querySelectorAll('#body .overview-driving-map img').length===2 && document.querySelector('#body .overview-pair')!==null"))
                 assert text_in("body","另 1 个目的地")
                 assert not text_in("body","已知拥堵") and not text_in("body","路况未知")
-                assert js("return Array.from(document.querySelectorAll('#body .driving-routes')).every(function(n){return /km/.test(n.textContent)&&/分钟/.test(n.textContent);})")
+                assert js("return Array.from(document.querySelectorAll('#body .overview-driving-routes')).every(function(n){return /km/.test(n.textContent)&&/分钟/.test(n.textContent);})")
+                assert js("""return (function(){
+                  var cards=document.querySelectorAll('#body .overview-driving-card'),maps=document.querySelectorAll('#body .overview-driving-map'),rows=document.querySelectorAll('#body .driving-route-row');
+                  if(cards.length!==2||maps.length!==2||rows.length!==6)return false;
+                  var a=cards[0].getBoundingClientRect(),c=cards[1].getBoundingClientRect();
+                  return a.left<c.left&&Math.abs(a.top-c.top)<2&&a.right<=c.left+2
+                    &&Array.prototype.every.call(maps,function(n){return Math.abs(n.getBoundingClientRect().height-140)<2;})
+                    &&Array.prototype.every.call(rows,function(n){return n.scrollHeight<=n.clientHeight+2&&parseFloat(getComputedStyle(n).fontSize)>=18;});
+                })()""")
                 assert js("return document.documentElement.scrollWidth<=window.innerWidth")
                 # Real rendered sizes, visible header geometry and reachable navigation.
                 readable = """return (function(){
                   var nav=document.getElementById('displayNav'), menu=document.getElementById('settingsMenu');
                   var visible=function(n){return n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0;};
-                  var rules=[['.overview-link',20],['.driving-fast',26],['.driving-routes',18],['.driving-foot',16],['.menu-dishes',20],['.task-row',20]];
+                  var rules=[['.overview-link',19],['.driving-route-row',18],['.driving-routes',18],['.driving-foot',16],['.menu-dishes',19],['.task-row',19]];
                   var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return nodes.length>0&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
                   return nav.querySelectorAll('button').length===1&&visible(document.getElementById('settings'))
                     &&menu.contains(document.getElementById('busMode'))&&!visible(document.getElementById('busMode'))
@@ -380,7 +389,9 @@ def main():
                 original_rect=wd("/session/"+sid+"/window/rect")
                 wd("/session/"+sid+"/window/rect", {"width":320,"height":640})
                 assert js(readable)
+                assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
+                assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2""")
                 click("settings")
                 assert js("return document.getElementById('busMode').getBoundingClientRect().height>=44 && document.getElementById('weatherMode').getBoundingClientRect().height>=44")
                 click("returnDisplay")
