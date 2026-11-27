@@ -659,12 +659,12 @@ def main():
                 js("var m=document.getElementById('previewMode');m.value='bus';m.onchange()")
                 for _ in range(80):
                     state=js("var f=document.getElementById('previewFrame');return {src:f.getAttribute('src'),mode:document.getElementById('previewMode').value,hash:f.contentWindow.location.hash,heading:f.contentDocument.getElementById('heading')&&f.contentDocument.getElementById('heading').textContent,body:f.contentDocument.getElementById('body').textContent.slice(0,240)}")
-                    if state.get("hash")=="#bus" and "公交" in state.get("body",""):break
+                    if state.get("hash")=="#bus" and state.get("heading") and js("return document.getElementById('previewFrame').contentWindow.document.getElementById('busMode').className==='selected'"):break
                     time.sleep(.15)
                 else:
                     raise AssertionError("Manual preview lock did not switch to bus: "+str(state))
                 click("tasks")
-                assert js("return document.getElementById('previewMode').value==='bus' && document.getElementById('previewFrame').contentWindow.location.hash==='#bus'")
+                assert js("return document.getElementById('previewMode').value==='bus' && document.getElementById('previewFrame').contentWindow.location.hash==='#bus' && document.getElementById('previewFrame').contentWindow.document.getElementById('busMode').className==='selected'")
                 js("var m=document.getElementById('previewMode');m.value='follow';m.onchange()")
                 wait(lambda:js("return document.getElementById('previewFrame').contentWindow.document.getElementById('heading').textContent==='待办清单'"))
                 # Viewport geometry remains the real CSS viewport, independent of the device bezel.
