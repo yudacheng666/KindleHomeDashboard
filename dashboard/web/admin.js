@@ -66,7 +66,7 @@ function field(label,id,value,min,max){var l=make(controls,"label",label),n=make
 var width=field("宽度（CSS px）","previewWidth",480,240,1600),height=field("高度（CSS px）","previewHeight",640,240,2400);
 var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=480,h=640,follow=true;
 var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});fitButton.id="previewFit";oneButton.id="previewOne";
-var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){width.value="480";height.value="640";mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});appearance.id="previewAppearance";defaults.id="previewDefaults";
+var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){width.value="480";height.value="640";w=480;h=640;mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});appearance.id="previewAppearance";defaults.id="previewDefaults";
 var apply=button(actions,"应用尺寸",function(){var nw=Number(width.value),nh=Number(height.value);if(!validSize(nw,nh))return;w=nw;h=nh;resize();});apply.id="previewApply";
 var feedback=make(preview,"p","","admin-preview-error");feedback.id="previewFeedback";feedback.setAttribute("role","status");
 var stage=make(preview,"div",null,"admin-preview-stage"),wrap=make(stage,"div",null,"admin-preview-wrap"),shellDevice=make(wrap,"div",null,"admin-preview-device"),screen=make(shellDevice,"div",null,"admin-preview-screen"),brandMark=make(shellDevice,"span","kindle","admin-preview-brand");
@@ -108,7 +108,8 @@ function resize(){
  appearance.textContent=device?"设备外观":"原始画面";appearance.setAttribute("aria-pressed",String(device));
 }
 mode.onchange=function(){follow=mode.value==="follow";loadFrame(follow?moduleMode():mode.value);};
-window.KHD_ADMIN_PREVIEW_SET_MODE=function(next){if(follow)loadFrame(next);};
+var lastFollowMode=moduleMode();
+window.KHD_ADMIN_PREVIEW_SET_MODE=function(next){if(follow&&next!==lastFollowMode)loadFrame(next);lastFollowMode=next;};
 window.KHD_ADMIN_PREVIEW_REFRESH=function(){if(frame&&frame.contentWindow)frame.contentWindow.postMessage({type:"khd-admin-preview-refresh"},location.origin);};
 window.KHD_ADMIN_PREVIEW_AUTH=function(){sendAuth();};
 if(frame.addEventListener)frame.addEventListener("load",onFrameLoad);else frame.onload=onFrameLoad;
