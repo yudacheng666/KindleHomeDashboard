@@ -24,6 +24,7 @@ jobs:
           node tests/test_bus_ui.js
           node --check dashboard/web/home.js
           node tests/test_home_ui.js
+          node --check dashboard/web/admin.js
           node --check dashboard/web/display.js
           node tests/test_display_ui.js
       - name: Real household browser integration

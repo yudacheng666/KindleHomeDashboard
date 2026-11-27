@@ -996,7 +996,7 @@ el("weatherNext").onclick=function(){if((mode!=="weather"&&mode!=="overview")||w
 el("apply").onclick=function(){var n=Number(el("seconds").value);if([120,180,300].indexOf(n)<0)return;if(closeSettings()){seconds=n;scheduleRotation();}};
 el("cancel").onclick=closeSettings;
 el("logout").onclick=function(){if(canLeaveSettings())reset();};
-["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage"].forEach(function(id){el(id).onclick=canLeaveSettings;});
+["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage","desktopAdminLink"].forEach(function(id){el(id).onclick=canLeaveSettings;});
 if(window.addEventListener){
   window.addEventListener("pagehide",function(){
     var keep=direct&&!autoEntry&&!automatic&&mode==="family"&&!!token;

@@ -64,6 +64,33 @@ class DirectTests(unittest.TestCase):
         self.assertIsNotNone(VERSION)
         self.assertIn(json.dumps(VERSION).encode(),flags)
 
+    def test_desktop_admin_preview_headers_and_access(self):
+        server = self.start(API(self.runtime, None, None, household=self.home, direct=True))
+        for path in ("/admin", "/admin/display", "/admin/bus", "/admin/weather",
+                     "/admin/driving", "/admin/family", "/admin/system", "/admin.css", "/admin.js",
+                     "/preview", "/preview/auto", "/display", "/api/home/view"):
+            conn = HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+            try:
+                conn.request("GET", path, headers={"Host":server.expected_host})
+                response = conn.getresponse()
+                self.assertEqual(response.status, 200, path)
+                self.assertEqual(response.getheader("X-Frame-Options"),
+                                 "SAMEORIGIN" if path.startswith("/preview") else "DENY")
+                csp = response.getheader("Content-Security-Policy")
+                self.assertIn("frame-ancestors 'self'" if path.startswith("/preview") else "frame-ancestors 'none'", csp)
+                self.assertEqual("frame-src 'self'" in csp, path == "/admin/display")
+                body = response.read()
+                if path.startswith("/admin/"):
+                    self.assertIn(b'href="/admin.css"', body)
+                    self.assertIn(b'src="/admin.js"', body)
+                if path.startswith("/preview"):
+                    self.assertNotIn(b'/admin.css', body)
+            finally:
+                conn.close()
+            self.assertEqual(self.request(server, path, extra={"Origin":"https://foreign.example"})[0],403)
+        self.assertEqual(self.request(server,"/preview")[1],self.request(server,"/display")[1])
+        self.assertEqual(self.request(server,"/preview/auto")[1],self.request(server,"/auto")[1])
+
     def test_auto_uses_server_clock_and_never_collects(self):
         now = datetime(2026, 1, 5, 0, 59, tzinfo=timezone.utc)
         bus = Mock()
