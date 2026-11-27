@@ -63,10 +63,11 @@ var controls=make(preview,"div",null,"admin-preview-controls");
 var modeLabel=make(controls,"label","预览内容"),mode=make(modeLabel,"select");mode.id="previewMode";
 [["follow","跟随模块"],["overview","综合展示"],["bus","公交"],["weather","天气"],["driving","驾驶"],["tasks","待办"],["posters","海报"],["menus","菜单"]].forEach(function(p){var o=make(mode,"option",p[1]);o.value=p[0];});
 function field(label,id,value,min,max){var l=make(controls,"label",label),n=make(l,"input");n.id=id;n.type="number";n.min=min;n.max=max;n.step="1";n.value=value;return n;}
-var width=field("宽度（CSS px）","previewWidth",480,240,1600),height=field("高度（CSS px）","previewHeight",640,240,2400);
-var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=480,h=640,follow=true;
+make(preview,"p","预览尺寸是网页可视区，不是屏幕分辨率。请在 Kindle 设置 → 系统信息读取可视宽高后输入；默认仅为估计，未校准。","admin-preview-error");
+var width=field("宽度（CSS px）","previewWidth",768,240,1600),height=field("高度（CSS px）","previewHeight",640,240,2400);
+var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=768,h=640,follow=true;
 var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});fitButton.id="previewFit";oneButton.id="previewOne";
-var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){width.value="480";height.value="640";w=480;h=640;feedback.textContent="";mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});appearance.id="previewAppearance";defaults.id="previewDefaults";
+var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){width.value="768";height.value="640";w=768;h=640;feedback.textContent="";mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});appearance.id="previewAppearance";defaults.id="previewDefaults";
 var apply=button(actions,"应用尺寸",function(){var nw=Number(width.value),nh=Number(height.value);if(!validSize(nw,nh))return;w=nw;h=nh;resize();});apply.id="previewApply";
 function validSize(nw,nh){if(!Number.isInteger(nw)||!Number.isInteger(nh)||nw<240||nw>1600||nh<240||nh>2400){feedback.textContent="请输入有效的整数视口尺寸。";return false;}feedback.textContent="";return true;}
 var feedback=make(preview,"p","","admin-preview-error");feedback.id="previewFeedback";feedback.setAttribute("role","status");

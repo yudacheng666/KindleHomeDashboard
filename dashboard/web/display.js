@@ -70,7 +70,7 @@ function updateManagementLinks(){
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
-function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();else fitOverviewViewport();}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open){updateManagementLinks();updateViewportInfo();}else fitOverviewViewport();}
 function taskDateLabel(day,today){
   var d=new Date(day+"T00:00:00Z"),base=new Date(today+"T00:00:00Z");
   var label=(day.slice(0,4)===today.slice(0,4)?"":day.slice(0,4)+"/")+day.slice(5).replace("-","/");
@@ -888,23 +888,47 @@ function bindOverviewScroll(n){
     n._scrollIdle=setTimeout(function(){n.setAttribute("data-scrolling","false");n._scrollIdle=null;},900);
   };
 }
+function wideOverview(){return window.innerWidth>=560&&window.innerHeight>=550;}
+function updateViewportInfo(){
+  var n=el("viewportInfo"),w=window.innerWidth,h=window.innerHeight;
+  if(n&&w&&h)n.textContent="当前网页可视区："+w+" × "+h+" CSS px；像素比 "+(window.devicePixelRatio||1)+"。电脑预览请填相同宽高（不含浏览器工具栏）。";
+}
 function fitOverviewViewport(){
   fitOverviewBusHeading();
+  if(settingsOpen)updateViewportInfo();
   var c=el("displayContent"),d=overviewRoots.driving,h=overviewRoots.home;
   if(!d||!h||!d.style||!h.style||!c.clientHeight||!c.getBoundingClientRect)return;
-  // Driving stays in the ordinary document flow: no inner scroll, no forced
-  // height and no clipping. Only the household lists use the remaining space.
-  // The bus budget and hence the driving start are unchanged.
+  // Allocate map height using the actual remaining viewport and both route lists.
+  // Keep at least 100px for the household headings/lists whenever possible.
+  // Only portrait wide viewports use this profile; other sizes keep existing CSS.
+  var maps=d.querySelectorAll?d.querySelectorAll(".overview-driving-map"):[];
+  if(maps.length){
+    var mapHeight="";
+    if(wideOverview()){
+      var current=maps[0].getBoundingClientRect().height;
+      var overhead=d.getBoundingClientRect().height-current;
+      var available=c.getBoundingClientRect().bottom-9-d.getBoundingClientRect().top-overhead-100;
+      var width=maps[0].clientWidth;
+      if(width)mapHeight=Math.max(60,Math.floor(Math.min(width*0.62,240,available)))+"px";
+    }
+    for(var i=0;i<maps.length;i++){
+      if(maps[i].style.height!==mapHeight)maps[i].style.height=mapHeight;
+      var images=maps[i].getElementsByTagName("img");
+      for(var j=0;j<images.length;j++)if(images[j].style.maxHeight!==mapHeight)images[j].style.maxHeight=mapHeight;
+    }
+  }
+  // No driving scrolling or forced section clipping: the household region uses
+  // the remainder, without changing height on task/menu data updates.
   h.style.height=Math.max(0,Math.floor(c.getBoundingClientRect().bottom-8-d.getBoundingClientRect().bottom))+"px";
 }
 function fitOverviewBusHeading(){
   var h=overviewRoots.busHeader,n=overviewRoots.busName,d=overviewRoots.busDirection;
   if(!h||!n||!d||!d.style||!h.clientWidth)return;
-  var width=h.clientWidth;
-  if(h._fitWidth===width&&h._fitText===d.textContent)return;
-  h._fitWidth=width;h._fitText=d.textContent;
-  d.style.maxWidth="none";d.style.fontSize="17px";
-  var remaining=Math.max(0,width-n.offsetWidth-1),size=17;
+  var width=h.clientWidth,size=wideOverview()?20:17;
+  if(h._fitWidth===width&&h._fitText===d.textContent&&h._fitSize===size)return;
+  h._fitWidth=width;h._fitText=d.textContent;h._fitSize=size;
+  d.style.maxWidth="none";d.style.fontSize=size+"px";
+  var remaining=Math.max(0,width-n.offsetWidth-1);
   while(size>10&&d.offsetWidth>remaining){size--;d.style.fontSize=size+"px";}
   d.style.maxWidth=remaining+"px";
 }

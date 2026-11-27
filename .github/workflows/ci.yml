@@ -28,7 +28,15 @@ jobs:
           node --check dashboard/web/display.js
           node tests/test_display_ui.js
       - name: Real household browser integration
-        run: PYTHONPATH=. python3 tests/browser_household.py
+        run: PYTHONPATH=. KHD_VISUAL_OUTPUT="${{ runner.temp }}/khd-visual" python3 tests/browser_household.py
+      - name: Store fictional browser screenshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: overview-browser-visual
+          path: ${{ runner.temp }}/khd-visual/overview-768x640.png
+          if-no-files-found: warn
+          retention-days: 7
       - name: Scan Git history for secrets
         run: |
           docker run --rm -v "$PWD:/repo:ro" zricethezav/gitleaks:v8.24.3 git /repo --redact --no-banner
