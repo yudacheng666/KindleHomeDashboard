@@ -62,7 +62,7 @@ const firstSlot=slot(0);view.snapshot={...savedSnapshot,vehicles:[{position:1,et
 view.snapshot={...savedSnapshot,status:"stale"};el("refresh").onclick();assert.equal(eta(0).textContent,"约 4 分钟");assert.ok(el("status").textContent.includes("旧数据"));
 view.snapshot=savedSnapshot;el("refresh").onclick();
 el("settings").onclick();el("keyword").value="Example";
-for(const [code,msg] of [["bus_disabled","未启用"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
+for(const [code,msg] of [["bus_disabled","自动更新已关闭"],["local_request_gap","请求过快"],["local_daily_limit","每日请求上限"]]){searchError=code;el("search").onclick();assert.ok(el("message").textContent.includes(msg));}
 searchError="";el("search").onclick();
 assert.deepEqual(el("route").children.map(n=>n.textContent),["请选择线路","Example","Other"]);assert.equal(el("directionStep").className,"hidden");
 el("route").value="0";el("route").onchange();assert.equal(el("directionStep").className,"");assert.equal(el("direction").value,"");

@@ -8,7 +8,7 @@ function initialTab(){if(desktopDisplay)return "displaySettings";var h=typeof lo
 function el(id){return document.getElementById(id);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function show(id,yes){el(id).className=yes?"":"hidden";}
-function note(s){el("message").textContent=s;}
+function note(s){el("message").textContent=(desktopDisplay||desktopFamily)&&/^(已保存。|菜单已保存。)$/.test(s)?"":s;}
 function node(parent,tag,s,cls){var n=document.createElement(tag);if(s!==undefined)n.textContent=s;if(cls)n.className=cls;parent.appendChild(n);return n;}
 function btn(parent,label,fn){var n=node(parent,"button",label);n.type="button";n.onclick=function(){if(!busy)fn();};return n;}
 function field(parent,label,value,kind,options,max){

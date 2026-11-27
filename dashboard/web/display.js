@@ -258,7 +258,7 @@ function updateEta(rows,s,now){
     }
     var cls="bus-left eta"+(compact?" bus-state":"");
     if(row.eta.className!==cls)row.eta.className=cls;
-    slotSet(row.eta,label);slotSet(row.time,time);slotSet(row.stops,stops);slotSet(row.distance,distance);
+    slotSet(row.eta,label);slotSet(row.time,i===0?time:time.replace("\n"," "));slotSet(row.stops,stops);slotSet(row.distance,distance);
   });
   return valid;
 }
@@ -290,7 +290,7 @@ function paintAge(){
 function acceptBus(v){
   data=null;pages=[];cursor=0;resumePage="";stopRotation();
   var s=v.snapshot,t=v.trip;
-  var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查 Docker 日志",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
+  var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"不在更新时间内",blocked:"接口限制访问",disabled:"公交自动更新已关闭",config_error:"公交配置错误，更新已暂停；请检查 Docker 日志",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次更新",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地更新服务异常"};
   var items=slotItems(s),key=JSON.stringify([t,items.length,["live","stale","no_live_data"].indexOf(s.status)>=0]);
   if(key!==lastRender){
     stopAge();lastRender=key;txt("date","");txt("heading",t?t.line.name:"实时公交");txt("index","");
@@ -362,7 +362,7 @@ function renderWeather(){
   lastRender=key;txt("date","");txt("heading",v.name||"天气");txt("index",weatherPages.length>1?(weatherCursor+1)+" / "+weatherPages.length:"");
   var root=el("body"),s=v.sections||{},groups=[],missing=[];clear(root);root.className="weather-page";
   if(v.status==="disabled"){append(root,"p","天气未启用，请前往设置。","note");return;}
-  if(v.status==="storage_error"){append(root,"p","天气配置或限额记录异常，已暂停采集。","note");return;}
+  if(v.status==="storage_error"){append(root,"p","天气配置或限额记录异常，已暂停更新。","note");return;}
   var current=s.current;
   if(current&&current.status==="available"){
     var c=current.data;
@@ -597,7 +597,7 @@ el("weatherSave").onclick=function(){
 
 function renderDrivingGroups(root,v,limit,summary){
     if(!v.enabled||!v.groups.length)append(root,"p","驾驶未启用或未配置，请前往设置。","note");
-    var messages={disabled:"未启用",paused:"不在采集时段",waiting:"等待采集",not_configured:"请在NAS配置高德密钥",credential_error:"高德密钥配置有误",storage_error:"配置或额度存储异常",blocked:"已停止请求，请核查高德账号",stale:"旧数据",unavailable:"暂不可用",ok:""};
+    var messages={disabled:"未启用",paused:"不在更新时间",waiting:"等待更新",not_configured:"请在NAS配置高德密钥",credential_error:"高德密钥配置有误",storage_error:"配置或额度存储异常",blocked:"已停止请求，请核查高德账号",stale:"旧数据",unavailable:"暂不可用",ok:""};
     (v.groups||[]).slice(0,limit).forEach(function(g){
       var group=append(root,"section","","driving-group");append(group,"h2",g.name);
       var pair=append(group,"div","","driving-pair"),map=append(pair,"div","","driving-map"),list=append(pair,"div","","driving-routes");
@@ -614,7 +614,7 @@ function renderDrivingGroups(root,v,limit,summary){
         append(list,"p",(r.meters/1000).toFixed(1)+"km");
       });
       if(!g.routes||!g.routes.length)append(list,"p","暂无可用路线");
-      var note=(messages[g.status]||"")+(g.fetched_at?" · 采集 "+weatherTime(g.fetched_at):"");
+      var note=(messages[g.status]||"")+(g.fetched_at?" · 更新于 "+weatherTime(g.fetched_at):"");
       if(g.routes&&g.routes.length<3&&g.routes.length>0)note+=" · 仅返回"+g.routes.length+"条";
       if(note)append(group,"p",note,"driving-foot");
     });
@@ -716,7 +716,7 @@ function drivingGroup(group){
     f.windows.push(row);
   }
   (group.windows||[]).forEach(addWindow);
-  drivingButton(root,"添加采集时段",function(){if(!drivingBusy&&f.windows.length<32)addWindow({days:[0,1,2,3,4,5,6],start:420,end:540});});
+  drivingButton(root,"添加更新时间",function(){if(!drivingBusy&&f.windows.length<32)addWindow({days:[0,1,2,3,4,5,6],start:420,end:540});});
   drivingButton(root,"移除此目的地",function(){if(drivingBusy)return;el("drivingGroups").removeChild(root);drivingFields.splice(drivingFields.indexOf(f),1);drivingActive=Math.max(0,Math.min(drivingActive,drivingFields.length-1));drivingLocationButtons();});
   drivingFields.push(f);drivingActive=drivingFields.length-1;drivingLocationButtons();
 }
@@ -749,10 +749,10 @@ el("drivingSave").onclick=function(){
     for(var j=0;j<f.windows.length;j++){
       var w=f.windows[j],start=drivingMinutes(w.start.value),end=drivingMinutes(w.end.value),days=[];
       w.days.forEach(function(cb,d){if(cb.checked)days.push(d);});
-      if(start<0||start>=1440||end<0||start===end||!days.length){drivingActive=i;drivingLocationButtons();settingStatus("driving","请检查第"+(i+1)+"组采集时段。");return;}
+      if(start<0||start>=1440||end<0||start===end||!days.length){drivingActive=i;drivingLocationButtons();settingStatus("driving","请检查第"+(i+1)+"组更新时间。");return;}
       windows.push({days:days,start:start,end:end});
     }
-    if(f.enabled.checked&&!windows.length){drivingActive=i;drivingLocationButtons();settingStatus("driving","启用的目的地至少需要一个采集时段。");return;}
+    if(f.enabled.checked&&!windows.length){drivingActive=i;drivingLocationButtons();settingStatus("driving","启用的目的地至少需要一个更新时间。");return;}
     groups.push({name:name,origin:f.origin.value.trim(),destination:f.destination.value.trim(),enabled:f.enabled.checked,windows:windows});
   }
   settingStatus("driving","保存中…");
@@ -783,7 +783,7 @@ function overviewLayout(){
 }
 function renderOverviewBus(v){
   var root=overviewRoots.bus,s=v.snapshot,t=v.trip,items=slotItems(s);
-  var labels={live:"实时预计到站",stale:"旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
+  var labels={live:"实时预计到站",stale:"旧数据",expired:"数据已过期",paused:"不在更新时间内",blocked:"接口限制访问",disabled:"公交自动更新已关闭",config_error:"公交配置错误",unconfigured:"请先设置公交",unverified:"正在核对线路",needs_selection:"站序变化，请重新选站",unavailable:"等待首次更新",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地更新服务异常"};
   var key=JSON.stringify([t,items.length,["live","stale","no_live_data"].indexOf(s.status)>=0]);
   if(key!==overviewKeys.bus){
     overviewKeys.bus=key;stopAge();clear(root);
@@ -909,7 +909,7 @@ function startOverview(){
 }
 
 function modeLabel(){
-  txt("modeStatus",automatic?"自动分时 · 按 NAS 采集时段":"手动显示 · 不自动切换模块");updateManagementLinks();
+  txt("modeStatus",automatic?"自动分时 · 按 NAS 更新时间":"手动显示 · 不自动切换模块");updateManagementLinks();
 }
 function manual(){
   if(!automatic)return;

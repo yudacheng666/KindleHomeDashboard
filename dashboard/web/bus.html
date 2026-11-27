@@ -55,6 +55,16 @@ small,.small,.muted,.menu-today,.menu-editor-note,.menu-save-feedback,.week-nav 
 .bus-slot-label,.bus-next .bus-slot-label,.bus-details,.bus-next .bus-details{font-size:18px;color:#222}
 .bus-next .bus-time{font-size:20px}
 @media(max-width:599px){.catalog-nav{width:100px}.week-nav button{padding:4px}}
+
+/* The first bus is the primary information; the following bus is a compact
+   secondary row, with the same aligned columns and complete timing semantics. */
+.bus-next{padding:4px 0}
+.bus-next .bus-slot-label{font-size:16px;line-height:1.25;margin:0 0 2px}
+.bus-next .eta{font-size:24px;line-height:1.2;font-weight:normal}
+.bus-next .eta.bus-state{font-size:18px}
+.bus-next .bus-time{font-size:16px;line-height:1.25;font-weight:normal;white-space:normal}
+.bus-next .bus-details{font-size:16px;line-height:1.25;margin-top:2px}
+@media(max-width:360px){.bus-next .eta{font-size:21px}.bus-next .eta.bus-state{font-size:17px}.bus-next .bus-time,.bus-next .bus-details,.bus-next .bus-slot-label{font-size:15px}}
 </style>
 </head>
 <body>
@@ -68,7 +78,7 @@ small,.small,.muted,.menu-today,.menu-editor-note,.menu-save-feedback,.week-nav 
 </div>
 <p id="message" role="status" aria-live="polite"></p>
 <div id="dashboard" class="hidden">
-<p><button id="refresh" type="button">刷新显示</button> <button id="settings" type="button">公交设置</button> <button id="scheduleSettings" type="button">采集时间设置</button> <button id="logout" type="button">退出</button></p>
+<p><button id="refresh" type="button">刷新显示</button> <button id="settings" type="button">公交设置</button> <button id="scheduleSettings" type="button">更新时间设置</button> <button id="logout" type="button">退出</button></p>
 <div id="view" class="panel" aria-live="polite">
 <p id="clock" class="small"></p><h2 id="line">尚未配置公交</h2><p id="trip"></p>
 <p id="status" class="notice">正在读取</p>
@@ -76,15 +86,15 @@ small,.small,.muted,.menu-today,.menu-editor-note,.menu-save-feedback,.week-nav 
 <p id="updated" class="small"></p>
 </div>
 <div id="scheduleConfig" class="panel hidden">
-<h2>公交采集设置</h2>
+<h2>公交更新时间</h2>
 <p class="small" id="scheduleZone"></p>
-<label for="scheduleEnabled">公交联网采集</label>
+<label for="scheduleEnabled">自动更新公交信息</label>
 <select id="scheduleEnabled"><option value="0">关闭</option><option value="1">开启</option></select>
-<p class="small">选择星期、开始和结束的小时及分钟。采用24小时制，结束可选24:00；结束早于开始表示跨午夜。仅在指定时段自动采集；手动线路搜索也会消耗本地额度。</p>
+<p class="small">选择星期、开始和结束的小时及分钟。采用24小时制，结束可选24:00；结束早于开始表示跨午夜。仅在指定时段自动更新；手动线路搜索也会消耗本地额度。</p>
 <div id="scheduleRows"></div>
 <button id="scheduleAdd" type="button">添加时段</button>
 <p id="scheduleStored" class="small"></p>
-<button id="scheduleSave" class="primary" type="button">保存采集设置</button>
+<button id="scheduleSave" class="primary" type="button">保存设置</button>
 <button id="scheduleCancel" type="button">取消 / 返回</button>
 <p id="scheduleMessage" role="status" aria-live="polite"></p>
 </div>

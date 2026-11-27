@@ -7,7 +7,7 @@ var lines=[], stops=[], handle="", lastKey="", timer=null, scheduleRows=[], sche
 function el(id){return document.getElementById(id);}
 function txt(id,value){var n=el(id);if(n.textContent!==value)n.textContent=value;}
 function show(id,visible){var n=el(id),c=visible?"":"hidden";if(n.className!==c)n.className=c;}
-function note(value){txt("message",value);}
+function note(value){txt("message",typeof location!=="undefined"&&location.pathname==="/admin/bus"&&value==="已保存。"?"":value);}
 function option(select,value,label){var n=document.createElement("option");n.value=String(value);n.textContent=label;select.appendChild(n);}
 function clear(n){while(n.firstChild)n.removeChild(n.firstChild);}
 function disable(value){
@@ -16,7 +16,7 @@ function disable(value){
   for(var i=0;i<ids.length;i++)el(ids[i]).disabled=value;
 }
 function errorMessage(code){
-  var messages={unauthorized:"令牌无效或没有管理权限。",provider_blocked:"公交服务已限制访问，停止请求。",local_budget_wait:"请求间隔或本地额度限制，请稍后手动重试。",bus_disabled:"公交采集未启用，请打开采集时间设置。",bus_config_error:"公交配置错误，采集已暂停，请检查采集时间设置或 Docker 日志。",local_request_gap:"请求过快，请等几秒再手动重试。",local_daily_limit:"已达到软件每日请求上限（UTC 日期），请次日再试；不是第三方额度。",provider_error:"公交接口暂不可用或未返回可识别结果。可尝试输入完整线路名称。",direction_unavailable:"接口未返回所选方向的有效站点，请核对线路方向后再试。",invalid_selection_or_request:"选择无效或已过期，请重新搜索。",service_error:"本地服务异常。"};
+  var messages={unauthorized:"令牌无效或没有管理权限。",provider_blocked:"公交服务已限制访问，停止请求。",local_budget_wait:"请求间隔或本地额度限制，请稍后手动重试。",bus_disabled:"公交自动更新已关闭，请打开更新时间设置。",bus_config_error:"公交配置错误，更新已暂停，请检查更新时间设置或 Docker 日志。",local_request_gap:"请求过快，请等几秒再手动重试。",local_daily_limit:"已达到软件每日请求上限（UTC 日期），请次日再试；不是第三方额度。",provider_error:"公交接口暂不可用或未返回可识别结果。可尝试输入完整线路名称。",direction_unavailable:"接口未返回所选方向的有效站点，请核对线路方向后再试。",invalid_selection_or_request:"选择无效或已过期，请重新搜索。",service_error:"本地服务异常。"};
   return messages[code]||"连接失败，请检查本机服务。";
 }
 function request(method,path,body,done){
@@ -102,7 +102,7 @@ function updateEta(rows,s,now){
     }
     var cls="bus-left eta"+(compact?" bus-state":"");
     if(row.eta.className!==cls)row.eta.className=cls;
-    slotSet(row.eta,label);slotSet(row.time,time);slotSet(row.stops,stops);slotSet(row.distance,distance);
+    slotSet(row.eta,label);slotSet(row.time,i===0?time:time.replace("\n"," "));slotSet(row.stops,stops);slotSet(row.distance,distance);
   });
   return valid;
 }
@@ -129,7 +129,7 @@ function render(data){
   if(!s){hideData("未取得有效数据");return;}
   txt("line",trip?trip.line.name:"尚未配置公交");
   txt("trip",trip?trip.boarding.name+" → "+trip.destination.name+" · "+(trip.destination_index-trip.board_index)+"站":"");
-  var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"非采集时段",blocked:"接口限制访问",disabled:"公交采集未启用",config_error:"公交配置错误，采集已暂停；请检查采集时间设置或 Docker 日志",unconfigured:"请先设置线路和站点",unverified:"正在核对保存的线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次采集",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地采集服务异常"};
+  var labels={live:"实时预计到站",stale:"数据暂未更新 · 以下为旧数据",expired:"数据已过期",paused:"不在更新时间内",blocked:"接口限制访问",disabled:"公交自动更新已关闭",config_error:"公交配置错误，更新已暂停；请检查更新时间设置或 Docker 日志",unconfigured:"请先设置线路和站点",unverified:"正在核对保存的线路",needs_selection:"站序已变化，请重新选站",unavailable:"等待首次更新",no_live_data:"暂未取得在途车辆信息",error:"接口请求失败",service_error:"本地更新服务异常"};
   var items=slotItems(s),key=JSON.stringify([trip,items.length]);
   if(key!==lastKey){lastKey=key;var root=el("vehicles");clear(root);etaRows=[];
     for(var i=0;i<items.length;i++)etaRows.push(buildSlot(root,i));
@@ -194,10 +194,10 @@ function addScheduleRow(w){
   remove.onclick=function(){if(busy)return;el("scheduleRows").removeChild(root);scheduleRows.splice(scheduleRows.indexOf(row),1);};
   root.appendChild(remove);scheduleRows.push(row);
 }
-function scheduleFeedback(message){txt("scheduleMessage",message);note(message);}
+function scheduleFeedback(message){txt("scheduleMessage",message);if(typeof location!=="undefined"&&location.pathname==="/admin/bus"&&message.indexOf("已保存并确认")>=0)note("");else note(message);}
 function storedSchedule(data){
   if(!data||typeof data.enabled!=="boolean"||!Array.isArray(data.windows))return false;
-  txt("scheduleStored","当前已保存："+(data.enabled?"开启（仅在指定时段采集）":"关闭"));
+  txt("scheduleStored","当前已保存："+(data.enabled?"开启（仅在指定时段更新）":"关闭"));
   return true;
 }
 function sameSchedule(a,b){
@@ -234,23 +234,23 @@ el("scheduleSave").onclick=function(){
     if(!days.length||start<0||start>=1440||end<0||end>1440||start===end){scheduleFeedback("保存失败：请为每个时段选择星期和有效时间。");return;}
     windows.push({days:days,start:start,end:end});
   }
-  if(enabled&&!windows.length){scheduleFeedback("未保存：开启公交前请至少添加一个采集时段。");return;}
+  if(enabled&&!windows.length){scheduleFeedback("未保存：开启公交前请至少添加一个更新时间。");return;}
   var expected={enabled:enabled,windows:windows};
-  txt("scheduleMessage","正在保存采集设置…");
+  txt("scheduleMessage","正在保存设置…");
   request("POST","/api/bus/schedule",expected,function(ok,data){
-    if(!ok){scheduleFeedback("未能确认保存："+errorMessage(data.error)+" 请重新打开采集设置核对。");return;}
+    if(!ok){scheduleFeedback("未能确认保存："+errorMessage(data.error)+" 请重新打开更新设置核对。");return;}
     var acknowledged=sameSchedule(data,expected);
     txt("scheduleMessage","正在核对已保存设置…");
     request("GET","/api/bus/schedule",null,function(readOk,actual){
       if(!readOk||!storedSchedule(actual)){
         txt("scheduleStored","当前保存状态未确认");
-        scheduleFeedback("已提交，但未能读取确认结果。请重新打开采集设置核对。");return;
+        scheduleFeedback("已提交，但未能读取确认结果。请重新打开更新设置核对。");return;
       }
       if(!acknowledged||!sameSchedule(actual,expected)){
         scheduleFeedback("保存结果与所选设置不一致；请核对当前已保存状态后重试。");return;
       }
       el("scheduleEnabled").value=actual.enabled?"1":"0";
-      scheduleFeedback("采集设置已保存并确认："+(actual.enabled?"开启。仅在设定时段采集。":"关闭。"));
+      scheduleFeedback("设置已保存并确认："+(actual.enabled?"开启。仅在设定时段更新。":"关闭。"));
     });
   });
 };
