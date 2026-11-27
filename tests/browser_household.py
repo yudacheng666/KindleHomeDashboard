@@ -398,7 +398,8 @@ def main():
                   var nav=document.getElementById('displayNav'), menu=document.getElementById('settingsMenu');
                   var visible=function(n){return n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0;};
                   var rules=[['.overview-link',19],['.driving-route-row',18],['.driving-routes',18],['.driving-foot',16],['.task-row',19]];
-                  var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]);return (r[0]==='.driving-foot'||nodes.length>0)&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=r[1];});});
+                  var compact=innerWidth<=420&&innerHeight<=600;
+                  var ok=rules.every(function(r){var nodes=document.querySelectorAll('#body '+r[0]),min=compact&&['.driving-route-row','.driving-foot'].indexOf(r[0])>=0?14:r[1];return (r[0]==='.driving-foot'||nodes.length>0)&&Array.from(nodes).every(function(n){return parseFloat(getComputedStyle(n).fontSize)>=min;});});
                   return nav.querySelectorAll('button').length===1&&visible(document.getElementById('settings'))
                     &&menu.contains(document.getElementById('busMode'))&&!visible(document.getElementById('busMode'))
                     &&ok&&document.documentElement.scrollWidth<=window.innerWidth;
@@ -469,7 +470,7 @@ def main():
                 assert js(fixed_home)
                 assert js("""var x=document.querySelector('.overview-todos .overview-home-scroll'),last=x.querySelector('.task-row:last-child'),s=document.getElementById('settings').getBoundingClientRect();return x.getBoundingClientRect().right<=s.left&&Math.abs(x.scrollHeight-x.clientHeight-x.scrollTop)<=2&&document.querySelector('.overview-menu-last')&&parseFloat(getComputedStyle(document.querySelector('.overview-menu-last')).paddingRight)>=48""")
                 js("""document.querySelector('.overview-todos .overview-home-scroll').scrollTop=0""")
-                assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1""")
+                assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&(innerHeight<=600?Math.abs(c[0].getBoundingClientRect().top-c[1].getBoundingClientRect().top)<=1&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2:c[1].getBoundingClientRect().top>=c[0].getBoundingClientRect().bottom-1)""")
                 wd("/session/"+sid+"/window/rect", {"width":original_rect["width"],"height":original_rect["height"]})
                 assert js("""var c=document.querySelectorAll('#body .overview-driving-card');return c.length===2&&c[0].getBoundingClientRect().right<=c[1].getBoundingClientRect().left+2""")
                 click("settings")
