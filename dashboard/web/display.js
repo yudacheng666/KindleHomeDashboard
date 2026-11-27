@@ -70,7 +70,7 @@ function updateManagementLinks(){
   el("manageLink").href="/bus#return-"+target;
   ["tasks","posters","menus","catalog","display"].forEach(function(t){el(t+"Manage").href="/home#"+t+"/return-"+target;});
 }
-function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();else fitOverviewBusHeading();}
+function panel(open){settingsOpen=open;show("settingsPanel",open);show("displayNav",!open);show("displayContent",!open);show("weatherDisplayControls",open&&(mode==="weather"||mode==="overview")&&weatherPages.length>1);if(open)updateManagementLinks();else fitOverviewViewport();}
 function taskDateLabel(day,today){
   var d=new Date(day+"T00:00:00Z"),base=new Date(today+"T00:00:00Z");
   var label=(day.slice(0,4)===today.slice(0,4)?"":day.slice(0,4)+"/")+day.slice(5).replace("-","/");
@@ -856,7 +856,7 @@ function overviewLink(root,label,action){
 }
 function stopOverview(){
   Object.keys(overviewTimers).forEach(function(k){clearTimeout(overviewTimers[k]);});
-  if(overviewRoots.clock)clear(el("date"));
+  if(overviewRoots.clock){clear(el("date"));[overviewRoots.todoScroll,overviewRoots.menuScroll].forEach(stopOverviewScroll);}
   overviewTimers={};overviewPending={};overviewRoots={};overviewKeys={};overviewDay="";
   clear(el("overviewWeather"));show("overviewWeather",false);el("displayHeader").className="";el("displayNav").setAttribute("data-overview","false");
 }
@@ -870,11 +870,33 @@ function overviewLayout(){
   overviewRoots.driving=append(root,"div","","overview-driving");
   overviewRoots.home=append(root,"div","","overview-home");
   stopAge();overviewBusShell(null,"正在读取");
-  ["weather","driving","home"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
+  ["weather","driving"].forEach(function(k){append(overviewRoots[k],"p","正在读取","note");});
+  overviewHomeColumns("正在读取");
   txt("heading","");txt("index","");
 }
 // Measure rendered text rather than character count: mixed CJK/Latin station names
 // have different widths. Refit only when the available width or text changes.
+function stopOverviewScroll(n){
+  if(!n)return;clearTimeout(n._scrollIdle);n._scrollIdle=null;n.onscroll=null;n.setAttribute("data-scrolling","false");
+}
+function bindOverviewScroll(n){
+  n.setAttribute("data-scrolling","false");
+  n.onscroll=function(){
+    if(n.scrollHeight<=n.clientHeight)return;
+    n.setAttribute("data-scrolling","true");
+    clearTimeout(n._scrollIdle);
+    n._scrollIdle=setTimeout(function(){n.setAttribute("data-scrolling","false");n._scrollIdle=null;},900);
+  };
+}
+function fitOverviewViewport(){
+  fitOverviewBusHeading();
+  var c=el("displayContent"),d=overviewRoots.driving,h=overviewRoots.home;
+  if(!d||!h||!d.style||!h.style||!c.clientHeight||!c.getBoundingClientRect)return;
+  // Driving stays in the ordinary document flow: no inner scroll, no forced
+  // height and no clipping. Only the household lists use the remaining space.
+  // The bus budget and hence the driving start are unchanged.
+  h.style.height=Math.max(0,Math.floor(c.getBoundingClientRect().bottom-8-d.getBoundingClientRect().bottom))+"px";
+}
 function fitOverviewBusHeading(){
   var h=overviewRoots.busHeader,n=overviewRoots.busName,d=overviewRoots.busDirection;
   if(!h||!n||!d||!d.style||!h.clientWidth)return;
@@ -927,6 +949,7 @@ function renderOverviewWeather(){
   weatherPages.forEach(function(p){var a=p.sections&&p.sections.alerts;
     if(a&&a.status==="available"&&a.data.length)a.data.forEach(function(x){append(root,"p",(p.name||"")+"："+(x.type==="cancel"?"解除信息 · ":"")+x.headline,"weather-alert");});
   });
+  fitOverviewViewport();
 }
 function acceptOverviewWeather(v){
   var next=[{name:v.name,status:v.status,sections:v.sections}];
@@ -946,45 +969,90 @@ function renderOverviewDriving(v){
     var link=overviewLink(root,"另 "+(v.groups.length-2)+" 个目的地",function(){switchMode("driving");});link.className+=" overview-driving-link";
   }
 }
+function overviewHomeTitle(root,label,section){
+  var link=overviewLink(root,label,function(){switchSection(section);});
+  link.className+=" overview-home-title";return link;
+}
+function overviewHomeColumns(message){
+  if(!overviewRoots.todos){
+    var root=overviewRoots.home;clear(root);
+    overviewRoots.todos=append(root,"section","","overview-todos");
+    overviewRoots.menu=append(root,"section","","overview-menu");
+    overviewRoots.todoTitle=overviewHomeTitle(overviewRoots.todos,"待办","tasks");
+    overviewRoots.menuTitle=overviewHomeTitle(overviewRoots.menu,"菜单","menus");
+    overviewRoots.todoScroll=append(overviewRoots.todos,"div","","overview-home-scroll");
+    overviewRoots.menuScroll=append(overviewRoots.menu,"div","","overview-home-scroll");
+    overviewRoots.todoScroll.setAttribute("tabindex","0");overviewRoots.menuScroll.setAttribute("tabindex","0");
+    overviewRoots.todoScroll.setAttribute("aria-label","待办列表");overviewRoots.menuScroll.setAttribute("aria-label","菜单列表");
+    bindOverviewScroll(overviewRoots.todoScroll);bindOverviewScroll(overviewRoots.menuScroll);
+  }
+  if(message){
+    overviewRoots.todoTitle.textContent="待办";overviewRoots.menuTitle.textContent="菜单";
+    clear(overviewRoots.todoScroll);clear(overviewRoots.menuScroll);
+    append(overviewRoots.todoScroll,"p",message,"note");
+    append(overviewRoots.menuScroll,"p",message,"note overview-menu-last");
+  }
+}
 function renderOverviewHome(v){
   overviewDay=v.date;data=v;paintAge();
   var tasks=Array.isArray(v.upcoming_tasks)?v.upcoming_tasks:v.tasks;
-  var key=JSON.stringify([v.date,tasks,v.can_complete]);if(key===overviewKeys.home)return;
-  overviewKeys.home=key;var root=overviewRoots.home;clear(root);
-  var todoRoot=append(root,"section","","overview-todos");
-  function todoLink(heading){
-    var label=tasks.length>3?"待办（"+tasks.length+"）":"待办";
-    var link=overviewLink(heading,label,function(){switchSection("tasks");});link.className+=" overview-todo-link";
-    link.title=tasks.length>3?"全部待办（"+tasks.length+"）":"待办清单";
-    return link;
+  var key=JSON.stringify([v.date,tasks,v.can_complete]),todoRoot=overviewRoots.todoScroll;
+  if(key!==overviewKeys.todos){
+    overviewKeys.todos=key;var todoTop=todoRoot.scrollTop||0;clear(todoRoot);
+    overviewRoots.todoTitle.textContent=tasks.length>3?"待办（"+tasks.length+"）":"待办";
+    overviewRoots.todoTitle.title="待办清单";
+    var last="",dayGroup;
+    tasks.forEach(function(t){
+      var day=t.occurrence||v.date;
+      if(day!==last){
+        last=day;dayGroup=append(todoRoot,"section","","task-day");
+        var l=taskDateLabel(day,v.date),h=append(dayGroup,"h3",l.label,"task-date");
+        if(day<v.date)append(h,"span","逾期","task-date-tag");else if(l.tag)append(h,"span",l.tag,"task-date-tag");
+      }
+      var row=append(dayGroup,"div","","task-row"),action=append(row,"span","","overview-task-marker");
+      if(v.can_complete===true&&day<=v.date){
+        var button=append(action,"button","○","task-complete overview-task-circle");
+        button.type="button";button.setAttribute("aria-label","完成待办");button.title="完成待办";
+        button.onclick=function(){completeTask(t,v.date,button);};
+      }else append(action,"span","○","overview-task-inactive");
+      append(row,"span",t.title,"task-text");
+    });
+    if(!tasks.length)append(todoRoot,"p","暂无待办","note");
+    todoRoot.scrollTop=todoTop;
   }
-  var last="",dayGroup;
-  tasks.slice(0,3).forEach(function(t){
-    var day=t.occurrence||v.date;
-    if(day!==last){
-      var first=!last;last=day;dayGroup=append(todoRoot,"section","","task-day");
-      var header=first?append(dayGroup,"div","","overview-todo-heading"):dayGroup,l=taskDateLabel(day,v.date),h=append(header,"h3",l.label,"task-date");
-      if(day<v.date)append(h,"span","逾期","task-date-tag");else if(l.tag)append(h,"span",l.tag,"task-date-tag");
-      if(first)todoLink(header);
-    }
-    var row=append(dayGroup,"div","","task-row");append(row,"span",t.title,"task-text");
-    if(v.can_complete===true&&day<=v.date){
-      var action=append(row,"span","","task-action"),button=append(action,"button","完成","task-complete");
-      button.type="button";button.onclick=function(){completeTask(t,v.date,button);};
-    }
-  });
-  if(!tasks.length){
-    var emptyHeading=append(todoRoot,"div","","overview-todo-heading");
-    append(emptyHeading,"span","暂无待办","note");todoLink(emptyHeading);
+  var next=new Date(v.date+"T00:00:00Z");next.setUTCDate(next.getUTCDate()+1);
+  var tomorrow=isNaN(next.getTime())?"":next.toISOString().slice(0,10);
+  var meals=v.week_menu.filter(function(m){return m.day===v.date||m.day===tomorrow;});
+  var includeTomorrow=!!tomorrow&&(meals.some(function(m){return m.day===tomorrow;})||!!(v.menu_range&&v.menu_range.first<=tomorrow&&v.menu_range.last>=tomorrow));
+  var menuKey=JSON.stringify([v.date,meals,includeTomorrow]);
+  if(menuKey!==overviewKeys.menu){
+    overviewKeys.menu=menuKey;var menuRoot=overviewRoots.menuScroll,menuTop=menuRoot.scrollTop||0;clear(menuRoot);
+    var names={breakfast:"早餐",lunch:"午餐",dinner:"晚餐"},order={breakfast:0,lunch:1,dinner:2},lastMenu=null;
+    (includeTomorrow?[v.date,tomorrow]:[v.date]).forEach(function(day){
+      var entries=meals.filter(function(m){return m.day===day;});
+      if(day===v.date&&!entries.length)return;
+      var group=append(menuRoot,"section","","menu-day");lastMenu=group;
+      append(group,"h3",day.slice(5).replace("-","/")+" "+(day===v.date?"今日":"明日"),"menu-date");
+      entries.sort(function(a,b){return order[a.meal]-order[b.meal];}).forEach(function(m){
+        var row=append(group,"div","","menu-meal");append(row,"span",names[m.meal],"menu-meal-label");append(row,"span",m.dishes.join("、"),"menu-dishes");
+      });
+      if(!entries.length)append(group,"p","暂无菜单","note");
+    });
+    if(lastMenu)lastMenu.className+=" overview-menu-last";
+    else append(menuRoot,"p","暂无菜单","note overview-menu-last");
+    menuRoot.scrollTop=menuTop;
   }
 }
 function overviewFailure(k,status){
   if(k==="bus"){stopAge();serverBase=NaN;paintAge();delete overviewKeys.bus;overviewBusShell(null,status===404?"模块未启用":"暂不可用，旧内容已隐藏");return;}
   if(k==="weather"){weatherPages=[];weatherOrder="";weatherCursor=0;stopRotation();show("weatherDisplayControls",false);}
-  if(k==="home"){data=null;overviewDay="";paintAge();}
+  if(k==="home"){
+    data=null;overviewDay="";paintAge();delete overviewKeys.todos;delete overviewKeys.menu;
+    overviewHomeColumns(status===404?"模块未启用":"暂不可用，旧内容已隐藏");return;
+  }
   delete overviewKeys[k];var root=overviewRoots[k];clear(root);
-  var names={bus:"公交",weather:"天气",driving:"驾驶",home:"待办"};
-  overviewLink(root,names[k],function(){if(k==="home")switchSection("tasks");else switchMode(k);});
+  var names={bus:"公交",weather:"天气",driving:"驾驶"};
+  overviewLink(root,names[k],function(){switchMode(k);});
   append(root,"p",status===404?"模块未启用":"暂不可用，旧内容已隐藏","note");
 }
 function requestOverview(k){
@@ -1005,7 +1073,7 @@ function requestOverview(k){
       if(status===404||status===503||el("login").className==="hidden"){show("login",false);show("display",true);}
       else txt("status","连接异常，请检查 NAS 网络");
     }
-    fitOverviewBusHeading();
+    fitOverviewViewport();
     overviewTimers[k]=setTimeout(function(){requestOverview(k);},interval);
   }
   try{x.open("GET","/api/"+k+"/view",true);if(token!=="local-direct")x.setRequestHeader("Authorization","Bearer "+token);
@@ -1113,7 +1181,7 @@ el("cancel").onclick=closeSettings;
 el("logout").onclick=function(){if(canLeaveSettings())reset();};
 ["manageLink","tasksManage","postersManage","menusManage","catalogManage","displayManage","desktopAdminLink"].forEach(function(id){el(id).onclick=canLeaveSettings;});
 if(window.addEventListener){
-  window.addEventListener("resize",fitOverviewBusHeading,false);
+  window.addEventListener("resize",fitOverviewViewport,false);
   window.addEventListener("pagehide",function(){
     var keep=direct&&!autoEntry&&!automatic&&mode==="family"&&!!token;
     if(keep)rememberResume();

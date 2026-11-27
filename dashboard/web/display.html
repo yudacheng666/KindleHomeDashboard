@@ -138,16 +138,33 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .overview-driving-card .driving-fast{font-size:18px;font-weight:bold}
 .overview-page .overview-driving-card .driving-foot{font-size:16px;line-height:1.2;margin:2px 0;word-wrap:break-word}
 .overview-driving-link{display:block;min-height:27px;font-size:16px;line-height:1.2;margin:1px 0}
-.overview-home{border-top:1px solid #555}
-.overview-todos{padding:3px 0 0;margin:0}
-.overview-todo-heading{line-height:1.25}
-.overview-todo-heading .overview-todo-link{display:inline-block;min-height:28px;font-size:19px;margin:0 0 0 8px;vertical-align:baseline;white-space:nowrap}
-.overview-todo-heading .task-date{display:inline-block;margin:0;vertical-align:baseline}
-.overview-todo-heading .note{display:inline;margin:0}
-/* Reserve only the lower-right corner, never an entire footer row.
-   The final date group contains at least 44px of text/controls or natural space. */
-.overview-page .overview-todos .task-day:last-child,.overview-todos>.overview-todo-heading{box-sizing:border-box;min-height:44px;padding-right:48px;word-wrap:break-word}
-.overview-home>.note{min-height:44px;margin-right:48px}
+.overview-home{position:relative;box-sizing:border-box;border-top:1px solid #555;width:100%;overflow:hidden}
+.overview-todos,.overview-menu{position:absolute;top:0;bottom:0;width:50%;box-sizing:border-box;margin:0;padding:3px 6px 0 0;word-wrap:break-word;overflow:hidden}
+.overview-todos{left:0}
+.overview-menu{left:50%;border-left:1px solid #555;padding:3px 0 0 6px}
+.overview-home-scroll{position:absolute;top:29px;bottom:0;left:0;right:6px;overflow-y:auto;overflow-x:hidden;outline:none;overscroll-behavior:contain}
+.overview-menu .overview-home-scroll{left:6px;right:0}
+.overview-driving{box-sizing:border-box;overflow:visible}
+#displayHeader.overview-header{max-height:96px;overflow-y:auto;overflow-x:hidden}
+.overview-home-scroll{scrollbar-width:thin;scrollbar-color:transparent transparent}
+.overview-home-scroll::-webkit-scrollbar{width:4px}
+.overview-home-scroll::-webkit-scrollbar-thumb{background:transparent}
+.overview-home-scroll[data-scrolling="true"]{scrollbar-color:#777 transparent}
+.overview-home-scroll[data-scrolling="true"]::-webkit-scrollbar-thumb{background:#777}
+#displayHeader.overview-header{scrollbar-width:none}
+#displayHeader.overview-header::-webkit-scrollbar{display:none;width:0;height:0}
+.overview-task-marker{display:table-cell;width:30px;vertical-align:middle;text-align:left}
+.overview-page .overview-task-marker .overview-task-circle{border:0;background:white;font-size:22px;line-height:1;min-height:32px;width:30px;padding:0;text-align:left;color:#111}
+.overview-task-inactive{font-size:22px;color:#aaa}
+.overview-page .overview-todos .task-text{padding-right:0}
+.overview-page .overview-home-title{display:block;min-height:26px;padding:0;margin:0;font-size:19px;text-align:left}
+.overview-page .overview-menu .menu-day{padding:3px 0;border-bottom:1px solid #777}
+.overview-page .overview-menu .menu-date{font-size:19px;line-height:1.2;margin:0 0 2px}
+.overview-page .overview-menu .menu-meal{display:block;padding:1px 0;line-height:1.25;word-wrap:break-word}
+.overview-page .overview-menu .menu-meal-label,.overview-page .overview-menu .menu-dishes{display:inline;font-size:19px;white-space:normal}
+.overview-page .overview-menu .menu-meal-label{margin-right:4px;font-size:16px}
+/* Only the last group in the right column reserves the floating gear width. */
+.overview-page .overview-menu .overview-menu-last{box-sizing:border-box;min-height:44px;padding-right:48px;border-bottom:0;word-wrap:break-word}
 .overview-page .task-day{padding:3px 0;border-bottom:1px solid #777}
 .overview-todos .task-day:last-child{border-bottom:0}
 .overview-page .task-date{font-size:19px;line-height:1.2;margin:0 0 2px}
@@ -155,7 +172,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .task-action{width:56px}
 .overview-page .task-complete{font-size:16px;padding:1px 4px;min-height:36px}
 /* Overview header shares the date area; keep the dedicated weather page unchanged. */
-#displayHeader.overview-header{overflow:hidden}
+/* Header remains scrollable for unusually long weather alerts. */
 #display{position:relative}
 #displayNav .settings-icon{display:none}
 #displayNav[data-overview="true"]{position:fixed;right:4px;bottom:4px;float:none;margin:0;z-index:2}
@@ -164,7 +181,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 #displayNav[data-overview="true"] .settings-icon{display:block;width:26px;height:26px;margin:0 auto}
 /* Use the entire viewport, including the row beside the floating gear.
    Fixed edges avoid vh/calc dependency on older Kindle WebKit. */
-#displayNav[data-overview="true"] + #displayContent{position:fixed;top:4px;right:4px;bottom:4px;left:4px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;padding-bottom:4px}
+#displayNav[data-overview="true"] + #displayContent{position:fixed;top:4px;right:4px;bottom:4px;left:4px;box-sizing:border-box;overflow:hidden;padding-bottom:4px}
 #displayHeader.overview-header #headerRow{display:table;width:100%;table-layout:fixed}
 #displayHeader.overview-header #date{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 6px 2px 0;min-height:0;line-height:1.2;text-align:left;white-space:pre-line;word-wrap:break-word}
 #displayHeader.overview-header #overviewWeather{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;padding:2px 0 2px 6px;border-left:1px solid #aaa;text-align:left;word-wrap:break-word}
@@ -178,7 +195,7 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 }
 #overviewWeather .weather-alert{font-size:16px;line-height:1.2;margin:2px 0;padding:2px}
 #overviewWeather .note{font-size:17px;margin:2px 0}
-.overview-bus{box-sizing:border-box;height:149px;border-top:1px solid #555;padding:2px 0}
+.overview-bus{box-sizing:border-box;height:139px;margin-top:10px;border-top:1px solid #555;padding:2px 0}
 .overview-bus .overview-link{display:block;width:100%;height:26px;min-height:26px;line-height:26px;padding:0;white-space:nowrap;overflow:hidden}
 .overview-bus-name,.overview-bus-direction{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;word-wrap:normal}
 .overview-bus-direction{font-size:17px;font-weight:normal;color:#333}
@@ -187,8 +204,8 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
 .overview-page .overview-bus-status{font-size:16px}
 .overview-bus-eta{height:32px;line-height:32px;overflow:auto}
 .overview-bus-time,.overview-page .overview-bus-details{box-sizing:border-box;max-height:20px;line-height:20px;margin:0;overflow:auto}
-@media(max-width:420px){.overview-bus{height:170px}}
-@media(max-width:360px){.overview-bus{height:210px}.overview-bus-time,.overview-page .overview-bus-details{max-height:40px}}
+@media(max-width:420px){.overview-bus{height:160px}}
+@media(max-width:360px){.overview-bus{height:200px}.overview-bus-time,.overview-page .overview-bus-details{max-height:40px}}
 .overview-bus-slots{display:table;width:100%;table-layout:fixed}
 .overview-bus-slots .overview-bus-slot{display:table-cell;width:50%;box-sizing:border-box;vertical-align:top;border-bottom:0;padding:2px 5px 2px 0}
 .overview-bus-slots .overview-bus-slot+.overview-bus-slot{border-left:1px solid #aaa;padding:2px 0 2px 6px}
@@ -205,8 +222,34 @@ h1{font-size:30px;margin:4px 0}h2{font-size:24px}
   .overview-page .overview-driving-card{display:block;width:100%;padding:3px 0;border:0}
   .overview-page .overview-driving-card+.overview-driving-card{padding:3px 0;border-left:0;border-top:1px solid #aaa}
   .overview-page .overview-driving-card h2{min-height:0}
-  .overview-driving-map{height:150px}
-  .overview-driving-map img{max-height:150px}
+  /* Short narrow previews: stack destination cards, but keep their maps
+     next to route text so both destinations remain visible without scrolling. */
+  .overview-driving-pair{display:table;width:100%;table-layout:fixed}
+  .overview-driving-map{display:table-cell;width:33%;height:90px;vertical-align:middle}
+  .overview-driving-map img{max-height:90px}
+  .overview-driving-routes{display:table-cell;width:67%;vertical-align:middle;padding-left:4px}
+  .overview-driving-card .driving-route-number{width:1.1em}
+  .overview-driving-card .driving-route-time{width:5em}
+  .overview-driving-card .driving-route-distance{white-space:normal}
+}
+
+/* Very short phone/browser previews are not the Kindle portrait target.
+   Keep both maps and all route rows visible without a driving scroll region. */
+@media(max-width:420px) and (max-height:600px){
+  .overview-driving-grid{display:table;table-layout:fixed}
+  .overview-page .overview-driving-card{display:table-cell;width:50%;padding:2px 4px 2px 0;vertical-align:top}
+  .overview-page .overview-driving-card+.overview-driving-card{padding:2px 0 2px 4px;border-top:0;border-left:1px solid #555}
+  .overview-page .overview-driving-card h2{font-size:16px;line-height:1.15}
+  .overview-driving-pair{display:block}
+  .overview-driving-map{display:block;width:100%;height:60px;padding:0}
+  .overview-driving-map img{max-height:60px}
+  .overview-driving-map .driving-reverse{bottom:3px;width:28px;height:26px;line-height:24px;font-size:18px}
+  .overview-driving-routes{display:block;width:100%;padding:0}
+  .overview-page .overview-driving-card .driving-route-row{font-size:14px;line-height:1.15;margin:0}
+  .overview-driving-card .driving-route-number{width:1em}
+  .overview-driving-card .driving-route-time{width:5.1em}
+  .overview-driving-card .driving-foot{font-size:14px;line-height:1.15}
+  .overview-driving-link{min-height:21px;line-height:1.15;font-size:16px}
 }
 
 #settingsPanel{max-width:960px;margin:0 auto;padding:12px;color:#1f2937;font:16px/1.5 sans-serif;background:#f5f6f8}
