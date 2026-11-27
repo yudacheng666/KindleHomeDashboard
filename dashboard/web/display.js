@@ -366,7 +366,7 @@ function renderWeather(){
     var today=s.daily&&s.daily.status==="available"&&s.daily.data.length?s.daily.data[0]:null;
     if(today)append(root,"p","今日 "+weatherNum(today.min,"°")+" / "+weatherNum(today.max,"°"),"weather-summary");
     append(root,"p","体感 "+weatherNum(c.feels,"°C")+" · 湿度 "+weatherNum(c.humidity,"%")+" · 风速 "+weatherNum(c.wind," "+(c.wind_unit||"")),"weather-summary");
-    append(root,"p","观测 "+weatherTime(c.time),"weather-foot");weatherSource(groups,current,"实时");
+    weatherSource(groups,current,"实时");
   }else append(root,"p","当前天气暂不可用","note");
   var air=s.air;
   if(air&&air.status==="available"){
@@ -805,7 +805,6 @@ function renderOverviewWeather(){
   else if(c&&c.status==="available"){
     append(root,"p",weatherNum(c.data.temp,"°")+"　"+c.data.text,"weather-main");
     append(root,"p","体感 "+weatherNum(c.data.feels,"°")+" · 湿度 "+weatherNum(c.data.humidity,"%"),"weather-summary");
-    append(root,"p","观测 "+weatherTime(c.data.time),"weather-foot");
   }else append(root,"p","当前天气暂不可用","note");
   weatherPages.forEach(function(p){var a=p.sections&&p.sections.alerts;
     if(a&&a.status==="available"&&a.data.length)a.data.forEach(function(x){append(root,"p",(p.name||"")+"："+(x.type==="cancel"?"解除信息 · ":"")+x.headline,"weather-alert");});
