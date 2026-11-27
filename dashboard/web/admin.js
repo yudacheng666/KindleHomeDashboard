@@ -65,9 +65,9 @@ var modeLabel=make(controls,"label","预览内容"),mode=make(modeLabel,"select"
 function field(label,id,value,min,max){var l=make(controls,"label",label),n=make(l,"input");n.id=id;n.type="number";n.min=min;n.max=max;n.step="1";n.value=value;return n;}
 var width=field("宽度（CSS px）","previewWidth",480,240,1600),height=field("高度（CSS px）","previewHeight",640,240,2400);
 var actions=make(preview,"div",null,"admin-preview-actions"),fit=true,device=true,frame=null,w=480,h=640,follow=true;
-var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});
-var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){width.value="480";height.value="640";mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});
-var apply=button(actions,"应用尺寸",function(){var nw=Number(width.value),nh=Number(height.value);if(!validSize(nw,nh))return;w=nw;h=nh;resize();});
+var fitButton=button(actions,"适应区域",function(){fit=true;resize();},"primary"),oneButton=button(actions,"原始 1:1",function(){fit=false;resize();});fitButton.id="previewFit";oneButton.id="previewOne";
+var appearance=button(actions,"设备外观",function(){device=!device;resize();}),defaults=button(actions,"恢复默认",function(){width.value="480";height.value="640";mode.value="follow";follow=true;fit=true;device=true;loadFrame(moduleMode());resize();});appearance.id="previewAppearance";defaults.id="previewDefaults";
+var apply=button(actions,"应用尺寸",function(){var nw=Number(width.value),nh=Number(height.value);if(!validSize(nw,nh))return;w=nw;h=nh;resize();});apply.id="previewApply";
 var feedback=make(preview,"p","","admin-preview-error");feedback.id="previewFeedback";feedback.setAttribute("role","status");
 var stage=make(preview,"div",null,"admin-preview-stage"),wrap=make(stage,"div",null,"admin-preview-wrap"),shellDevice=make(wrap,"div",null,"admin-preview-device"),screen=make(shellDevice,"div",null,"admin-preview-screen"),brandMark=make(shellDevice,"span","kindle","admin-preview-brand");
 stage.id="previewStage";shellDevice.id="previewDevice";screen.id="previewScreen";brandMark.setAttribute("aria-hidden","true");
