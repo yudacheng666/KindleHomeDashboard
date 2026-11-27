@@ -669,14 +669,15 @@ def main():
                 from dataclasses import replace
                 live_snapshot=bus.poller.last
                 wd("/session/"+sid+"/window/rect", {"width":480,"height":640})
-                def overview_bus_geometry():
-                    go("/display#overview")
-                    wait(lambda:js("return document.querySelectorAll('#body .overview-bus-slot').length===2 && !!document.querySelector('#body .overview-bus-status') && !!document.querySelector('#body .overview-driving-card')"))
+                def overview_bus_geometry(expected):
+                    click("busMode")
+                    click("overviewMode")
+                    wait(lambda:js("return document.querySelectorAll('#body .overview-bus-slot').length===2 && !!document.querySelector('#body .overview-bus-status') && !!document.querySelector('#body .overview-driving-card') && document.querySelector('#body .overview-bus').textContent.indexOf(arguments[0])>=0", [expected]))
                     return js("""var b=document.querySelector('.overview-bus'),d=document.querySelector('.overview-driving');return [b.getBoundingClientRect().height,d.getBoundingClientRect().top-b.getBoundingClientRect().top,...Array.from(b.querySelectorAll('.overview-bus-eta,.overview-bus-time,.overview-bus-details')).map(n=>n.getBoundingClientRect().height)]""")
-                baseline=overview_bus_geometry()
-                for state in [replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),replace(live_snapshot,status="stale"),replace(live_snapshot,status="expired",vehicles=(),departure_plans=())]:
+                baseline=overview_bus_geometry("预计")
+                for state,expected in [(replace(live_snapshot,vehicles=live_snapshot.vehicles[:1],scheduled_departures=1,departure_plans=({"time":"23:59","imminent":False},)),"计划"),(replace(live_snapshot,vehicles=(),scheduled_departures=0,departure_plans=()),"暂无车辆"),(replace(live_snapshot,status="stale"),"数据未更新"),(replace(live_snapshot,status="expired",vehicles=(),departure_plans=()),"数据已过期")]:
                     bus.poller.last=state
-                    assert overview_bus_geometry()==baseline
+                    assert overview_bus_geometry(expected)==baseline
                 bus.poller.last=live_snapshot
                 # Use the existing cache, not a new upstream request.
                 bus.poller.last=replace(bus.poller.last, vehicles=bus.poller.last.vehicles[:1],
